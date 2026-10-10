@@ -1,4 +1,6 @@
-# ExposureIQ
+# ExposureIQ <img src="assets/branding/icon-tight.svg" height="25" alt="ExposureIQ logo">
+
+![ExposureIQ](./assets/branding/banner.png)
 
 **Discover your attack surface. Track what changes. Turn findings into reports.**
 
