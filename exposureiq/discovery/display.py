@@ -1,4 +1,3 @@
-
 def print_ports(ports: list[dict]) -> None:
     """Display discovered open ports in a readable table."""
     if not ports:

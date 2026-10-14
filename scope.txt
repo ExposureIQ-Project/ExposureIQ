@@ -1,4 +1,4 @@
-﻿# ExposureIQ authorized scan targets
+# ExposureIQ authorized scan targets
 # One exact hostname, IP address, or explicitly authorized CIDR range per line.
 # Add only targets approved for this project.
 

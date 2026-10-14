@@ -1,4 +1,4 @@
-﻿import ipaddress
+import ipaddress
 from pathlib import Path
 
 
@@ -25,7 +25,8 @@ def is_in_scope(target: str) -> bool:
         return True
 
     try:
-        entries = SCOPE_FILE.read_text(encoding="utf-8").splitlines()
+        # utf-8-sig also accepts a file saved with a hidden BOM mark (common on Windows).
+        entries = SCOPE_FILE.read_text(encoding="utf-8-sig").splitlines()
     except FileNotFoundError:
         return False
 
