@@ -1,0 +1,6 @@
+# ExposureIQ authorized scan targets
+# One exact hostname, IP address, or explicitly authorized CIDR range per line.
+# Add only targets approved for this project.
+
+127.0.0.1
+localhost
