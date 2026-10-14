@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exposureiq"
+version = "0.1.0"
+description = "Open-source attack surface discovery: subdomains, IP addresses, change tracking and reports."
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28",
+    "dnspython>=2.3",
+    "rich>=13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+exposureiq = "exposureiq.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["exposureiq*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
