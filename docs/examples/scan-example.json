@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.1",
+  "scan_id": "2026-10-13T20-15-00Z",
+  "target": "example.com",
+  "started_at": "2026-10-13T20:15:00Z",
+  "assets": [
+    {
+      "host": "api.example.com",
+      "ips": [
+        {
+          "ip": "203.0.113.10",
+          "open_ports": [
+            {
+              "port": 443,
+              "protocol": "tcp",
+              "service": "https"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "host": "dev.example.com",
+      "ips": [
+        {
+          "ip": "203.0.113.20",
+          "open_ports": []
+        }
+      ]
+    }
+  ]
+}
