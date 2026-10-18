@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1",
+  "schema_version": "0.2",
   "scan_id": "2026-10-13T20-15-00Z",
   "target": "example.com",
   "started_at": "2026-10-13T20:15:00Z",
@@ -16,6 +16,38 @@
               "service": "https"
             }
           ]
+        }
+      ],
+      "technologies": [
+        {
+          "name": "nginx",
+          "version": "1.18.0",
+          "source": "Server header"
+        },
+        {
+          "name": "WordPress",
+          "version": "6.4.2",
+          "source": "HTML generator tag"
+        }
+      ],
+      "findings": [
+        {
+          "id": "F-0001",
+          "rule": "https.cert_expired",
+          "check": "https",
+          "severity": "high",
+          "title": "Certificate has expired",
+          "detail": "Certificate for api.example.com ended on 2026-09-01",
+          "recommendation": "Renew the certificate and enable automatic renewal."
+        },
+        {
+          "id": "F-0002",
+          "rule": "headers.missing_csp",
+          "check": "security_headers",
+          "severity": "medium",
+          "title": "Missing Content-Security-Policy header",
+          "detail": "No Content-Security-Policy header on https://api.example.com/",
+          "recommendation": "Add a Content-Security-Policy header that lists where scripts may load from."
         }
       ]
     },
