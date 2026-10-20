@@ -37,7 +37,7 @@ class BuildScanTests(unittest.TestCase):
         self.assertEqual(
             set(scan), {"schema_version", "scan_id", "target", "started_at", "assets"}
         )
-        self.assertEqual(scan["schema_version"], "0.1")
+        self.assertEqual(scan["schema_version"], "0.2")
         self.assertEqual(scan["target"], "example.com")
         self.assertEqual(scan["assets"], ASSETS)
 
@@ -171,11 +171,150 @@ class ValidationTests(unittest.TestCase):
         self.check_bad(lambda s: s["assets"][0]["ips"][0]["open_ports"][0].update(protocol=""), "protocol must be a non-empty string")
 
 
+TECHNOLOGIES = [
+    {"name": "nginx", "version": "1.18.0", "source": "Server header"},
+    {"name": "WordPress", "version": "", "source": "HTML generator tag"},   # empty version is allowed
+]
+
+FINDINGS = [
+    {
+        "id": "F-0001",
+        "rule": "https.cert_expired",
+        "check": "https",
+        "severity": "high",
+        "title": "Certificate has expired",
+        "detail": "Certificate for api.example.com ended on 2026-09-01",
+        "recommendation": "Renew the certificate and enable automatic renewal.",
+    },
+    {
+        "id": "F-0002",
+        "rule": "ports.ssh_exposed",
+        "check": "risky_services",
+        "severity": "low",
+        "title": "SSH is open to the internet",
+        "detail": "SSH (port 22) is open on 203.0.113.10",
+        "recommendation": "Restrict SSH to trusted addresses.",
+        "ip": "203.0.113.10",
+        "port": 22,
+    },
+]
+
+
+def make_scan_02():
+    scan = make_scan()
+    scan["assets"][0]["technologies"] = copy.deepcopy(TECHNOLOGIES)
+    scan["assets"][0]["findings"] = copy.deepcopy(FINDINGS)
+    return scan
+
+
+class FormatZeroPointTwoTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.dir = Path(self._tmp.name)
+
+    def check_bad(self, change, message):
+        scan = make_scan_02()
+        change(scan)
+        with self.assertRaisesRegex(ValueError, message):
+            storage._validate_scan(scan)
+
+    def test_supported_versions(self):
+        self.assertEqual(storage.SUPPORTED_VERSIONS, {"0.1", "0.2"})
+
+    def test_valid_02_with_findings_round_trips(self):
+        scan = make_scan_02()
+        path = self.dir / "scan.json"
+        storage.save_scan(scan, str(path))
+        loaded = storage.load_scan(str(path))
+        self.assertEqual(loaded, scan)
+        self.assertEqual(loaded["schema_version"], "0.2")
+        self.assertEqual(len(loaded["assets"][0]["findings"]), 2)
+
+    def test_valid_02_without_findings(self):
+        scan = make_scan()                      # neither list on any asset
+        self.assertEqual(scan["schema_version"], "0.2")
+        storage._validate_scan(scan)
+        scan["assets"][0]["technologies"] = []  # empty lists are fine too
+        scan["assets"][0]["findings"] = []
+        storage._validate_scan(scan)
+
+    def test_old_01_file_still_loads(self):
+        scan = make_scan()
+        scan["schema_version"] = "0.1"
+        path = self.dir / "old.json"
+        path.write_text(json.dumps(scan), encoding="utf-8")
+        self.assertEqual(storage.load_scan(str(path))["schema_version"], "0.1")
+        storage.save_scan(scan, str(self.dir / "old-saved.json"))   # saving 0.1 also works
+
+    def test_unknown_version_is_rejected(self):
+        for bad in ("0.3", "1.0", None, ["0.2"]):
+            self.check_bad(lambda s, b=bad: s.update(schema_version=b), "Unsupported schema_version")
+
+    def test_bad_severity(self):
+        for bad in ("critical", "HIGH", "", None, 3):
+            self.check_bad(
+                lambda s, b=bad: s["assets"][0]["findings"][1].update(severity=b),
+                r"assets\[0\]\.findings\[1\]\.severity must be low, medium or high\.",
+            )
+
+    def test_missing_field_in_a_finding(self):
+        for field in ("id", "rule", "check", "severity", "title", "detail", "recommendation"):
+            self.check_bad(
+                lambda s, f=field: s["assets"][0]["findings"][0].pop(f),
+                rf"findings\[0\] is missing required field '{field}'",
+            )
+
+    def test_empty_or_wrong_type_text_in_a_finding(self):
+        for field in ("id", "rule", "check", "title", "detail", "recommendation"):
+            for bad in ("", "  ", None, 5):
+                self.check_bad(
+                    lambda s, f=field, b=bad: s["assets"][0]["findings"][0].update({f: b}),
+                    rf"findings\[0\]\.{field} must be a non-empty string",
+                )
+
+    def test_bad_finding_ip(self):
+        for bad in ("999.1.1.1", "not-an-ip", "", None, 5):
+            self.check_bad(
+                lambda s, b=bad: s["assets"][0]["findings"][1].update(ip=b),
+                "findings.1..ip is not a valid IP address",
+            )
+
+    def test_bad_finding_port(self):
+        for bad in (0, 65536, -1, "22", True, 1.5, None):
+            self.check_bad(
+                lambda s, b=bad: s["assets"][0]["findings"][1].update(port=b),
+                "port must be an integer between 1 and 65535",
+            )
+
+    def test_ip_and_port_are_optional_in_a_finding(self):
+        scan = make_scan_02()
+        self.assertNotIn("ip", scan["assets"][0]["findings"][0])
+        storage._validate_scan(scan)
+
+    def test_findings_must_be_a_list_of_objects(self):
+        self.check_bad(lambda s: s["assets"][0].update(findings={}), r"assets\[0\]\.findings must be a list")
+        self.check_bad(lambda s: s["assets"][0].update(findings=["x"]), r"findings\[0\] must be an object")
+
+    def test_bad_technology(self):
+        self.check_bad(lambda s: s["assets"][0].update(technologies="nginx"), r"technologies must be a list")
+        self.check_bad(lambda s: s["assets"][0].update(technologies=["nginx"]), r"technologies\[0\] must be an object")
+        self.check_bad(lambda s: s["assets"][0]["technologies"][0].pop("source"), r"technologies\[0\] is missing required field 'source'")
+        self.check_bad(lambda s: s["assets"][0]["technologies"][0].pop("version"), r"missing required field 'version'")
+        for field in ("name", "source"):
+            self.check_bad(lambda s, f=field: s["assets"][0]["technologies"][0].update({f: ""}), rf"technologies\[0\]\.{field} must be a non-empty string")
+        for bad in (None, 1, ["1"]):
+            self.check_bad(lambda s, b=bad: s["assets"][0]["technologies"][0].update(version=b), r"technologies\[0\]\.version must be a string")
+
+
 class ExampleFileTests(unittest.TestCase):
     def test_example_file_is_valid(self):
         scan = storage.load_scan(str(EXAMPLE))
         self.assertEqual(scan["target"], "example.com")
         self.assertEqual(len(scan["assets"]), 2)
+        self.assertEqual(scan["schema_version"], "0.2")
+        self.assertEqual(len(scan["assets"][0]["technologies"]), 2)
+        self.assertEqual(len(scan["assets"][0]["findings"]), 2)
 
     def test_example_survives_a_round_trip(self):
         scan = json.loads(EXAMPLE.read_text(encoding="utf-8"))

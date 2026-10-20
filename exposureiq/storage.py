@@ -11,9 +11,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-# Define the version of the findings format used by ExposureIQ.
-# Every saved scan must use this version.
-SCHEMA_VERSION = "0.1"
+# Define the version of the findings format that new scans are written with.
+SCHEMA_VERSION = "0.2"
+
+# Every format version that can still be saved and loaded.
+# Old 0.1 files have no technologies or findings, and they must keep working.
+SUPPORTED_VERSIONS = {"0.1", "0.2"}
+
+# The only severity levels a finding may use.
+ALLOWED_SEVERITIES = ("low", "medium", "high")
+
+# Text fields that every finding must have (non-empty strings).
+FINDING_TEXT_FIELDS = ("id", "rule", "check", "title", "detail", "recommendation")
 
 
 def _utc_now():
@@ -104,10 +113,14 @@ def _validate_scan(scan: dict) -> None:
         )
 
     # Reject files that use an unsupported findings format version.
-    if scan["schema_version"] != SCHEMA_VERSION:
+    # A list is not hashable, so check the type before the set lookup.
+    if (
+        not isinstance(scan["schema_version"], str)
+        or scan["schema_version"] not in SUPPORTED_VERSIONS
+    ):
         raise ValueError(
             f"Unsupported schema_version: {scan['schema_version']!r}. "
-            f"Expected {SCHEMA_VERSION!r}."
+            f"Supported versions: {', '.join(sorted(SUPPORTED_VERSIONS))}."
         )
 
     # These fields must all contain non-empty strings.
@@ -239,6 +252,114 @@ def _validate_scan(scan: dict) -> None:
                             f"{port_prefix}.{field} must be a "
                             "non-empty string."
                         )
+
+        # Format 0.2: both lists are optional, but if present they must be valid.
+        if "technologies" in asset:
+            _validate_technologies(asset["technologies"], prefix)
+
+        if "findings" in asset:
+            _validate_findings(asset["findings"], prefix)
+
+
+def _validate_technologies(technologies, prefix: str) -> None:
+    # Check the optional list of technologies found on one asset.
+    # prefix is the error label of the asset, for example "Invalid scan: assets[0]".
+
+    # The technologies field must be a list.
+    if not isinstance(technologies, list):
+        raise ValueError(f"{prefix}.technologies must be a list.")
+
+    for index, tech in enumerate(technologies):
+        # Build a label that identifies this technology entry.
+        tech_prefix = f"{prefix}.technologies[{index}]"
+
+        # Each technology must be an object.
+        if not isinstance(tech, dict):
+            raise ValueError(f"{tech_prefix} must be an object.")
+
+        # name, version and source must all exist.
+        for field in ("name", "version", "source"):
+            if field not in tech:
+                raise ValueError(
+                    f"{tech_prefix} is missing required field '{field}'."
+                )
+
+        # name and source must contain text.
+        for field in ("name", "source"):
+            if not isinstance(tech[field], str) or not tech[field].strip():
+                raise ValueError(
+                    f"{tech_prefix}.{field} must be a non-empty string."
+                )
+
+        # The version must be a string, but an empty string is allowed
+        # (we sometimes know the product but not its version).
+        if not isinstance(tech["version"], str):
+            raise ValueError(f"{tech_prefix}.version must be a string.")
+
+
+def _validate_findings(findings, prefix: str) -> None:
+    # Check the optional list of findings (security problems) on one asset.
+
+    # The findings field must be a list.
+    if not isinstance(findings, list):
+        raise ValueError(f"{prefix}.findings must be a list.")
+
+    for index, finding in enumerate(findings):
+        # Build a label that identifies this finding.
+        finding_prefix = f"{prefix}.findings[{index}]"
+
+        # Each finding must be an object.
+        if not isinstance(finding, dict):
+            raise ValueError(f"{finding_prefix} must be an object.")
+
+        # These fields are required in every finding.
+        for field in FINDING_TEXT_FIELDS + ("severity",):
+            if field not in finding:
+                raise ValueError(
+                    f"{finding_prefix} is missing required field '{field}'."
+                )
+
+        # These fields must contain text.
+        for field in FINDING_TEXT_FIELDS:
+            if not isinstance(finding[field], str) or not finding[field].strip():
+                raise ValueError(
+                    f"{finding_prefix}.{field} must be a non-empty string."
+                )
+
+        # Severity can only be one of the three allowed levels.
+        if (
+            not isinstance(finding["severity"], str)
+            or finding["severity"] not in ALLOWED_SEVERITIES
+        ):
+            raise ValueError(
+                f"{finding_prefix}.severity must be low, medium or high."
+            )
+
+        # Optional ip: if present it must be a real IPv4 or IPv6 address.
+        if "ip" in finding:
+            try:
+                if not isinstance(finding["ip"], str):
+                    raise ValueError
+                ipaddress.ip_address(finding["ip"].strip())
+            except ValueError:
+                raise ValueError(
+                    f"{finding_prefix}.ip is not a valid IP address: "
+                    f"{finding['ip']!r}."
+                ) from None
+
+        # Optional port: if present it must be an integer from 1 to 65535.
+        # Reject True and False, because bool is a subclass of int in Python.
+        if "port" in finding:
+            port = finding["port"]
+            if (
+                isinstance(port, bool)
+                or not isinstance(port, int)
+                or not 1 <= port <= 65535
+            ):
+                raise ValueError(
+                    f"{finding_prefix}.port must be an integer "
+                    "between 1 and 65535."
+                )
 
 
 def save_scan(scan: dict, path: str) -> None:
