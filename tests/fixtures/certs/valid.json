@@ -1,0 +1,11 @@
+{
+  "host": "www.example.com",
+  "subject": "www.example.com",
+  "issuer": "Example Test CA",
+  "san": [
+    "www.example.com"
+  ],
+  "not_before": "2026-07-01T00:00:00Z",
+  "not_after": "2027-01-18T00:00:00Z",
+  "verified": true
+}

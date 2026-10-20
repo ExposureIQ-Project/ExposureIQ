@@ -1,0 +1,10 @@
+{
+  "host": "old.example.com",
+  "url": "http://old.example.com/",
+  "scheme": "http",
+  "status": 200,
+  "headers": {
+    "content-type": "text/html"
+  },
+  "body": "<html><body>Plain HTTP page</body></html>"
+}

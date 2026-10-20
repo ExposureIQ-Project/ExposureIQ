@@ -1,0 +1,12 @@
+{
+  "host": "blog.example.com",
+  "url": "https://blog.example.com/",
+  "scheme": "https",
+  "status": 200,
+  "headers": {
+    "server": "nginx/1.18.0",
+    "x-powered-by": "PHP/8.1.2",
+    "content-type": "text/html"
+  },
+  "body": "<html><head><meta name=\"generator\" content=\"WordPress 6.4.2\"><title>Blog</title></head><body>Blog</body></html>"
+}
