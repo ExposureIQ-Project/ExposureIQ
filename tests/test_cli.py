@@ -62,7 +62,10 @@ def test_full_run_prints_subdomains_ips_and_saves(stages, capsys, tmp_path):
     text = read(capsys)
     assert "api.example.com" in text and "www.example.com" in text    # subdomains table
     assert "203.0.113.1" in text                                      # IP table
-    assert "Saved 3 hosts" in text and str(out_file) in text
+    assert "Saved 3 hosts" in text
+    # A long path (Windows temp folders) can be cut in the middle when it wraps,
+    # so compare it with all whitespace removed.
+    assert "".join(str(out_file).split()) in "".join(text.split())
     assert stages.path == str(out_file)
 
 
@@ -225,4 +228,4 @@ def test_real_storage_round_trip(monkeypatch, tmp_path):
     scan = storage.load_scan(str(path))                         # valid according to the findings format
     assert scan["target"] == "example.com"
     assert [a["host"] for a in scan["assets"]] == ["example.com", "api.example.com"]
-    assert json.loads(path.read_text(encoding="utf-8"))["schema_version"] == "0.1"
+    assert json.loads(path.read_text(encoding="utf-8"))["schema_version"] == storage.SCHEMA_VERSION
