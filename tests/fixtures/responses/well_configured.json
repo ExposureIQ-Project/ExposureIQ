@@ -1,0 +1,16 @@
+{
+  "host": "www.example.com",
+  "url": "https://www.example.com/",
+  "scheme": "https",
+  "status": 200,
+  "headers": {
+    "strict-transport-security": "max-age=31536000; includeSubDomains",
+    "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "permissions-policy": "geolocation=(), camera=()",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "body": "<html><head><title>Example</title></head><body>Hello</body></html>"
+}

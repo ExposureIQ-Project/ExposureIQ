@@ -1,0 +1,10 @@
+{
+  "host": "bare.example.com",
+  "url": "https://bare.example.com/",
+  "scheme": "https",
+  "status": 200,
+  "headers": {
+    "content-type": "text/html"
+  },
+  "body": "<html><body>Plain page</body></html>"
+}
