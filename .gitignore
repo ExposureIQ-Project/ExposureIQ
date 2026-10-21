@@ -1,2 +1,7 @@
 __pycache__/
 *.py[cod]
+results/
+.venv/
+.DS_Store
+.idea/
+.vscode/
