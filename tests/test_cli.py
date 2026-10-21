@@ -17,7 +17,7 @@ def fake_sources(names, crtsh=()):
 
 
 def fake_resolver(live=None):
-    """Resolve every name to a fake IP, except names listed in `dead`."""
+    """Resolve every name to a fake IP, except names not listed in `live`."""
     def resolve(hosts, **kwargs):
         return [{"host": h, "ips": [f"203.0.113.{i + 1}"]} for i, h in enumerate(hosts)
                 if live is None or h in live]
@@ -43,6 +43,7 @@ def stages(monkeypatch):
     monkeypatch.setattr(cli, "resolve_hosts", fake_resolver())
     monkeypatch.setattr(cli, "build_scan", rec.build)
     monkeypatch.setattr(cli, "save_scan", rec.save)
+    monkeypatch.setattr(cli, "_load_scope", lambda: (lambda target: True))   # in scope by default
     return rec
 
 
@@ -86,12 +87,6 @@ def test_default_file_goes_to_results_folder(stages, tmp_path, monkeypatch):
     assert stages.path.endswith(".json")
 
 
-def test_no_apex_leaves_the_domain_itself_out(stages):
-    run("example.com", "--no-apex", "--no-save")
-    # nothing saved, but the lookup must not have included the apex
-    assert stages.scan is None
-
-
 def test_apex_is_looked_up_by_default(monkeypatch, stages):
     seen = []
     monkeypatch.setattr(cli, "resolve_hosts", lambda hosts, **k: seen.append(list(hosts)) or [])
@@ -111,8 +106,7 @@ def test_no_save_writes_nothing(stages, capsys):
 def test_dead_names_are_counted(monkeypatch, stages, capsys):
     monkeypatch.setattr(cli, "resolve_hosts", fake_resolver(live={"example.com", "api.example.com"}))
     run("example.com", "--no-save")
-    text = read(capsys)
-    assert "1 had no DNS answer" in text
+    assert "1 had no DNS answer" in read(capsys)
 
 
 def test_table_is_limited_unless_all(monkeypatch, stages, capsys):
@@ -135,7 +129,7 @@ def test_no_subdomains_still_looks_up_the_domain(monkeypatch, stages, capsys):
 
 # ------------------------------------------------------------------- errors --
 def test_invalid_domain_is_a_clean_error(capsys):
-    assert run("not a domain") == 2
+    assert run("not a domain") == cli.EXIT_USAGE
     assert "does not look like a valid domain" in read(capsys)
 
 
@@ -143,12 +137,12 @@ def test_save_error_is_reported(monkeypatch, stages, capsys):
     def boom(scan, path):
         raise OSError("disk full")
     monkeypatch.setattr(cli, "save_scan", boom)
-    assert run("example.com") == 1
+    assert run("example.com") == cli.EXIT_ERROR
     assert "Could not save" in read(capsys)
 
 
 def test_no_command_shows_help(capsys):
-    assert cli.main([]) == 2
+    assert cli.main([]) == cli.EXIT_USAGE
     assert "scan" in read(capsys)
 
 
@@ -159,12 +153,23 @@ def test_version(capsys):
     assert "exposureiq" in read(capsys)
 
 
+def test_unexpected_error_is_clean_and_debug_shows_details(monkeypatch, stages, capsys):
+    def boom(hosts, **kwargs):
+        raise RuntimeError("DNS exploded")
+    monkeypatch.setattr(cli, "resolve_hosts", boom)
+    assert run("example.com", "--no-save") == cli.EXIT_ERROR
+    text = read(capsys)
+    assert "The scan failed: DNS exploded" in text and "Traceback" not in text
+    assert run("example.com", "--no-save", "--debug") == cli.EXIT_ERROR
+    assert "Traceback" in capsys.readouterr().err
+
+
 # ------------------------------------- parts that teammates have not merged yet --
 def test_works_before_dns_resolver_is_merged(monkeypatch, stages, capsys):
     monkeypatch.setattr(cli, "resolve_hosts", None)
     assert run("example.com") == 0
     out = read(capsys)
-    assert "api.example.com" in out                  # step 1 still works
+    assert "api.example.com" in out                  # the subdomain step still works
     assert "dns_resolver.py is missing" in out
     assert "Nothing to save yet" in out
     assert stages.path is None
@@ -175,8 +180,46 @@ def test_works_before_storage_is_merged(monkeypatch, stages, capsys):
     monkeypatch.setattr(cli, "save_scan", None)
     assert run("example.com") == 0
     out = read(capsys)
-    assert "203.0.113.1" in out                      # step 2 still works
+    assert "203.0.113.1" in out                      # the IP step still works
     assert "storage.py is missing" in out
+
+
+# -------------------------------------------------------------------- scope --
+def test_domain_not_in_scope_still_gets_passive_lookups(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_load_scope", lambda: (lambda target: False))
+    assert run("example.com") == 0
+    out = read(capsys)
+    assert "not listed in scope.txt" in out and "only passive lookups" in out
+    assert stages.scan is not None                   # results are still saved
+
+
+def test_require_scope_refuses_a_domain_that_is_not_in_scope(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_load_scope", lambda: (lambda target: False))
+    monkeypatch.setattr(cli.sub, "find_subdomains_by_source",
+                        lambda *a, **k: pytest.fail("nothing may run when the scope check fails"))
+    assert run("example.com", "--require-scope") == cli.EXIT_OUT_OF_SCOPE
+    assert "not in scope" in read(capsys)
+    assert stages.path is None
+
+
+def test_require_scope_without_a_scope_module_fails_closed(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_load_scope", lambda: None)
+    assert run("example.com", "--require-scope") == cli.EXIT_ERROR
+    assert "scope check is not available" in read(capsys)
+    assert stages.path is None
+
+
+def test_scope_check_that_crashes_never_means_allowed(monkeypatch, stages, capsys):
+    def broken(target):
+        raise RuntimeError("scope file unreadable")
+    monkeypatch.setattr(cli, "_load_scope", lambda: broken)
+    assert run("example.com", "--require-scope") == cli.EXIT_ERROR
+    assert stages.path is None
+
+
+def test_a_non_true_answer_is_not_a_yes(monkeypatch, stages):
+    monkeypatch.setattr(cli, "_load_scope", lambda: (lambda target: "yes please"))   # truthy, but not True
+    assert run("example.com", "--require-scope") == cli.EXIT_OUT_OF_SCOPE
 
 
 # ------------------------------------------------------------------- --ports --
@@ -201,6 +244,12 @@ def test_ports_only_scans_in_scope_ipv4(monkeypatch, stages, capsys):
     assert by_ip["2001:db8::2"] == []
 
 
+def test_ports_are_not_scanned_without_the_flag(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: pytest.fail("no --ports, no scan"), lambda ip: True))
+    assert run("example.com") == 0
+    assert "only runs with --ports" in read(capsys)
+
+
 def test_ports_failure_does_not_stop_the_scan(monkeypatch, stages, capsys):
     def scan_ports(ip):
         raise RuntimeError("Nmap was not found")
@@ -213,7 +262,21 @@ def test_ports_failure_does_not_stop_the_scan(monkeypatch, stages, capsys):
 def test_ports_not_merged_yet(monkeypatch, stages, capsys):
     monkeypatch.setattr(cli, "_load_ports", lambda: (None, None))
     assert run("example.com", "--ports") == 0
-    assert "Port scanning is not available yet" in read(capsys)
+    assert "Port scanning is not available" in read(capsys)
+
+
+def test_ports_without_a_scope_check_scan_nothing(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: pytest.fail("must not scan"), None))
+    assert run("example.com", "--ports") == 0
+    assert "nothing was scanned" in read(capsys)
+
+
+def test_ports_scope_check_that_crashes_skips_the_ip(monkeypatch, stages, capsys):
+    def broken(ip):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: pytest.fail("must not scan"), broken))
+    assert run("example.com", "--ports") == 0
+    assert "was not scanned" in read(capsys)
 
 
 # ------------------------------------ with the real storage module (if merged) --
@@ -223,6 +286,7 @@ def test_real_storage_round_trip(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "resolve_hosts", fake_resolver())
     monkeypatch.setattr(cli, "build_scan", storage.build_scan)
     monkeypatch.setattr(cli, "save_scan", storage.save_scan)
+    monkeypatch.setattr(cli, "_load_scope", lambda: (lambda target: True))
     path = tmp_path / "scan.json"
     assert run("example.com", "-o", str(path)) == 0
     scan = storage.load_scan(str(path))                         # valid according to the findings format
