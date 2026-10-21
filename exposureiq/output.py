@@ -1,18 +1,22 @@
-"""Nice terminal output for ExposureIQ (built on the 'rich' library).
+"""Compact plain output for ExposureIQ, with optional Rich colors.
 
 Everything the command prints goes through here, so the look of the tool is
 defined in one place. Colors follow the ExposureIQ brand.
 """
 
-from rich import box
+from contextlib import nullcontext
+import copy
+import logging
+import re
+
 from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+from rich.logging import RichHandler
 from rich.text import Text
 
 TEAL = "#16B8A6"
 INDIGO = "#7C83FD"
 AMBER = "#F59E0B"
+DARK = "#111827"
 SEVERITY_STYLES = {"high": "bold red", "medium": AMBER, "low": "dim blue"}
 
 console = Console()
@@ -23,21 +27,86 @@ WARN_MARK = "!"
 ARROW = "→" if _UTF else "->"
 
 
+def _network_reason(message: str) -> str | None:
+    lower = message.lower()
+    reasons = (
+        (("errno 101", "network is unreachable", "network unreachable"), "network unreachable"),
+        (("errno 113", "no route to host"), "host unreachable"),
+        (("errno 111", "connection refused"), "connection refused"),
+        (("timed out", "timeout", "connecttimeout", "readtimeout"), "request timed out"),
+        (("name or service not known", "name resolution", "nodename nor servname", "gaierror"), "DNS lookup failed"),
+        (("certificate verify failed", "certificate_verify_failed"), "certificate could not be verified"),
+        (("errno 104", "connection reset", "remotedisconnected"), "connection interrupted"),
+        (("sslerror", "ssl error"), "TLS connection failed"),
+        (("newconnectionerror", "maxretryerror", "connectionpool", "connectionerror", "requestexception", "errno"),
+         "connection failed"),
+    )
+    return next((description for hints, description in reasons if any(hint in lower for hint in hints)), None)
+
+
+def readable_message(message: str, *, verbose: bool = False, host: str | None = None) -> str:
+    """Keep ordinary warnings; translate transport trace text unless --verbose."""
+    if verbose:
+        return message
+    lower = message.lower()
+    reason = _network_reason(message)
+    if reason is None:
+        return message
+    if host is None:
+        match = re.search(r"(?:https?://|host=['\"])([a-zA-Z0-9.-]+)", message)
+        if not match:
+            match = re.search(r"\b([a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,})\b", message)
+        host = match.group(1) if match else None
+    if "no web server answered" in lower:
+        label = "no web server answered on ports 80 and 443"
+    elif any(word in lower for word in ("certificate", "tls", "could not connect to")):
+        label = "certificate check failed"
+    else:
+        label = "front-page request failed"
+    return f"{host + ': ' if host else ''}{label} ({reason})"
+
+
+def web_check_status(host: str, observation: dict) -> tuple:
+    """A failed request is not a clean bill of health; successful findings are kept."""
+    messages = observation["warnings"]
+    if observation["answered"] is False:
+        reason = _network_reason(" ".join(messages))
+        suffix = f" ({reason})" if reason else " (no response)"
+        return True, f"{host}: no web server answered on ports 80 and 443{suffix}"
+    failures = ("checks failed", "not in scope", "scope check failed", "no usable tls answer",
+                "could not connect to", "could not read the certificate")
+    if any(any(hint in message.lower() for hint in failures) for message in messages):
+        return True, f"{host}: some web checks failed; collected results kept"
+    return False, f"{host}: web checks done"
+
+
+class ReadableLogHandler(RichHandler):
+    """Render a copy so tests/log collectors can still inspect raw evidence."""
+    def __init__(self, *, verbose: bool = False, **kwargs):
+        super().__init__(**kwargs)
+        self.verbose = verbose
+
+    def emit(self, record: logging.LogRecord) -> None:
+        rendered = copy.copy(record)
+        rendered.msg = readable_message(record.getMessage(), verbose=self.verbose)
+        rendered.args = ()
+        if not self.verbose:
+            rendered.exc_info = rendered.exc_text = rendered.stack_info = None
+        super().emit(rendered)
+
+
 def banner(domain: str, version: str) -> None:
-    title = Text.assemble(("ExposureIQ", f"bold {TEAL}"), (f"  v{version}", "dim"))
-    body = Text.assemble("Scanning ", (domain, "bold white"))
-    console.print(Panel(Text("\n").join([title, body]), border_style=TEAL,
-                        box=box.ROUNDED, expand=False, padding=(0, 2)))
+    console.print(Text.assemble(("ExposureIQ", f"bold {TEAL}"), (f" v{version}", "dim"),
+                               " | Target: ", (domain, "bold")))
 
 
 def step(number: int, total: int, text: str) -> None:
-    console.print()
     console.print(Text.assemble((f"[{number}/{total}] ", f"bold {TEAL}"), (text, "bold")))
 
 
 def status(text: str):
-    """Use as:  with output.status("working..."):  (shows a spinner)"""
-    return console.status(text, spinner="dots", spinner_style=TEAL)
+    """Plain output has no transient animations; the TUI owns its own spinner."""
+    return nullcontext()
 
 
 def ok(text: str) -> None:
@@ -70,12 +139,9 @@ def subdomain_table(names: list, limit: int) -> None:
     if not names:
         return
     shown = names if limit == 0 else names[:limit]
-    table = Table(box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}", pad_edge=False, show_edge=False)
-    table.add_column("#", justify="right", style="dim")
-    table.add_column("Subdomain", overflow="fold")
-    for number, name in enumerate(shown, 1):
-        table.add_row(str(number), Text(name))
-    console.print(table)
+    console.print(Text("Subdomains", style=f"bold {TEAL}"))
+    for name in shown:
+        console.print(Text(f"  {name}"))
     _more(len(shown), len(names))
 
 
@@ -83,32 +149,33 @@ def _ip_text(ip: str) -> Text:
     return Text(ip, style=INDIGO if ":" in ip else TEAL)
 
 
+def grouped_ips(resolved: list) -> list:
+    """One row per IP, accepting either resolver rows or saved asset rows."""
+    groups = {}
+    for item in resolved:
+        for entry in item.get("ips", []):
+            ip = entry["ip"] if isinstance(entry, dict) else entry
+            groups.setdefault(ip, set()).add(item["host"])
+    return [(ip, sorted(hosts)) for ip, hosts in sorted(groups.items())]
+
+
 def ip_table(resolved: list, limit: int) -> None:
     if not resolved:
         return
-    shown = resolved if limit == 0 else resolved[:limit]
-    table = Table(box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}", pad_edge=False, show_edge=False)
-    table.add_column("Host", overflow="fold")
-    table.add_column("IP addresses")
-    for item in shown:
-        table.add_row(Text(item["host"]), Text("\n").join(_ip_text(ip) for ip in item["ips"]))
-    console.print(table)
-    _more(len(shown), len(resolved))
+    groups = grouped_ips(resolved)
+    shown = groups if limit == 0 else groups[:limit]
+    console.print(Text("IP addresses (grouped)", style=f"bold {TEAL}"))
+    for ip, hosts in shown:
+        console.print(Text.assemble("  ", _ip_text(ip), f"  <- {len(hosts)} hosts"))
+    _more(len(shown), len(groups))
 
 
 def ports_table(rows: list) -> None:
     """rows: list of (ip, [ {port, protocol, service}, ... ])"""
-    table = Table(box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}", pad_edge=False, show_edge=False)
-    table.add_column("IP")
-    table.add_column("Port", justify="right")
-    table.add_column("Protocol")
-    table.add_column("Service")
+    console.print(Text("Ports", style=f"bold {TEAL}"))
     for ip, ports in rows:
-        if not ports:
-            table.add_row(_ip_text(ip), "-", "-", Text("no open ports", style="dim"))
-        for index, item in enumerate(ports):
-            table.add_row(_ip_text(ip) if index == 0 else "", str(item["port"]), item["protocol"], item["service"])
-    console.print(table)
+        services = "; ".join(f"{item['protocol']}/{item['port']} {item['service']}" for item in ports)
+        console.print(Text.assemble("  ", _ip_text(ip), f"  {services or 'no open ports'}"))
 
 
 def technology_table(assets: list, limit: int) -> None:
@@ -118,63 +185,98 @@ def technology_table(assets: list, limit: int) -> None:
         info("No technology hints returned.")
         return
     shown = rows if limit == 0 else rows[:limit]
-    table = Table(title="Technologies", box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}",
-                  pad_edge=False, show_edge=False)
-    table.add_column("Host", overflow="fold")
-    table.add_column("Product", overflow="fold")
-    table.add_column("Version")
-    table.add_column("Source", overflow="fold")
+    console.print(Text("Technologies", style=f"bold {TEAL}"))
     for host, technology in shown:
-        table.add_row(Text(host), Text(technology["name"]), Text(technology["version"] or "unknown"),
-                      Text(technology["source"]))
-    console.print(table)
+        console.print(Text(f"  {host}: {technology['name']} {technology['version'] or 'unknown'} "
+                           f"({technology['source']})"))
     _more(len(shown), len(rows))
 
 
-def findings_table(assets: list, limit: int) -> None:
+def findings_table(assets: list, limit: int, verbose: bool = False) -> None:
     rows = [(asset["host"], finding) for asset in assets for finding in asset.get("findings", [])]
     if not rows:
         info("No findings returned; hosts may be out of scope or checks may have failed.")
         return
     shown = rows if limit == 0 else rows[:limit]
-    table = Table(title="Findings", box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}",
-                  pad_edge=False, show_edge=False)
-    table.add_column("ID", no_wrap=True)
-    table.add_column("Host / endpoint", overflow="fold")
-    table.add_column("Severity", no_wrap=True)
-    table.add_column("Finding and recommendation", overflow="fold")
+    console.print(Text("Findings", style=f"bold {TEAL}"))
     for host, finding in shown:
         severity = finding["severity"]
         style = SEVERITY_STYLES[severity]
-        endpoint = Text(host)
-        if "ip" in finding:
-            endpoint.append(f"\n{finding['ip']}", style="dim")
-        if "port" in finding:
-            endpoint.append(f"\nPort {finding['port']}", style="dim")
-        evidence = Text(finding["title"], style=style)
-        evidence.append(f"\n{finding['rule']}\n", style="dim")
-        evidence.append(finding["detail"])
-        evidence.append(f"\nFix: {finding['recommendation']}", style="dim")
-        table.add_row(Text(finding["id"]), endpoint, Text(severity, style=style), evidence)
-    console.print(table)
+        console.print(Text.assemble("  ", (severity.upper(), style), f"  {host}  {finding['title']}"))
+        if verbose:
+            endpoint = f" | {finding['ip']}" if "ip" in finding else ""
+            if "port" in finding:
+                endpoint += f" | Port {finding['port']}"
+            console.print(Text(f"    {finding['id']} | {finding['rule']}{endpoint}", style="dim"))
+            console.print(Text(f"    {finding['detail']}"))
+            console.print(Text(f"    Fix: {finding['recommendation']}", style="dim"))
     _more(len(shown), len(rows))
 
 
 def summary(rows: list, saved_to=None, assets=None) -> None:
-    grid = Table.grid(padding=(0, 2))
-    grid.add_column(style="dim")
-    grid.add_column()
+    console.print(Text("Summary", style=f"bold {TEAL}"))
     for label, value in rows:
-        grid.add_row(label, Text(str(value)))
+        console.print(Text(f"  {label}  {value}"))
     if assets is not None:
         counts = {severity: 0 for severity in SEVERITY_STYLES}
         for asset in assets:
             for finding in asset.get("findings", []):
                 counts[finding["severity"]] += 1
         for severity, count in counts.items():
-            grid.add_row(f"Findings ({severity})", Text(str(count), style=SEVERITY_STYLES[severity]))
+            console.print(Text.assemble(f"  Findings ({severity}) ", (str(count), SEVERITY_STYLES[severity])))
     if saved_to:
-        grid.add_row("Saved to", Text(str(saved_to), style=f"bold {TEAL}"))
-    console.print()
-    console.print(Panel(grid, title="Summary", title_align="left", border_style=TEAL,
-                        box=box.ROUNDED, expand=False, padding=(0, 2)))
+        console.print(Text.assemble("  Saved to  ", (str(saved_to), f"bold {TEAL}")))
+
+
+class PlainReporter:
+    """Turn the shared scan's events into compact lines, never a full-screen UI."""
+
+    def __init__(self, args):
+        self.limit = 0 if args.all else max(args.limit, 0)
+        self.verbose = args.verbose
+        self.active = not args.passive
+        self.skipped = {}
+
+    def __call__(self, event: dict) -> None:
+        from exposureiq.tui.scan import PHASES
+
+        kind = event["kind"]
+        if kind == "start":
+            version = event["version"] + (" | DEMO (fake data; no network)" if event["demo"] else "")
+            banner(event["target"], version)
+        elif kind == "phase":
+            if event["state"] == "spinner":
+                step(PHASES.index(event["phase"]) + 1, len(PHASES), event["message"])
+            elif event["message"]:
+                info(event["message"])
+        elif kind == "skipped":
+            group = event["active_step"]
+            self.skipped[group] = self.skipped.get(group, 0) + 1
+            if not self.limit or self.skipped[group] <= self.limit:
+                info(event["message"])
+        elif kind == "log":
+            if event["level"] != "live":
+                text = readable_message(event["message"], verbose=self.verbose)
+                {"ok": ok, "warn": warn, "error": error}.get(event["level"], info)(text)
+        elif kind == "data":
+            table, rows = event["table"], event["rows"]
+            if table == "subdomains":
+                sources_line(event["by_source"])
+                subdomain_table(rows, self.limit)
+            elif table == "ips":
+                ip_table(rows, self.limit)
+            elif table == "ports":
+                ports_table(rows)
+            elif table == "technologies":
+                technology_table(rows, self.limit)
+            elif table == "findings":
+                findings_table(rows, self.limit, self.verbose)
+        elif kind == "result":
+            for group, count in self.skipped.items():
+                if self.limit and count > self.limit:
+                    info(f"... and {count - self.limit} more skipped: not in scope.txt ({group}; use --all)")
+            result = event["result"]
+            show_assets = result["assets"] if self.active and result.get("mode") != "passive" else None
+            summary(result["summary_rows"], result["saved_to"], assets=show_assets)
+            if result.get("skipped_hosts") and not result.get("demo") and result.get("saved_to"):
+                info(f"Authorize skipped hosts: exposureiq scope add {result['target']}")
