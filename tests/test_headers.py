@@ -36,8 +36,23 @@ def test_fully_secure_page_has_no_findings():
     assert check_security_headers(make_response()) == []
 
 
-def test_response_none_returns_empty_list():
-    assert check_security_headers(None) == []
+@pytest.mark.parametrize("bad", [None, "text", 42, ["headers"]])
+def test_non_dict_response_raises_value_error(bad):
+    with pytest.raises(ValueError, match="dict"):
+        check_security_headers(bad)
+
+
+@pytest.mark.parametrize("bad", [None, "text", 42, ["server"]])
+def test_non_dict_headers_raise_value_error(bad):
+    response = make_response()
+    response["headers"] = bad
+    with pytest.raises(ValueError, match="headers"):
+        check_security_headers(response)
+
+
+def test_missing_headers_raise_value_error():
+    with pytest.raises(ValueError, match="headers"):
+        check_security_headers({"scheme": "https"})
 
 
 def test_example_from_brief():

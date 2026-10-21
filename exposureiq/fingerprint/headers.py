@@ -39,9 +39,11 @@ def _weak_script_sources(csp: dict[str, list[str]]) -> list[str]:
 def check_security_headers(response: dict) -> list[dict]:
     """Return raw findings for missing or weak security headers."""
     if not isinstance(response, dict):
-        return []
+        raise ValueError("response must be a dict")
+    if not isinstance(response.get("headers"), dict):
+        raise ValueError("response['headers'] must be a dict")
 
-    headers = {str(k).lower(): str(v) for k, v in (response.get("headers") or {}).items()}
+    headers = {str(k).lower(): str(v) for k, v in response["headers"].items()}
     scheme = response.get("scheme")
     url = response.get("url") or f"{scheme}://{response.get('host', '')}/"
     findings = []
