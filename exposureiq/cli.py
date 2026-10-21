@@ -3,7 +3,7 @@
     exposureiq scan example.com
 
 Steps: find subdomains -> look up their IP addresses -> (optional) port scan
--> save everything as a JSON file.
+-> (optional) scoped web/certificate checks -> save everything as a JSON file.
 
 The IP lookup and the JSON saving live in other modules (dns_resolver.py and
 storage.py). If one of them is not in your copy of the project yet, the command
@@ -58,6 +58,39 @@ def _load_ports():
         _optional("exposureiq.discovery.scope", "is_in_scope")[0]
 
 
+def _load_checks():
+    """Load active checks only for --checks; absent teammate modules fail closed."""
+    try:
+        return _optional("exposureiq.fingerprint.runner", "run_checks")[0]
+    except ModuleNotFoundError as error:
+        # runner.py imports the other checks. Missing any of those (or scope)
+        # must disable checks, not stop passive discovery or saving.
+        name = error.name or ""
+        if name == "exposureiq.fingerprint" or name.startswith("exposureiq.fingerprint.") \
+                or name == "exposureiq.discovery.scope":
+            return None
+        raise  # Missing external dependencies still need to be installed.
+
+
+def _check_assets(assets: list) -> list:
+    for asset in assets:
+        asset["technologies"], asset["findings"] = [], []
+    run_checks = _load_checks()
+    if run_checks is None:
+        output.warn("Checks are not available yet (fingerprint modules or scope.py are missing); no checks sent.")
+        return assets
+    try:
+        result = run_checks(assets)
+        if not isinstance(result, list):
+            raise ValueError("run_checks must return a list of assets")
+        return result
+    except Exception as error:
+        output.warn(f"Checks failed: {error}. Keeping discovery results with empty check lists.")
+        for asset in assets:
+            asset["technologies"], asset["findings"] = [], []
+        return assets
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -88,6 +121,9 @@ def build_parser() -> argparse.ArgumentParser:
                       help="maximum minutes for Subfinder (default: %(default)s)")
     scan.add_argument("--ports", action="store_true",
                       help="also scan open ports, but only on IPs listed in scope.txt (needs Nmap)")
+    scan.add_argument("--checks", action="store_true",
+                      help="also run active HTTP/TLS checks, but only on hosts allowed by scope.txt "
+                           "(loopback is always allowed; use --ports too for risky-port findings)")
     scan.add_argument("--limit", type=int, default=30, metavar="N", help="rows to show per table (default: %(default)s)")
     scan.add_argument("--all", action="store_true", help="show every row in the tables")
     return parser
@@ -122,7 +158,7 @@ def run_scan(args) -> int:
         return 2
 
     limit = 0 if args.all else max(args.limit, 0)
-    total = 3 + (1 if args.ports else 0)
+    total = 3 + int(args.ports) + int(args.checks)
     started_at, clock = _utc_now(), time.monotonic()
     output.banner(domain, _version())
 
@@ -165,7 +201,21 @@ def run_scan(args) -> int:
         if skipped:
             output.info(f"Skipped {skipped} IP address(es): not in scope.txt, or IPv6. We only scan targets we are allowed to.")
 
-    # 4) save -----------------------------------------------------------------
+    assets = [
+        {"host": item["host"],
+         "ips": [{"ip": ip, "open_ports": ports_by_ip.get(ip, [])} for ip in item["ips"]]}
+        for item in resolved
+    ]
+
+    # 4) checks (optional; still run with --no-save or missing storage) ----------
+    if args.checks:
+        output.step(3 + int(args.ports), total, "Checking front pages and certificates (only hosts allowed by scope.txt)")
+        with output.status("Running scoped checks, one host at a time..."):
+            assets = _check_assets(assets)
+        output.technology_table(assets, limit)
+        output.findings_table(assets, limit)
+
+    # 5) save -----------------------------------------------------------------
     output.step(total, total, "Saving results")
     saved_to = None
     if args.no_save:
@@ -175,11 +225,6 @@ def run_scan(args) -> int:
     elif build_scan is None or save_scan is None:
         output.warn("Saving is not available yet (exposureiq/storage.py is missing).")
     else:
-        assets = [
-            {"host": item["host"],
-             "ips": [{"ip": ip, "open_ports": ports_by_ip.get(ip, [])} for ip in item["ips"]]}
-            for item in resolved
-        ]
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         path = Path(args.output) if args.output else Path("results") / f"{domain}_{stamp}.json"
         try:
@@ -195,8 +240,10 @@ def run_scan(args) -> int:
         rows += [("Names with an IP", len(resolved)), ("Dropped (no DNS answer)", dropped)]
     if args.ports:
         rows.append(("IPs port scanned", len(port_rows)))
+    if args.checks:
+        rows.append(("Technology hints", sum(len(asset.get("technologies", [])) for asset in assets)))
     rows.append(("Time", _seconds(clock)))
-    output.summary(rows, saved_to)
+    output.summary(rows, saved_to, assets=assets if args.checks else None)
     return 0
 
 
