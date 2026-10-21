@@ -13,6 +13,7 @@ from rich.text import Text
 TEAL = "#16B8A6"
 INDIGO = "#7C83FD"
 AMBER = "#F59E0B"
+SEVERITY_STYLES = {"high": "bold red", "medium": AMBER, "low": "dim blue"}
 
 console = Console()
 
@@ -110,12 +111,68 @@ def ports_table(rows: list) -> None:
     console.print(table)
 
 
-def summary(rows: list, saved_to=None) -> None:
+def technology_table(assets: list, limit: int) -> None:
+    rows = [(asset["host"], technology)
+            for asset in assets for technology in asset.get("technologies", [])]
+    if not rows:
+        info("No technology hints returned.")
+        return
+    shown = rows if limit == 0 else rows[:limit]
+    table = Table(title="Technologies", box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}",
+                  pad_edge=False, show_edge=False)
+    table.add_column("Host", overflow="fold")
+    table.add_column("Product", overflow="fold")
+    table.add_column("Version")
+    table.add_column("Source", overflow="fold")
+    for host, technology in shown:
+        table.add_row(Text(host), Text(technology["name"]), Text(technology["version"] or "unknown"),
+                      Text(technology["source"]))
+    console.print(table)
+    _more(len(shown), len(rows))
+
+
+def findings_table(assets: list, limit: int) -> None:
+    rows = [(asset["host"], finding) for asset in assets for finding in asset.get("findings", [])]
+    if not rows:
+        info("No findings returned; hosts may be out of scope or checks may have failed.")
+        return
+    shown = rows if limit == 0 else rows[:limit]
+    table = Table(title="Findings", box=box.SIMPLE_HEAD, header_style=f"bold {TEAL}",
+                  pad_edge=False, show_edge=False)
+    table.add_column("ID", no_wrap=True)
+    table.add_column("Host / endpoint", overflow="fold")
+    table.add_column("Severity", no_wrap=True)
+    table.add_column("Finding and recommendation", overflow="fold")
+    for host, finding in shown:
+        severity = finding["severity"]
+        style = SEVERITY_STYLES[severity]
+        endpoint = Text(host)
+        if "ip" in finding:
+            endpoint.append(f"\n{finding['ip']}", style="dim")
+        if "port" in finding:
+            endpoint.append(f"\nPort {finding['port']}", style="dim")
+        evidence = Text(finding["title"], style=style)
+        evidence.append(f"\n{finding['rule']}\n", style="dim")
+        evidence.append(finding["detail"])
+        evidence.append(f"\nFix: {finding['recommendation']}", style="dim")
+        table.add_row(Text(finding["id"]), endpoint, Text(severity, style=style), evidence)
+    console.print(table)
+    _more(len(shown), len(rows))
+
+
+def summary(rows: list, saved_to=None, assets=None) -> None:
     grid = Table.grid(padding=(0, 2))
     grid.add_column(style="dim")
     grid.add_column()
     for label, value in rows:
         grid.add_row(label, Text(str(value)))
+    if assets is not None:
+        counts = {severity: 0 for severity in SEVERITY_STYLES}
+        for asset in assets:
+            for finding in asset.get("findings", []):
+                counts[finding["severity"]] += 1
+        for severity, count in counts.items():
+            grid.add_row(f"Findings ({severity})", Text(str(count), style=SEVERITY_STYLES[severity]))
     if saved_to:
         grid.add_row("Saved to", Text(str(saved_to), style=f"bold {TEAL}"))
     console.print()
