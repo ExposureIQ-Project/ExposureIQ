@@ -10,6 +10,17 @@ import pytest
 
 from exposureiq import cli
 
+REAL_CHECKS_LOADER = cli._load_checks
+
+
+@pytest.fixture(autouse=True)
+def fake_default_active_stages(monkeypatch):
+    """Defaults exercise the pipeline without any real tools or scope reads."""
+    monkeypatch.setattr(cli, "_load_scope", lambda: lambda target: True)
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: [], lambda target: False))
+    monkeypatch.setattr(cli, "_load_checks", lambda: lambda assets: assets)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: f"/fake/{name}")
+
 
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
@@ -90,7 +101,8 @@ def test_json_structure_matches_the_findings_format(stages, tmp_path):
     assert scan["target"] == "example.com"
     assert scan["started_at"].endswith("Z")                           # real start time is passed on
     assert scan["assets"][0] == {"host": "example.com",               # the domain itself comes first
-                                 "ips": [{"ip": "203.0.113.1", "open_ports": []}]}
+                                 "ips": [{"ip": "203.0.113.1", "open_ports": []}],
+                                 "technologies": [], "findings": []}
     assert [a["host"] for a in scan["assets"]] == ["example.com", "api.example.com", "www.example.com"]
 
 
@@ -198,17 +210,18 @@ def test_works_before_storage_is_merged(monkeypatch, stages, capsys):
 def test_ports_only_scans_in_scope_ipv4(monkeypatch, stages, capsys):
     scanned = []
 
-    def scan_ports(ip):
-        scanned.append(ip)
+    def scan_ports(host):
+        scanned.append(host)
         return [{"port": 443, "protocol": "tcp", "service": "https"}]
 
-    monkeypatch.setattr(cli, "_load_ports", lambda: (scan_ports, lambda ip: ip == "203.0.113.2"))
+    # Ports are requested by authorized host name; ports.py still checks scope.
+    monkeypatch.setattr(cli, "_load_ports", lambda: (scan_ports, lambda host: host == "api.example.com"))
     monkeypatch.setattr(cli, "resolve_hosts", lambda hosts, **k: [
         {"host": "example.com", "ips": ["203.0.113.1"]},
         {"host": "api.example.com", "ips": ["203.0.113.2", "2001:db8::2"]},
     ])
     assert run("example.com", "--ports") == 0
-    assert scanned == ["203.0.113.2"]                          # others are skipped, never scanned
+    assert scanned == ["api.example.com"]                      # others are skipped, never scanned
     assert "Skipped 2 IP address" in read(capsys)
     api = next(a for a in stages.scan["assets"] if a["host"] == "api.example.com")
     by_ip = {entry["ip"]: entry["open_ports"] for entry in api["ips"]}
@@ -255,13 +268,15 @@ def fake_checks(monkeypatch):
 
     seen = []
     rules = ["https.not_available", "headers.missing_csp", "tech.server_version_disclosed"]
+    host_rule = {"example.com": 0, "api.example.com": 1, "www.example.com": 2}
 
     def checks(assets):
         seen.append(copy.deepcopy(assets))
         for index, asset in enumerate(assets):
             asset["technologies"] = [{"name": "nginx", "version": "1.18.0", "source": "Server header"}]
             asset["findings"] = build_findings([
-                {"rule": rules[index % len(rules)], "detail": f"Fake finding on {asset['host']}"},
+                {"rule": rules[host_rule.get(asset["host"], index) % len(rules)],
+                 "detail": f"Fake finding on {asset['host']}"},
             ], start_id=index + 1)
         return assets
 
@@ -269,49 +284,53 @@ def fake_checks(monkeypatch):
     return seen
 
 
-def test_checks_are_opt_in_and_not_even_loaded_by_default(monkeypatch, stages):
+def test_passive_does_not_even_load_active_stages(monkeypatch, stages):
     def blocked():
-        raise AssertionError("checks loaded without --checks")
+        raise AssertionError("active stage loaded during --passive")
 
     monkeypatch.setattr(cli, "_load_checks", blocked)
-    assert run("example.com") == 0
+    monkeypatch.setattr(cli, "_load_ports", blocked)
+    assert run("example.com", "--passive", "--checks", "--ports") == 0
     assert all("findings" not in asset and "technologies" not in asset for asset in stages.scan["assets"])
 
 
 def test_checks_flag_saves_lists_and_prints_tables_summary(stages, fake_checks, capsys):
     assert run("example.com", "--checks") == 0
-    assert len(fake_checks) == 1
+    assert len(fake_checks) == 3
     assert len(stages.scan["assets"]) == 3
     assert all(asset["technologies"] and asset["findings"] for asset in stages.scan["assets"])
     text = read(capsys)
     assert "Technologies" in text and "Findings" in text and "nginx" in text
-    assert "HTTPS is unavailable" in text and "F-0001" in text
+    assert "HTTPS is unavailable" in text and "F-0001" not in text
     assert "Findings (high) 1" in text and "Findings (medium) 1" in text and "Findings (low) 1" in text
-    assert "[3/4] Checking" in text and "[4/4] Saving" in text
+    assert "[4/6] Checking" in text and "[6/6] Saving" in text
 
 
 def test_checks_still_run_without_saving(stages, fake_checks, capsys):
     assert run("example.com", "--checks", "--no-save") == 0
-    assert len(fake_checks) == 1 and stages.path is None
-    assert "F-0001" in read(capsys)
+    assert len(fake_checks) == 3 and stages.path is None
+    assert "HTTPS is unavailable" in read(capsys)
 
 
-def test_checks_do_not_start_port_scanning(monkeypatch, stages, fake_checks):
-    def blocked():
-        raise AssertionError("Nmap loaded without --ports")
-
-    monkeypatch.setattr(cli, "_load_ports", blocked)
-    assert run("example.com", "--checks") == 0
+def test_default_runs_checks_and_ports_without_flags(monkeypatch, stages, fake_checks):
+    scanned = []
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda host: scanned.append(host) or [], lambda host: True))
+    assert run("example.com") == 0
+    assert len(fake_checks) == 3
+    assert scanned == ["example.com", "api.example.com", "www.example.com"]
     assert all(ip["open_ports"] == [] for asset in fake_checks[0] for ip in asset["ips"])
 
 
-def test_checks_and_ports_receive_collected_ports_in_order(monkeypatch, stages, fake_checks, capsys):
+def test_web_checks_then_ports_and_offline_risky_rules(monkeypatch, stages, fake_checks, capsys):
     ports = [{"port": 3306, "protocol": "tcp", "service": "mysql"}]
     monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: ports, lambda ip: True))
     assert run("example.com", "--ports", "--checks") == 0
-    assert all(ip["open_ports"] == ports for asset in fake_checks[0] for ip in asset["ips"])
+    assert all(ip["open_ports"] == [] for asset in fake_checks[0] for ip in asset["ips"])
+    assert all(ip["open_ports"] == ports for asset in stages.scan["assets"] for ip in asset["ips"])
+    assert all(any(f["rule"] == "ports.database_exposed" for f in asset["findings"])
+               for asset in stages.scan["assets"])
     text = read(capsys)
-    assert "[3/5] Scanning" in text and "[4/5] Checking" in text and "[5/5] Saving" in text
+    assert "[4/6] Checking" in text and "[5/6] Scanning" in text and "[6/6] Saving" in text
 
 
 def test_missing_runner_still_saves_discovery_with_empty_lists(monkeypatch, stages, capsys):
@@ -330,6 +349,7 @@ def test_optional_checks_loader_tolerates_missing_internal_modules(monkeypatch, 
         raise ModuleNotFoundError(f"No module named {missing}", name=missing)
 
     monkeypatch.setattr(cli.importlib, "import_module", missing_import)
+    monkeypatch.setattr(cli, "_load_checks", REAL_CHECKS_LOADER)
     assert run("example.com", "--checks") == 0
     assert "Checks are not available yet" in read(capsys)
     assert stages.scan is not None
@@ -341,7 +361,7 @@ def test_optional_checks_loader_does_not_hide_missing_external_dependency(monkey
 
     monkeypatch.setattr(cli.importlib, "import_module", missing_import)
     with pytest.raises(ModuleNotFoundError, match="cryptography"):
-        cli._load_checks()
+        REAL_CHECKS_LOADER()
 
 
 def test_failing_runner_does_not_stop_discovery_save(monkeypatch, stages, capsys):
@@ -366,25 +386,26 @@ def test_checks_still_run_when_storage_is_missing(monkeypatch, stages, fake_chec
     monkeypatch.setattr(cli, "build_scan", None)
     monkeypatch.setattr(cli, "save_scan", None)
     assert run("example.com", "--checks") == 0
-    assert len(fake_checks) == 1
+    assert len(fake_checks) == 3
     text = read(capsys)
-    assert "F-0001" in text and "storage.py is missing" in text
+    assert "HTTPS is unavailable" in text and "storage.py is missing" in text
 
 
 def test_checks_send_nothing_when_ip_lookup_is_missing(monkeypatch, stages, fake_checks, capsys):
     monkeypatch.setattr(cli, "resolve_hosts", None)
     assert run("example.com", "--checks") == 0
-    assert fake_checks == [[]]
+    assert fake_checks == []
     assert "Nothing to save yet" in read(capsys)
 
 
-def test_checks_help_states_active_scope_and_port_requirement(capsys):
+def test_help_states_active_defaults_passive_and_hides_old_aliases(capsys):
     with pytest.raises(SystemExit) as exit_info:
         cli.main(["scan", "--help"])
     assert exit_info.value.code == 0
     text = read(capsys)
-    assert "--checks" in text and "active HTTP/TLS" in text and "hosts allowed by scope.txt" in text
-    assert "use --ports too" in text
+    assert "active HTTP/TLS" in text and "also authorizes its subdomains" in text
+    assert "--passive" in text and "discovered passively" in text
+    assert "--checks" not in text and "--ports" not in text
 
 
 def test_real_checks_runner_saves_valid_json_and_skips_out_of_scope(monkeypatch, tmp_path):
@@ -405,6 +426,8 @@ def test_real_checks_runner_saves_valid_json_and_skips_out_of_scope(monkeypatch,
     monkeypatch.setattr(cli, "build_scan", storage.build_scan)
     monkeypatch.setattr(cli, "save_scan", storage.save_scan)
     monkeypatch.setattr(runner, "is_in_scope", lambda host: host == "api.example.com")
+    monkeypatch.setattr(cli, "_load_scope", lambda: runner.is_in_scope)
+    monkeypatch.setattr(cli, "_load_checks", REAL_CHECKS_LOADER)
     monkeypatch.setattr(runner, "fetch_front_page", fetch)
     monkeypatch.setattr(runner, "check_https", lambda host, response: [])
     path = tmp_path / "checks.json"
@@ -426,12 +449,12 @@ def test_check_tables_respect_limit_and_all_rows(capsys):
         {"rule": "headers.missing_csp", "detail": f"evidence{index}"} for index in range(3)
     ])}]
     cli.output.technology_table(assets, 1)
-    cli.output.findings_table(assets, 1)
+    cli.output.findings_table(assets, 1, verbose=True)
     text = read(capsys)
     assert "product0" in text and "product1" not in text and "evidence1" not in text
     assert text.count("and 2 more") == 2
     cli.output.technology_table(assets, 0)
-    cli.output.findings_table(assets, 0)
+    cli.output.findings_table(assets, 0, verbose=True)
     text = read(capsys)
     assert "product2" in text and "evidence2" in text
 
@@ -445,7 +468,7 @@ def test_check_output_treats_collected_text_as_plain_text(capsys):
         {"rule": "headers.missing_csp", "detail": "[bold]untrusted response[/bold]"},
     ])}]
     cli.output.technology_table(assets, 0)
-    cli.output.findings_table(assets, 0)
+    cli.output.findings_table(assets, 0, verbose=True)
     text = read(capsys)
     assert "[bold]nginx[/bold]" in text and "[bold]untrusted response[/bold]" in text
 
@@ -462,7 +485,164 @@ def test_finding_table_shows_port_endpoint_and_valid_severity_colors(capsys):
     assets = [{"host": "example.com", "findings": build_findings([
         {"rule": "ports.database_exposed", "detail": "MySQL is open", "ip": "203.0.113.10", "port": 3306},
     ])}]
-    cli.output.findings_table(assets, 0)
+    cli.output.findings_table(assets, 0, verbose=True)
     text = read(capsys)
-    assert "203.0.113.10" in text and "Port 3306" in text and "high" in text
+    assert "203.0.113.10" in text and "Port 3306" in text and "HIGH" in text
     assert "Database service exposed" in text and "Fix:" in text
+
+
+def test_out_of_scope_host_is_visibly_skipped(monkeypatch, stages, fake_checks, capsys):
+    monkeypatch.setattr(cli, "_load_scope", lambda: lambda host: host == "api.example.com")
+    assert run("example.com") == 0
+    assert [asset["host"] for asset in fake_checks[0]] == ["api.example.com"]
+    text = read(capsys)
+    assert "example.com: skipped: not in scope.txt (web checks)" in text
+    assert "www.example.com: skipped: not in scope.txt (web checks)" in text
+
+
+@pytest.mark.parametrize("gate", [None, lambda target: None, lambda target: "yes"])
+def test_active_scope_only_accepts_true(monkeypatch, stages, fake_checks, gate):
+    monkeypatch.setattr(cli, "_load_scope", lambda: gate)
+    scanned = []
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: scanned.append(ip), gate))
+    assert run("example.com") == 0
+    assert fake_checks == [] and scanned == []
+
+
+def test_broken_scope_fails_closed_for_web_and_ports(monkeypatch, stages, fake_checks, capsys):
+    def broken(target):
+        raise OSError("scope unreadable")
+
+    scanned = []
+    monkeypatch.setattr(cli, "_load_scope", lambda: broken)
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: scanned.append(ip), broken))
+    assert run("example.com") == 0
+    assert fake_checks == [] and scanned == []
+    assert "skipped: not in scope.txt" in read(capsys)
+
+
+def test_nmap_missing_warns_once_and_continues(monkeypatch, stages, capsys):
+    scanned = []
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: scanned.append(ip), lambda ip: True))
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    assert run("example.com") == 0
+    assert scanned == [] and stages.scan is not None
+    assert read(capsys).count("Nmap was not found") == 1
+
+
+def test_plain_groups_shared_ips_once(capsys):
+    cli.output.ip_table([
+        {"host": host, "ips": ["192.0.2.10"]}
+        for host in ("example.com", "api.example.com", "www.example.com")
+    ], 0)
+    text = read(capsys)
+    assert text.count("192.0.2.10") == 1
+    assert "192.0.2.10 <- 3 hosts" in text
+
+
+def test_plain_findings_are_short_unless_verbose(stages, fake_checks, capsys):
+    assert run("example.com", "--plain") == 0
+    text = read(capsys)
+    assert "HIGH example.com HTTPS is unavailable" in text
+    assert "Fix:" not in text and "Fake finding on" not in text and "F-0001" not in text
+    assert run("example.com", "--plain", "--verbose") == 0
+    text = read(capsys)
+    assert "Fix:" in text and "Fake finding on" in text and "F-0001" in text
+
+
+def test_demo_uses_no_network_tools_and_saves_valid_labeled_json(monkeypatch, tmp_path, capsys):
+    from exposureiq import storage
+
+    def blocked(*args, **kwargs):
+        raise AssertionError("DEMO must not call a real discovery or active stage")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.sub, "find_subdomains_by_source", blocked)
+    monkeypatch.setattr(cli, "resolve_hosts", blocked)
+    monkeypatch.setattr(cli, "_load_scope", blocked)
+    monkeypatch.setattr(cli, "_load_ports", blocked)
+    monkeypatch.setattr(cli, "_load_checks", blocked)
+    monkeypatch.setattr(cli, "build_scan", storage.build_scan)
+    monkeypatch.setattr(cli, "save_scan", storage.save_scan)
+    assert run("example.com", "--demo", "--plain") == 0
+    paths = list((tmp_path / "results").glob("demo_*.json"))
+    assert len(paths) == 1
+    scan = storage.load_scan(str(paths[0]))
+    assert scan["schema_version"] == "0.2" and scan["scan_id"].startswith("DEMO-")
+    assert all(asset["host"].endswith("example.com") for asset in scan["assets"])
+    assert {ip["ip"] for asset in scan["assets"] for ip in asset["ips"]} == {"192.0.2.10", "192.0.2.20"}
+    assert any(f["severity"] == "high" for asset in scan["assets"] for f in asset["findings"])
+    text = read(capsys)
+    assert "DEMO" in text and "192.0.2.10 <- 3 hosts" in text
+
+
+def test_demo_passive_has_no_active_sample_results(stages):
+    assert run("example.com", "--demo", "--passive", "--plain") == 0
+    assert all(not asset.get("findings") and not asset.get("technologies")
+               and all(not ip["open_ports"] for ip in asset["ips"])
+               for asset in stages.scan["assets"])
+
+
+def test_demo_active_stages_still_obey_the_demo_scope_gate(monkeypatch, stages, capsys):
+    monkeypatch.setattr(cli, "_demo_scope", lambda target: False)
+    assert run("example.com", "--demo", "--plain") == 0
+    assert all(not asset["findings"] and not asset["technologies"]
+               and all(not ip["open_ports"] for ip in asset["ips"])
+               for asset in stages.scan["assets"])
+    assert "skipped: not in scope.txt" in read(capsys)
+
+
+@pytest.mark.parametrize("target, allowed", [
+    ("192.0.2.10", True), ("192.0.2.250", True), ("203.0.113.1", False),
+    ("127.0.0.1", False), ("::1", False), ("api.example.com", True),
+    ("outside.example.com", False), ("example.net", False),
+])
+def test_demo_scope_is_only_test_net_one(target, allowed):
+    assert cli._demo_scope(target) is allowed
+
+
+def test_non_terminal_stdout_falls_back_to_plain(monkeypatch, stages, capsys):
+    import sys
+
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: False)
+    monkeypatch.setitem(sys.modules, "exposureiq.tui.app", None)
+    assert run("example.com") == 0
+    assert "IP addresses (grouped)" in read(capsys)
+
+
+def test_plain_flag_disables_tui_even_in_a_terminal(monkeypatch, stages, capsys):
+    import sys
+
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)
+    monkeypatch.setitem(sys.modules, "exposureiq.tui.app", None)
+    assert run("example.com", "--plain") == 0
+    assert "IP addresses (grouped)" in read(capsys)
+
+
+def test_terminal_stdout_selects_tui(monkeypatch, stages):
+    from exposureiq.tui import app
+
+    seen = []
+
+    class FakeApp:
+        def __init__(self, args, **kwargs):
+            seen.append((args, kwargs))
+
+        def run(self):
+            return 0
+
+    monkeypatch.setattr(cli.sys.stdout, "isatty", lambda: True)
+    monkeypatch.setattr(app, "ExposureIQApp", FakeApp)
+    assert run("example.com") == 0
+    assert len(seen) == 1 and seen[0][0].domain == "example.com"
+
+
+def test_initial_broken_gate_cannot_be_overridden_by_port_gate(monkeypatch, stages, fake_checks):
+    def broken(target):
+        raise OSError("scope unreadable")
+
+    scanned = []
+    monkeypatch.setattr(cli, "_load_scope", lambda: broken)
+    monkeypatch.setattr(cli, "_load_ports", lambda: (lambda ip: scanned.append(ip), lambda ip: True))
+    assert run("example.com") == 0
+    assert scanned == [] and fake_checks == []

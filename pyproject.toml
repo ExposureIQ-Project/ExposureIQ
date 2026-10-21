@@ -12,6 +12,7 @@ dependencies = [
     "dnspython>=2.3",
     "rich>=13",
     "cryptography>=41",
+    "textual==8.2.8",
 ]
 
 [project.optional-dependencies]

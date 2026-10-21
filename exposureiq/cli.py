@@ -2,8 +2,9 @@
 
     exposureiq scan example.com
 
-Steps: find subdomains -> look up their IP addresses -> (optional) port scan
--> (optional) scoped web/certificate checks -> save everything as a JSON file.
+Steps: scope -> subdomains -> IP addresses -> scoped web/certificate checks
+-> scoped ports and offline risky-port rules -> save everything as JSON.
+Use --passive to send no active HTTP, TLS, or port probes.
 
 The IP lookup and the JSON saving live in other modules (dns_resolver.py and
 storage.py). If one of them is not in your copy of the project yet, the command
@@ -13,21 +14,20 @@ still runs and tells you which part is missing.
 import argparse
 import importlib
 import logging
+import shutil
 import sys
-import time
-from datetime import datetime, timezone
-from pathlib import Path
-
-from rich.logging import RichHandler
 
 from exposureiq import output
 from exposureiq.discovery import subdomains as sub
+from exposureiq.tui.control import ScanCancelled, ScanControl
+from exposureiq.tui.scan import ScanStages, demo_scope as _demo_scope, run_scan as _execute_scan
+from exposureiq.tui.user_scope import MAX_HOSTS, append_hosts, eligible_hosts, last_scan, responsibility, user_scope_path
 
 
 def _version() -> str:
     try:
         from importlib.metadata import version
-        return version("exposureiq")
+        return version("exposureiq") or "0.1.0"
     except Exception:
         return "0.1.0"
 
@@ -53,15 +53,27 @@ build_scan, save_scan = _optional("exposureiq.storage", "build_scan", "save_scan
 
 
 def _load_ports():
-    """Port scanning is optional (--ports). Returns (scan_ports, is_in_scope)."""
-    return _optional("exposureiq.discovery.ports", "scan_ports")[0], \
-        _optional("exposureiq.discovery.scope", "is_in_scope")[0]
+    """Return the port scanner and its unchanged scope gate, or fail closed."""
+    try:
+        return _optional("exposureiq.discovery.ports", "scan_ports")[0], _load_scope()
+    except (ModuleNotFoundError, AttributeError):
+        return None, None
+
+
+def _load_scope():
+    try:
+        return _optional("exposureiq.discovery.scope", "is_in_scope")[0]
+    except Exception:
+        # Scope failures must never stop saving passive results or allow probes.
+        return None
 
 
 def _load_checks():
-    """Load active checks only for --checks; absent teammate modules fail closed."""
+    """Load the existing active checks; absent teammate modules fail closed."""
     try:
         return _optional("exposureiq.fingerprint.runner", "run_checks")[0]
+    except AttributeError:
+        return None
     except ModuleNotFoundError as error:
         # runner.py imports the other checks. Missing any of those (or scope)
         # must disable checks, not stop passive discovery or saving.
@@ -72,46 +84,23 @@ def _load_checks():
         raise  # Missing external dependencies still need to be installed.
 
 
-def _check_assets(assets: list) -> list:
-    for asset in assets:
-        asset["technologies"], asset["findings"] = [], []
-    run_checks = _load_checks()
-    if run_checks is None:
-        output.warn("Checks are not available yet (fingerprint modules or scope.py are missing); no checks sent.")
-        return assets
-    try:
-        result = run_checks(assets)
-        if not isinstance(result, list):
-            raise ValueError("run_checks must return a list of assets")
-        return result
-    except Exception as error:
-        output.warn(f"Checks failed: {error}. Keeping discovery results with empty check lists.")
-        for asset in assets:
-            asset["technologies"], asset["findings"] = [], []
-        return assets
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
-def _seconds(start: float) -> str:
-    total = int(time.monotonic() - start)
-    return f"{total // 60}m {total % 60}s" if total >= 60 else f"{total}s"
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="exposureiq",
-        description="ExposureIQ: discover what an organization exposes to the internet.",
+        description="ExposureIQ: discover what an organization exposes to the internet. "
+                    "Run it with no command for the home screen.",
         epilog="Only scan domains you own or have written permission to test.",
     )
     parser.add_argument("--version", action="version", version=f"exposureiq {_version()}")
+    parser.add_argument("--open", "--op", dest="open_file", metavar="FILE", nargs="?", const="",
+                        help="open a saved results JSON read-only; omit FILE to browse results/")
     commands = parser.add_subparsers(dest="command", metavar="<command>")
 
-    scan = commands.add_parser("scan", help="find subdomains and their IP addresses, and save them as JSON",
-                               description="Find the subdomains of a domain, look up their IP addresses, "
-                                           "and save the result as a JSON file.")
+    scan = commands.add_parser("scan", help="discover assets, run scoped checks and ports, and save JSON",
+                               description="Find subdomains and IP addresses, then run active HTTP/TLS "
+                                           "checks and Nmap. A domain in scope.txt also authorizes its "
+                                           "subdomains; a domain that is not listed is discovered passively. "
+                                           "--passive skips every active step.")
     scan.add_argument("domain", help="the domain to scan, for example example.com")
     scan.add_argument("-o", "--output", metavar="FILE", help="JSON file to write (default: results/<domain>_<time>.json)")
     scan.add_argument("--no-save", action="store_true", help="do not write a JSON file")
@@ -119,147 +108,204 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--no-subfinder", action="store_true", help="skip Subfinder (use crt.sh only, finds fewer)")
     scan.add_argument("--minutes", type=int, default=sub.SUBFINDER_MAX_MINUTES, metavar="N",
                       help="maximum minutes for Subfinder (default: %(default)s)")
-    scan.add_argument("--ports", action="store_true",
-                      help="also scan open ports, but only on IPs listed in scope.txt (needs Nmap)")
-    scan.add_argument("--checks", action="store_true",
-                      help="also run active HTTP/TLS checks, but only on hosts allowed by scope.txt "
-                           "(loopback is always allowed; use --ports too for risky-port findings)")
+    scan.add_argument("--passive", action="store_true", help="skip all active web, TLS, and port probes")
+    scan.add_argument("--plain", action="store_true", help="use compact plain output instead of the terminal UI")
+    scan.add_argument("--verbose", action="store_true", help="include raw warnings, and finding details/Fix in plain output")
+    scan.add_argument("--demo", action="store_true", help="use clearly labeled example.com sample data; no network")
+    scan.add_argument("--ports", action="store_true", help=argparse.SUPPRESS)
+    scan.add_argument("--checks", action="store_true", help=argparse.SUPPRESS)
     scan.add_argument("--limit", type=int, default=30, metavar="N", help="rows to show per table (default: %(default)s)")
     scan.add_argument("--all", action="store_true", help="show every row in the tables")
+
+    scope = commands.add_parser("scope", help="view scope or confirm host-name authorization")
+    scope_commands = scope.add_subparsers(dest="scope_command", metavar="<command>")
+    scope_commands.add_parser("list", help="show the repository and user scope files")
+    add = scope_commands.add_parser("add", help="confirm scope-skipped names from the last saved scan, then run web checks")
+    add.add_argument("domain", help="the domain from the last saved scan")
+    add.add_argument("--verbose", action="store_true", help="include raw warning details")
     return parser
 
 
-def _scan_ports_for(resolved: list, ports_by_ip: dict) -> tuple:
-    """Port scan IPv4 addresses that are in scope. Returns (scanned_rows, skipped_count)."""
-    scan_ports, is_in_scope = _load_ports()
-    if scan_ports is None or is_in_scope is None:
-        output.warn("Port scanning is not available yet (ports.py or scope.py is missing).")
-        return [], 0
-    ips = sorted({ip for item in resolved for ip in item["ips"]})
-    rows, skipped = [], 0
-    for ip in ips:
-        if ":" in ip or not is_in_scope(ip):      # IPv6 is not scanned yet; out of scope is never scanned
-            skipped += 1
-            continue
-        try:
-            ports_by_ip[ip] = scan_ports(ip)
-        except (ValueError, RuntimeError, TimeoutError) as error:
-            output.warn(f"Port scan of {ip} failed: {error}")
-            continue
-        rows.append((ip, ports_by_ip[ip]))
-    return rows, skipped
+def _stages() -> ScanStages:
+    return ScanStages(sub.find_subdomains_by_source, resolve_hosts, build_scan, save_scan,
+                      _load_scope, _load_checks, _load_ports,
+                      lambda: shutil.which("nmap") is not None, _demo_scope)
+
+
+def _use_tui(args) -> bool:
+    return not args.plain and sys.stdout.isatty()
 
 
 def run_scan(args) -> int:
     try:
-        domain = sub.normalize_domain(args.domain)
+        args.domain = sub.normalize_domain(args.domain)
     except ValueError as error:
         output.error(str(error))
         return 2
 
-    limit = 0 if args.all else max(args.limit, 0)
-    total = 3 + int(args.ports) + int(args.checks)
-    started_at, clock = _utc_now(), time.monotonic()
-    output.banner(domain, _version())
+    if args.demo:
+        args.domain = "example.com"
+    stages, control = _stages(), ScanControl()
+    try:
+        if _use_tui(args):
+            try:
+                from exposureiq.tui.app import ExposureIQApp
+            except ModuleNotFoundError as error:
+                if error.name != "textual":
+                    raise
+                output.warn("Textual is not installed; using plain output. Install the project dependencies for the TUI.")
+            else:
+                return ExposureIQApp(args, stages=stages, control=control, version=_version()).run()
+        result = _execute_scan(args, stages, output.PlainReporter(args), control, _version())
+        return result["return_code"]
+    except (KeyboardInterrupt, ScanCancelled):
+        control.cancel()
+        output.error("Cancelled.")
+        return 130
 
-    # 1) subdomains ---------------------------------------------------------
-    output.step(1, total, f"Finding subdomains of {domain}")
-    with output.status("Asking Subfinder's sources (this can take a few minutes)..."):
-        by_source = sub.find_subdomains_by_source(
-            domain, use_subfinder=not args.no_subfinder, subfinder_max_minutes=args.minutes)
-    names = sorted(set(by_source["subfinder"]) | set(by_source["crtsh"]))
-    if names:
-        output.ok(f"Found {len(names)} subdomains")
-        output.sources_line(by_source)
-        output.subdomain_table(names, limit)
-    else:
-        output.warn("No subdomains found. Only the domain itself will be looked up.")
 
-    # 2) IP addresses -------------------------------------------------------
-    output.step(2, total, "Looking up IP addresses")
-    hosts = names if args.no_apex else [domain] + names
-    resolved, dropped = [], 0
-    if resolve_hosts is None:
-        output.warn("IP lookup is not available yet (exposureiq/discovery/dns_resolver.py is missing).")
-    else:
-        with output.status(f"Asking DNS about {len(hosts)} names..."):
-            resolved = resolve_hosts(hosts)
-        dropped = len(set(hosts)) - len(resolved)
-        if resolved:
-            output.ok(f"{len(resolved)} names have an IP address ({dropped} had no DNS answer and were dropped)")
-            output.ip_table(resolved, limit)
-        else:
-            output.warn("None of the names resolved to an IP address.")
+def run_scope(args) -> int:
+    from exposureiq.discovery import scope
+    from exposureiq.tui.rerun import rerun_hosts
 
-    # 3) ports (optional) ---------------------------------------------------
-    ports_by_ip, port_rows = {}, []
-    if args.ports:
-        output.step(3, total, "Scanning open ports (only IPs listed in scope.txt)")
-        port_rows, skipped = _scan_ports_for(resolved, ports_by_ip)
-        if port_rows:
-            output.ports_table(port_rows)
-        if skipped:
-            output.info(f"Skipped {skipped} IP address(es): not in scope.txt, or IPv6. We only scan targets we are allowed to.")
-
-    assets = [
-        {"host": item["host"],
-         "ips": [{"ip": ip, "open_ports": ports_by_ip.get(ip, [])} for ip in item["ips"]]}
-        for item in resolved
-    ]
-
-    # 4) checks (optional; still run with --no-save or missing storage) ----------
-    if args.checks:
-        output.step(3 + int(args.ports), total, "Checking front pages and certificates (only hosts allowed by scope.txt)")
-        with output.status("Running scoped checks, one host at a time..."):
-            assets = _check_assets(assets)
-        output.technology_table(assets, limit)
-        output.findings_table(assets, limit)
-
-    # 5) save -----------------------------------------------------------------
-    output.step(total, total, "Saving results")
-    saved_to = None
-    if args.no_save:
-        output.info("Not saved (--no-save).")
-    elif resolve_hosts is None:
-        output.warn("Nothing to save yet, because the IP lookup is missing.")
-    elif build_scan is None or save_scan is None:
-        output.warn("Saving is not available yet (exposureiq/storage.py is missing).")
-    else:
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        path = Path(args.output) if args.output else Path("results") / f"{domain}_{stamp}.json"
-        try:
-            save_scan(build_scan(domain, assets, started_at=started_at), str(path))
-        except (ValueError, OSError) as error:
-            output.error(f"Could not save the results: {error}")
+    if args.scope_command == "list":
+        for label, path in (("Repository scope (never modified)", scope.SCOPE_FILE),
+                            ("User scope", user_scope_path())):
+            output.info(f"{label}: {path}")
+            try:
+                contents = path.read_text(encoding="utf-8-sig")
+            except FileNotFoundError:
+                output.info("  (missing; no entries)")
+            except (OSError, UnicodeError):
+                output.warn("  Unreadable; entries are not used.")
+            else:
+                for line in contents.splitlines():
+                    output.info(line)
+        return 0
+    if args.scope_command != "add":
+        output.error("Use exposureiq scope list or exposureiq scope add <domain>.")
+        return 2
+    try:
+        domain = sub.normalize_domain(args.domain)
+        record = last_scan(domain)
+        from exposureiq.storage import load_scan
+        snapshot = load_scan(record["saved_to"])
+        if snapshot["target"] != domain or snapshot["scan_id"] != record.get("scan_id"):
+            raise ValueError("The last-scan record does not match the saved scan.")
+        asset_hosts = {asset["host"] for asset in snapshot["assets"]}
+        names = eligible_hosts(domain, [host for host in record.get("skipped_hosts", []) if host in asset_hosts])
+    except (OSError, ValueError, KeyError) as error:
+        output.error(f"Cannot find a saved scan for {getattr(args, 'domain', '')}: {error}")
+        output.info("First run exposureiq scan <domain> --plain; it will record any scope-skipped hosts.")
+        return 1
+    if not names:
+        output.info(f"No eligible hosts were skipped for scope in the last scan of {domain}.")
+        return 0
+    selected = names[:MAX_HOSTS]
+    output.info(f"{len(names)} hosts skipped: not in scope for {domain}")
+    if len(names) > MAX_HOSTS:
+        output.warn(f"Only the first {MAX_HOSTS} of {len(names)} hosts will be added.")
+    for name in selected:
+        output.info(name)
+    output.info("Host names only. No IP addresses will be added or port scanned.")
+    output.info(responsibility(domain))
+    control = ScanControl()
+    try:
+        typed = input(f"Type {domain} exactly to confirm (anything else cancels): ")
+        if typed != domain:
+            output.info("Cancelled: domain did not match exactly; no scope file changed.")
             return 1
-        saved_to = path
-        output.ok(f"Saved {len(assets)} hosts to {path}")
+        path, added = append_hosts(domain, selected, typed)
+        output.ok(f"Added {len(added)} host names to {path}")
+        result = {**record, "demo": False, "snapshot": snapshot, "assets": snapshot["assets"],
+                  "warnings": [], "user_scope_path": str(path), "return_code": 0,
+                  "port_rows": [], "started_at": snapshot["started_at"]}
 
-    rows = [("Target", domain), ("Subdomains found", len(names))]
-    if resolve_hosts is not None:
-        rows += [("Names with an IP", len(resolved)), ("Dropped (no DNS answer)", dropped)]
-    if args.ports:
-        rows.append(("IPs port scanned", len(port_rows)))
-    if args.checks:
-        rows.append(("Technology hints", sum(len(asset.get("technologies", [])) for asset in assets)))
-    rows.append(("Time", _seconds(clock)))
-    output.summary(rows, saved_to, assets=assets if args.checks else None)
-    return 0
+        def report(event):
+            if event["kind"] == "host_progress":
+                message = output.readable_message(event["message"], verbose=args.verbose, host=event["host"])
+                output.info(f"{event['state']} — {message}")
+            elif event["kind"] == "log":
+                output.info(output.readable_message(event["message"], verbose=args.verbose))
+
+        updated = rerun_hosts(result, added, _stages(), report, control)
+        output.technology_table(updated["assets"], 30)
+        output.findings_table(updated["assets"], 30, args.verbose)
+        output.ok(f"Web-only update saved to {record['saved_to']}; scan ID and start time kept.")
+        output.info("No port scans ran. Run a new scan now that the domain is authorized for full mode.")
+        return 0
+    except (EOFError, KeyboardInterrupt, ScanCancelled):
+        control.cancel()
+        output.info("Cancelled; no later checks sent. Any already-confirmed scope entries are kept.")
+        return 130
+    except (OSError, ValueError) as error:
+        output.error(f"Scope/web update failed: {error}")
+        return 1
+
+
+def run_home(args, *, browser: bool = False) -> int:
+    """Bare `exposureiq` starts at home; `--open` alone starts at the file list."""
+    try:
+        from exposureiq.tui.app import ExposureIQApp
+    except ModuleNotFoundError as error:
+        if error.name != "textual":
+            raise
+        output.error("The terminal UI needs Textual. Install the project dependencies first.")
+        return 1
+    return ExposureIQApp(args, stages=_stages(), control=ScanControl(),
+                         version=_version(), home=True, browser=browser).run()
+
+
+def run_open(args) -> int:
+    """Preview a saved JSON. Never scans, saves, or sends a request."""
+    path = getattr(args, "open_file", None)
+    try:
+        from exposureiq.storage import load_scan
+        from exposureiq.tui.saved import print_preview, result_from_snapshot
+        snapshot = load_scan(str(path))
+    except (OSError, ValueError, ModuleNotFoundError) as error:
+        output.error(f"Could not open {path}: {error}")
+        return 1
+    result = result_from_snapshot(snapshot, path)
+    verbose = bool(getattr(args, "verbose", False))
+    if not sys.stdout.isatty():
+        print_preview(result, verbose=verbose)
+        return 0
+    try:
+        from exposureiq.tui.app import ExposureIQApp
+    except ModuleNotFoundError as error:
+        if error.name != "textual":
+            raise
+        print_preview(result, verbose=verbose)
+        output.warn("Textual is not installed; showing the compact preview.")
+        return 0
+    return ExposureIQApp(args, stages=_stages(), control=ScanControl(),
+                         version=_version(), open_file=str(path)).run()
 
 
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
-    if args.command != "scan":
+    logging.basicConfig(level=logging.WARNING, format="%(message)s", force=True,
+                        handlers=[output.ReadableLogHandler(verbose=getattr(args, "verbose", False),
+                                  console=output.console, show_time=False, show_path=False, markup=False)])
+    if args.command is None:
+        if args.open_file is not None:
+            if args.open_file:
+                return run_open(args)
+            if not sys.stdout.isatty():
+                output.error("--open needs a FILE when output is not a terminal.")
+                output.info("Try: exposureiq --open results/<file>.json")
+                return 2
+            return run_home(args, browser=True)
+        if not sys.stdout.isatty():
+            parser.print_help()
+            return 2
+        return run_home(args)
+    if args.command not in ("scan", "scope"):
         parser.print_help()
         return 2
-    logging.basicConfig(level=logging.WARNING, format="%(message)s", force=True,
-                        handlers=[RichHandler(console=output.console, show_time=False, show_path=False, markup=False)])
-    try:
-        return run_scan(args)
-    except KeyboardInterrupt:
-        output.error("Cancelled.")
-        return 130
+    return run_scope(args) if args.command == "scope" else run_scan(args)
 
 
 if __name__ == "__main__":
