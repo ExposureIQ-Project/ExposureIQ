@@ -36,10 +36,10 @@ ExposureIQ is built around three ideas:
 
 | Area | Capability | Status |
 | --- | --- | --- |
-| **Discovery** | Subdomain enumeration (certificate transparency, DNS) | Planned |
-| | Port and service scanning (Nmap integration) | Planned |
-| **Fingerprinting** | Tech stack and version detection | Planned |
-| | Basic checks (missing security headers, outdated software) | Planned |
+| **Discovery** | Subdomain enumeration (certificate transparency, DNS) | Done |
+| | Port and service scanning (Nmap integration) | Done |
+| **Fingerprinting** | Tech stack and version detection | Done |
+| | Basic checks (missing security headers, outdated software) | Done |
 | **Diffing** | Compare two scans: new, changed, removed assets | Planned |
 | **Storage** | Structured JSON/YAML findings schema | In design |
 | **Reporting** | HTML / PDF / DOCX reports with charts, findings table, remediation | Planned |
