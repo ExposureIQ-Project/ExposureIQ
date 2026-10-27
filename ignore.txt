@@ -1,0 +1,24 @@
+# ExposureIQ ignore rules (noise control for the diff command)
+#
+# Some changes are harmless noise, for example a CDN that rotates its IP
+# addresses every day. A rule here hides such changes from the diff. They are
+# not lost: they are listed separately as "ignored".
+#
+# One rule per line:   <kind pattern> <host pattern>
+#   * is a wildcard. Letter case does not matter.
+#   # starts a comment, and empty lines are skipped.
+#   A change is hidden only when BOTH patterns match it.
+#   "*.example.com" matches subdomains, not example.com itself.
+#
+# Kinds: host.new host.removed ip.new ip.removed port.opened port.closed
+#        port.service_changed tech.new tech.removed tech.version_changed
+#        finding.new finding.resolved finding.severity_changed
+#
+# Nothing is ignored by default: both examples below are commented out.
+# Remove the "#" at the start of a line to turn that rule on.
+#
+# Example 1: ignore every IP change under example.com
+# ip.* *.example.com
+#
+# Example 2: ignore technology changes on one host
+# tech.* cdn.example.com
