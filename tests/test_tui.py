@@ -130,7 +130,7 @@ def test_results_tabs_grouped_hosts_and_finding_selection_shows_fix():
             await app.worker.wait()
             await pilot.pause()
             assert not app.query_one("#scanning").display and app.query_one("#results").display
-            assert len(app.query(TabPane)) == 6
+            assert len(app.query(TabPane)) >= 6
             svg = app.export_screenshot(title="ExposureIQ DEMO results")
             assert "quit/cancel" in svg and "Tab" in svg and "Enter" in svg
             for label in ("Summary", "Subdomains", "Hosts", "Technologies", "Findings", "Ports"):

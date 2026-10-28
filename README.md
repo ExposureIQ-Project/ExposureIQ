@@ -40,7 +40,8 @@ ExposureIQ is built around three ideas:
 | | Port and service scanning (Nmap integration) | Done |
 | **Fingerprinting** | Tech stack and version detection | Done |
 | | Basic checks (missing security headers, outdated software) | Done |
-| **Diffing** | Compare two scans: new, changed, removed assets | Planned |
+| **Diffing** | Compare two scans: new, changed, removed assets | Available |
+| **Diff (TUI)** | Diff view in the terminal UI for saved scans | Available |
 | **Storage** | Structured JSON/YAML findings schema | In design |
 | **Reporting** | HTML / PDF / DOCX reports with charts, findings table, remediation | Planned |
 | | Custom branding and templates | Planned |
@@ -78,7 +79,7 @@ The findings store is the contract between every component. If you want to add a
 
 ## Quick start
 
-> **Not yet available.** The commands below describe the planned CLI. They will be enabled as each milestone lands.
+> The CLI below is available. Run scans and compare them with `diff`.
 
 ```bash
 # 1. Install

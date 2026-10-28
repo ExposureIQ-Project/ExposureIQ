@@ -123,6 +123,14 @@ def build_parser() -> argparse.ArgumentParser:
     add = scope_commands.add_parser("add", help="confirm scope-skipped names from the last saved scan, then run web checks")
     add.add_argument("domain", help="the domain from the last saved scan")
     add.add_argument("--verbose", action="store_true", help="include raw warning details")
+
+    diff = commands.add_parser("diff", help="compare saved scans")
+    diff.add_argument("first", help="domain or OLD.json path")
+    diff.add_argument("second", nargs="?", help="NEW.json path (if comparing two files)")
+    diff.add_argument("--json", action="store_true", help="output JSON only to stdout")
+    diff.add_argument("--all", dest="show_all", action="store_true", help="also show ignored changes")
+    diff.add_argument("--results-dir", dest="results_dir", default="results", help="results directory")
+    diff.add_argument("--fail-on-worse", action="store_true", help="exit 1 if anything got worse")
     return parser
 
 
@@ -162,6 +170,86 @@ def run_scan(args) -> int:
         control.cancel()
         output.error("Cancelled.")
         return 130
+
+
+def run_diff(args) -> int:
+    import json
+    from pathlib import Path
+
+    from exposureiq import history, storage
+    from exposureiq.diffing import pipeline
+    from exposureiq.discovery import subdomains
+
+    first = args.first
+    second = getattr(args, "second", None)
+    results_dir = getattr(args, "results_dir", "results")
+
+    try:
+        # file-to-file?
+        first_path = Path(first)
+        if second is not None:
+            second_path = Path(second)
+            if first_path.exists() or first.endswith(".json"):
+                try:
+                    old_scan = storage.load_scan(str(first_path) if first_path.exists() else first)
+                except Exception as e:
+                    output.error(str(e))
+                    return 2
+                try:
+                    new_scan = storage.load_scan(str(second_path) if second_path.exists() else second)
+                except Exception as e:
+                    output.error(str(e))
+                    return 2
+                try:
+                    diff = pipeline.build_diff(old_scan, new_scan, before_old=None, rules=None)
+                except ValueError as e:
+                    msg = str(e)
+                    if "differ" in msg.lower() or "target" in msg.lower():
+                        output.error("Targets differ")
+                    else:
+                        output.error(msg)
+                    return 2
+                except Exception as e:
+                    output.error(str(e))
+                    return 2
+            else:
+                # treat as domains?
+                pass
+        else:
+            # domain mode
+            try:
+                diff = pipeline.diff_domain(first, results_dir=results_dir)
+            except ValueError as e:
+                output.error(str(e))
+                return 2
+            except Exception as e:
+                output.error(str(e))
+                return 2
+    except SystemExit:
+        raise
+    except Exception as e:
+        output.error(str(e))
+        return 2
+
+    if getattr(args, "json", False):
+        # valid JSON only on stdout
+        out = {"target": diff.get("target"), "old": diff.get("old"), "new": diff.get("new"), 
+               "changes": diff.get("changes"), "ignored": diff.get("ignored") if args.show_all else [], 
+               "notes": diff.get("notes"), "summary": diff.get("summary")}
+        print(json.dumps(out))
+        if args.fail_on_worse and diff.get("summary", {}).get("counts", {}).get("worse", 0) > 0:
+            return 1
+        return 0
+
+    try:
+        output.diff_report(diff, show_all=getattr(args, "show_all", False))
+    except Exception as e:
+        output.error(str(e))
+        return 2
+
+    if args.fail_on_worse and diff.get("summary", {}).get("counts", {}).get("worse", 0) > 0:
+        return 1
+    return 0
 
 
 def run_scope(args) -> int:
@@ -302,10 +390,14 @@ def main(argv=None) -> int:
             parser.print_help()
             return 2
         return run_home(args)
-    if args.command not in ("scan", "scope"):
+    if args.command not in ("scan", "scope", "diff"):
         parser.print_help()
         return 2
-    return run_scope(args) if args.command == "scope" else run_scan(args)
+    if args.command == "scope":
+        return run_scope(args)
+    if args.command == "diff":
+        return run_diff(args)
+    return run_scan(args)
 
 
 if __name__ == "__main__":

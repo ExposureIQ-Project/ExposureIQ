@@ -280,3 +280,89 @@ class PlainReporter:
             summary(result["summary_rows"], result["saved_to"], assets=show_assets)
             if result.get("skipped_hosts") and not result.get("demo") and result.get("saved_to"):
                 info(f"Authorize skipped hosts: exposureiq scope add {result['target']}")
+
+
+def diff_report(diff: dict, show_all: bool = False) -> None:
+    from rich.console import Console
+    from rich.text import Text
+
+    console = Console()
+
+    target = diff.get("target") or (diff.get("new") or {}).get("target") or ""
+    old_meta = diff.get("old") or {}
+    new_meta = diff.get("new") or {}
+    console.print(Text.assemble(("Diff", f"bold {TEAL}"), f"  {target}"))
+    if old_meta.get("started_at") or new_meta.get("started_at"):
+        console.print(Text.assemble("  ", f"old: {old_meta.get('started_at','?')} ({old_meta.get('scan_id','')})", "  |  ", f"new: {new_meta.get('started_at','?')} ({new_meta.get('scan_id','')})", style="dim"))
+    headline = (diff.get("summary") or {}).get("headline") or ""
+    if headline:
+        console.print(Text(headline, style="bold"))
+
+    changes = diff.get("changes") or []
+    ignored = diff.get("ignored") or []
+    from exposureiq.diffing import summary as diff_summary
+
+    def _fmt(c):
+        msg = diff_summary.describe_change(c)
+        status = c.get("status")
+        if status == "confirmed":
+            if "not seen this time" in msg:
+                msg = msg.replace("not seen this time", "removed")
+            elif msg and "removed" not in msg:
+                msg = msg + " (removed)"
+        return msg
+
+    def _is_new(c):
+        k = c.get("kind", "")
+        if k in ("host.new", "ip.new", "port.opened", "tech.new", "finding.new"):
+            return True
+        return False
+
+    def _is_gone(c):
+        k = c.get("kind", "")
+        if k in ("host.removed", "ip.removed", "port.closed", "tech.removed", "finding.resolved"):
+            return True
+        if status := c.get("status"):
+            if status == "confirmed" or status == "missing":
+                if k.endswith(".removed") or k in ("port.closed", "finding.resolved"):
+                    return True
+        return False
+
+    # group by category
+    categories = [
+        ("Subdomains/Hosts", lambda c: c.get("kind") in ("host.new", "host.removed")),
+        ("IP addresses", lambda c: c.get("kind") in ("ip.new", "ip.removed")),
+        ("Open ports / services", lambda c: c.get("kind") in ("port.opened", "port.closed", "port.service_changed")),
+        ("Technologies", lambda c: c.get("kind") in ("tech.new", "tech.removed", "tech.version_changed")),
+        ("Findings", lambda c: c.get("kind") in ("finding.new", "finding.resolved", "finding.severity_changed")),
+    ]
+
+    for title, pred in categories:
+        items = [c for c in changes if isinstance(c, dict) and pred(c)]
+        if not items:
+            continue
+        console.print(Text(title, style=f"bold {TEAL}"))
+        for c in items:
+            msg = _fmt(c)
+            k = c.get("kind", "")
+            if _is_new(c) and not (k.endswith(".removed") or k in ("port.closed", "finding.resolved") or c.get("status") == "confirmed"):
+                console.print(Text.assemble(("  + ", "bold green"), (msg, "green")))
+            elif _is_gone(c):
+                console.print(Text.assemble(("  - ", "bold red"), (msg, "red")))
+            elif c.get("direction") == "better":
+                console.print(Text.assemble(("  ~ ", "bold green"), (msg, "green")))
+            elif c.get("direction") == "worse":
+                console.print(Text.assemble(("  ! ", "bold red"), (msg, "red")))
+            else:
+                console.print(Text(f"  • {msg}", style="dim"))
+
+    if show_all and ignored:
+        console.print(Text("Ignored", style="dim"))
+        for c in ignored:
+            if isinstance(c, dict):
+                console.print(Text(f"  { _fmt(c) }", style="dim"))
+
+    notes = diff.get("notes") or []
+    for n in notes:
+        if isinstance(n, str):
+            console.print(Text(f"  note: {n}", style="dim"))
