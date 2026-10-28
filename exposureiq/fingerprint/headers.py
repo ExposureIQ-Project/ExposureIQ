@@ -7,6 +7,7 @@ No network, no severity, no advice text.
 
 HSTS_MIN_AGE = 15552000  # 180 days, in seconds
 WEAK_SCRIPT_SOURCES = ("'unsafe-inline'", "'unsafe-eval'", "*")
+REDIRECT_CODES = {301, 302, 303, 307, 308}
 
 
 def _parse_csp(value: str) -> dict[str, list[str]]:
@@ -66,6 +67,14 @@ def check_security_headers(response: dict) -> list[dict]:
                 add("headers.weak_hsts",
                     f"Strict-Transport-Security max-age is missing or below "
                     f"{HSTS_MIN_AGE} seconds ({hsts}) on {url}")
+
+    # A redirect has no page of its own, and the scan never follows it (one
+    # front-page GET only). The headers below describe a page, so judging them
+    # here would give false "missing" findings. The target of the redirect is
+    # checked when it is scanned as its own host. HSTS above still counts.
+    status = response.get("status")
+    if isinstance(status, int) and status in REDIRECT_CODES and "location" in headers:
+        return findings
 
     if csp_value is None:
         add("headers.missing_csp", f"No Content-Security-Policy header on {url}")

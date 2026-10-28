@@ -13,12 +13,12 @@ GOOD_HEADERS = {
 }
 
 
-def make_response(headers=None, scheme="https"):
+def make_response(headers=None, scheme="https", status=200):
     return {
         "host": "example.com",
         "url": f"{scheme}://example.com/",
         "scheme": scheme,
-        "status": 200,
+        "status": status,
         "headers": GOOD_HEADERS if headers is None else headers,
         "body": "",
     }
@@ -192,3 +192,47 @@ def test_one_finding_per_rule_never_duplicates():
 def test_header_names_in_any_case_are_understood():
     upper = {k.upper(): v for k, v in GOOD_HEADERS.items()}
     assert check_security_headers(make_response(upper)) == []
+
+
+PAGE_ONLY_RULES = {
+    "headers.missing_csp",
+    "headers.missing_x_content_type_options",
+    "headers.missing_clickjacking_protection",
+    "headers.missing_referrer_policy",
+    "headers.missing_permissions_policy",
+}
+REDIRECT = {"location": "https://www.example.com/"}
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_redirect_is_not_judged_on_page_only_headers(status):
+    found = rules(make_response(REDIRECT, status=status))
+    assert not PAGE_ONLY_RULES & set(found)
+    assert found == ["headers.missing_hsts"]  # HSTS still counts on https
+
+
+def test_redirect_still_checks_hsts():
+    weak = {**REDIRECT, "strict-transport-security": "max-age=100"}
+    assert rules(make_response(weak, status=301)) == ["headers.weak_hsts"]
+    good = {**REDIRECT, "strict-transport-security": "max-age=31536000"}
+    assert rules(make_response(good, status=301)) == []
+
+
+def test_plain_http_redirect_has_no_findings():
+    assert rules(make_response(REDIRECT, scheme="http", status=301)) == []
+
+
+def test_redirect_status_without_location_is_still_judged_as_a_page():
+    found = rules(make_response({}, status=301))
+    assert PAGE_ONLY_RULES <= set(found)
+
+
+def test_other_statuses_with_location_are_still_judged_as_a_page():
+    for status in (200, 304, 404):
+        assert PAGE_ONLY_RULES <= set(rules(make_response(REDIRECT, status=status)))
+
+
+@pytest.mark.parametrize("status", [None, "301", [301], 301.0, True])
+def test_odd_status_values_do_not_crash_and_count_as_a_page(status):
+    found = rules(make_response(REDIRECT, status=status))
+    assert PAGE_ONLY_RULES <= set(found)
