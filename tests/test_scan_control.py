@@ -15,12 +15,20 @@ from exposureiq.tui.scan import ScanStages, run_scan
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
     attempts = []
+    original_connect = socket.socket.connect
+
+    def blocked_connect(sock, address, *args, **kwargs):
+        # asyncio's event loop uses a loopback socketpair on Windows.
+        if isinstance(address, tuple) and address and address[0] in ("127.0.0.1", "::1", "localhost"):
+            return original_connect(sock, address, *args, **kwargs)
+        attempts.append((sock, address))
+        raise AssertionError("cancellation tests must not use the network")
 
     def blocked(*args, **kwargs):
         attempts.append(args)
         raise AssertionError("cancellation tests must not use the network")
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
+    monkeypatch.setattr(socket.socket, "connect", blocked_connect)
     monkeypatch.setattr(socket, "create_connection", blocked)
     yield
     assert attempts == []

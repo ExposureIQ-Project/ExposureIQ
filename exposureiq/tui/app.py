@@ -22,7 +22,6 @@ from exposureiq.tui.scan import PHASES, ScanStages, run_scan
 from exposureiq.tui.user_scope import MAX_HOSTS, append_hosts, eligible_hosts
 from exposureiq.diffing import pipeline as diff_pipeline
 from exposureiq.diffing import summary as diff_summary
-from exposureiq import history
 
 _SEVERITY = {"high": "bold #EF4444", "medium": output.AMBER, "low": "#60A5FA"}
 _SPINNER = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
@@ -344,10 +343,23 @@ class ExposureIQApp(App[int]):
         self._finished, self.exit_code = True, 0
         self._hide_all_views()
         self.query_one("#home").display = True
+        self._fit_home_logo()
         self._set_back(False)
         self._set_title(suffix="home", demo=False)
         self._keys("Type a domain   Tab move   Enter scan   Ctrl+C quit")
-        self.call_after_refresh(self.query_one("#home-domain", Input).focus)
+        field = self.query_one("#home-domain", Input)
+        field.focus()
+        self.call_after_refresh(field.focus)
+
+    def _fit_home_logo(self) -> None:
+        """Hide the large logo on short terminals so the controls stay visible."""
+        try:
+            self.query_one("#ascii-logo", Static).display = self.size.height >= 30
+        except Exception:
+            pass
+
+    def on_resize(self, event) -> None:
+        self._fit_home_logo()
 
     def _show_saved_list(self):
         self.mode = "browser"
@@ -855,10 +867,6 @@ class ExposureIQApp(App[int]):
         except Exception as error:
             report({"kind": "rerun_failed", "message": f"Scope/web update failed: {error}"})
 
-
-    def action_diff_view(self) -> None:
-        self._show_diff_browser()
-
     def _show_diff_browser(self) -> None:
         self.mode = "diff"
         self.query_one("#topbar").display = True
@@ -984,10 +992,8 @@ class ExposureIQApp(App[int]):
             pass
 
 
-    @on(Button.Pressed, "#diff-latest")
     def _update_scan_diff_tab(self) -> None:
         try:
-            tabs = self.query_one("#results", TabbedContent)
             try:
                 tab = self.query_one("#scan-diff-tab", TabPane)
             except Exception:
@@ -1045,8 +1051,10 @@ class ExposureIQApp(App[int]):
                 from exposureiq import storage
 
                 new_scan = storage.load_scan(saved_to)
-                old_path = others[-1]
+                # list_saved() is newest first, so others[0] is the previous scan.
+                old_path = others[0]
                 old_scan = storage.load_scan(old_path)
+                before_old = storage.load_scan(others[1]) if len(others) > 1 else None
             except Exception as e:
                 try:
                     self.query_one("#scan-diff-body").update("")
@@ -1057,7 +1065,7 @@ class ExposureIQApp(App[int]):
                     pass
                 return
             try:
-                diff = diff_pipeline.build_diff(old_scan, new_scan)
+                diff = diff_pipeline.build_diff(old_scan, new_scan, before_old=before_old)
             except Exception as e:
                 try:
                     self.query_one("#scan-diff-body").update("")
@@ -1129,25 +1137,3 @@ class ExposureIQApp(App[int]):
                 pass
         except Exception:
             pass
-
-    def _on_diff_latest(self) -> None:
-        # try to get target from selected saved entry
-        target = None
-        try:
-            table = self.query_one("#saved-table", DataTable)
-            if table.cursor_row is not None and table.row_count > table.cursor_row:
-                row_key = table.get_row_at(table.cursor_row)
-                # not directly giving target; better use list
-        except Exception:
-            pass
-        try:
-            entries = list_saved(self.results_dir)
-            # if we have selection, could map - but easier: use first valid target
-            for e in entries:
-                if e.get("target") and e.get("target") != "unreadable":
-                    target = e["target"]
-                    break
-        except Exception:
-            target = None
-        self._show_diff_browser()
-        self._load_diff_for_target(target)

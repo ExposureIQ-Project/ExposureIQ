@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from rich.text import Text
-from textual.widgets import Button, DataTable, Input, Static
+from textual.widgets import Button, DataTable, Input, Static, TabPane
 
 from exposureiq import cli, storage
 from exposureiq.discovery import scope
@@ -27,12 +27,20 @@ from exposureiq.tui.scan import PHASES
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
     attempts = []
+    original_connect = socket.socket.connect
+
+    def blocked_connect(sock, address, *args, **kwargs):
+        # asyncio's event loop uses a loopback socketpair on Windows.
+        if isinstance(address, tuple) and address and address[0] in ("127.0.0.1", "::1", "localhost"):
+            return original_connect(sock, address, *args, **kwargs)
+        attempts.append((sock, address))
+        raise AssertionError("saved-preview tests must not use the network")
 
     def blocked(*args, **kwargs):
         attempts.append(args)
         raise AssertionError("saved-preview tests must not use the network")
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
+    monkeypatch.setattr(socket.socket, "connect", blocked_connect)
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
     yield
@@ -255,6 +263,40 @@ def test_home_scan_shows_results_with_domain_and_scan_time(tmp_path):
             assert "example.com" in text(app.query_one("#summary-notes", Static))
             await pilot.press("q")
         assert app.return_value == 0
+
+    asyncio.run(exercise())
+
+
+def test_results_diff_tab_shows_changes_since_the_previous_scan(tmp_path):
+    results = tmp_path / "results"
+    previous = storage.build_scan("example.com", [], started_at="2026-10-20T08:00:00Z")
+    storage.save_scan(previous, str(results / "one.json"))
+    current = storage.build_scan("example.com", [{
+        "host": "example.com",
+        "ips": [{"ip": "192.0.2.10", "open_ports": [
+            {"port": 8443, "protocol": "tcp", "service": "https-alt"},
+        ]}],
+        "technologies": [], "findings": [],
+    }], started_at="2026-10-21T08:00:00Z")
+    storage.save_scan(current, str(results / "two.json"))
+
+    result = fake_result("example.com")
+    result["saved_to"] = str(results / "two.json")
+
+    async def exercise():
+        app = home_app(tmp_path, scan_job=lambda args, stages, report, control, version: result)
+        async with app.run_test(size=(110, 34)) as pilot:
+            await pilot.pause()
+            app.query_one("#home-domain", Input).focus()
+            await pilot.press(*list("example.com"))
+            await pilot.click("#home-scan")
+            await app.worker.wait()
+            await pilot.pause()
+            assert app.mode == "results"
+            assert app.query_one("#scan-diff-tab", TabPane).display
+            assert "1 things got worse" in text(app.query_one("#scan-diff-headline", Static))
+            assert "example.com" in text(app.query_one("#scan-diff-body", Static))
+            await pilot.press("q")
 
     asyncio.run(exercise())
 

@@ -78,11 +78,21 @@ def check_security_headers(response: dict) -> list[dict]:
 
     if csp_value is None:
         add("headers.missing_csp", f"No Content-Security-Policy header on {url}")
+    elif not csp:
+        # A blank, whitespace-only, or semicolon-only policy parses to nothing
+        # and is ignored by browsers, so it gives no protection at all.
+        add("headers.missing_csp", f"Content-Security-Policy is empty on {url}")
     else:
         weak = _weak_script_sources(csp)
         if weak:
             add("headers.weak_csp",
                 f"Content-Security-Policy allows {', '.join(weak)} for scripts on {url}")
+        elif "script-src" not in csp and "default-src" not in csp:
+            # Neither directive is present, so scripts are unrestricted even
+            # though the policy sets other directives (for example img-src).
+            add("headers.weak_csp",
+                f"Content-Security-Policy has no script-src or default-src "
+                f"directive on {url}")
 
     xcto = headers.get("x-content-type-options")
     if xcto is None:

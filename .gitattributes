@@ -1,0 +1,8 @@
+# Keep the repository consistent on Windows and POSIX. Git normalizes text
+# files to LF in the index and checks them out with LF everywhere.
+* text=auto eol=lf
+
+# Windows scripts, if added later, should keep native CRLF endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

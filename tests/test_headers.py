@@ -135,11 +135,45 @@ def test_weak_csp_variants_fire(csp):
     "script-src 'self' https://cdn.example.com; frame-ancestors 'none'",
     "script-src 'self'; default-src *; frame-ancestors 'none'",   # script-src wins
     "script-src https://*.example.com; frame-ancestors 'none'",  # not a bare *
-    "style-src 'unsafe-inline'; frame-ancestors 'none'",         # only scripts count
+    "script-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'none'",  # only scripts count
 ])
 def test_safe_csp_variants_do_not_fire_weak_csp(csp):
     headers = {**GOOD_HEADERS, "content-security-policy": csp}
     assert "headers.weak_csp" not in rules(make_response(headers))
+
+
+@pytest.mark.parametrize("csp", ["", " ", "   ", ";", " ; ; "])
+def test_blank_csp_counts_as_missing_and_never_weak(csp):
+    headers = {**GOOD_HEADERS, "content-security-policy": csp}
+    found = rules(make_response(headers))
+    assert "headers.missing_csp" in found
+    assert "headers.weak_csp" not in found
+
+
+@pytest.mark.parametrize("csp", [
+    "img-src 'self'; frame-ancestors 'none'",
+    "style-src 'self'; frame-ancestors 'none'",
+    "frame-ancestors 'none'",
+])
+def test_csp_without_script_restriction_is_weak(csp):
+    headers = {**GOOD_HEADERS, "content-security-policy": csp}
+    found = rules(make_response(headers))
+    assert "headers.weak_csp" in found
+    assert "headers.missing_csp" not in found
+
+
+@pytest.mark.parametrize("csp", [
+    "script-src 'none'",
+    "script-src",
+    "default-src 'none'",
+    "default-src",
+    "script-src 'self'; img-src *",
+])
+def test_csp_with_any_script_directive_is_not_weak(csp):
+    headers = {**GOOD_HEADERS, "content-security-policy": csp}
+    found = rules(make_response(headers))
+    assert "headers.weak_csp" not in found
+    assert "headers.missing_csp" not in found
 
 
 def test_missing_csp_does_not_also_report_weak_csp():

@@ -138,7 +138,10 @@ def test_unreadable_user_scope_is_not_overwritten(monkeypatch, repo_scope, isola
 def test_scope_link_to_repo_is_never_written(repo_scope, isolated_user_scope):
     before = repo_scope.read_bytes()
     isolated_user_scope.parent.mkdir(parents=True)
-    isolated_user_scope.symlink_to(repo_scope)
+    try:
+        isolated_user_scope.symlink_to(repo_scope)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"symlinks are not available on this system: {error}")
     with pytest.raises(ValueError):
         user_scope.append_hosts("example.com", ["api.example.com"], "example.com")
     assert repo_scope.read_bytes() == before

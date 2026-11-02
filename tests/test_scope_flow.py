@@ -27,12 +27,20 @@ from exposureiq.tui.user_scope import remember_scan
 @pytest.fixture(autouse=True)
 def no_network(monkeypatch):
     attempts = []
+    original_connect = socket.socket.connect
+
+    def blocked_connect(sock, address, *args, **kwargs):
+        # asyncio's event loop uses a loopback socketpair on Windows.
+        if isinstance(address, tuple) and address and address[0] in ("127.0.0.1", "::1", "localhost"):
+            return original_connect(sock, address, *args, **kwargs)
+        attempts.append((sock, address))
+        raise AssertionError("scope-flow tests must not use the network")
 
     def blocked(*args, **kwargs):
         attempts.append(args)
         raise AssertionError("scope-flow tests must not use the network")
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
+    monkeypatch.setattr(socket.socket, "connect", blocked_connect)
     monkeypatch.setattr(socket, "create_connection", blocked)
     monkeypatch.setattr(socket, "getaddrinfo", blocked)
     yield
@@ -586,7 +594,10 @@ def test_last_scan_pointer_never_follows_a_predictable_temp_link(case, isolated_
     directory = isolated_user_scope.parent / "last-scans"
     directory.mkdir(parents=True)
     linked = directory / "example.com.tmp"
-    linked.symlink_to(case.repo)
+    try:
+        linked.symlink_to(case.repo)
+    except (OSError, NotImplementedError) as error:
+        pytest.skip(f"symlinks are not available on this system: {error}")
     remember_scan(case.result)
     assert case.repo.read_bytes() == before and linked.is_symlink()
     assert (directory / "example.com.json").exists()

@@ -27,7 +27,7 @@ RULES = {
     },
     "headers.weak_csp": {
         "severity": "medium", "title": "Weak content security policy",
-        "recommendation": "Remove unsafe-inline, unsafe-eval, and broad script wildcards from Content-Security-Policy.",
+        "recommendation": "Add a script-src or default-src directive, and remove unsafe-inline, unsafe-eval, and broad script wildcards from Content-Security-Policy.",
     },
     "headers.missing_x_content_type_options": {
         "severity": "low", "title": "Missing content-type protection",

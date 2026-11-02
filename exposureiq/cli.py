@@ -176,9 +176,8 @@ def run_diff(args) -> int:
     import json
     from pathlib import Path
 
-    from exposureiq import history, storage
+    from exposureiq import storage
     from exposureiq.diffing import pipeline
-    from exposureiq.discovery import subdomains
 
     first = args.first
     second = getattr(args, "second", None)
@@ -188,33 +187,35 @@ def run_diff(args) -> int:
         # file-to-file?
         first_path = Path(first)
         if second is not None:
+            if not (first_path.exists() or first.endswith(".json")):
+                output.error(
+                    "When two arguments are given, both must be saved scan files "
+                    "(for example old.json new.json). For a domain, pass one argument."
+                )
+                return 2
             second_path = Path(second)
-            if first_path.exists() or first.endswith(".json"):
-                try:
-                    old_scan = storage.load_scan(str(first_path) if first_path.exists() else first)
-                except Exception as e:
-                    output.error(str(e))
-                    return 2
-                try:
-                    new_scan = storage.load_scan(str(second_path) if second_path.exists() else second)
-                except Exception as e:
-                    output.error(str(e))
-                    return 2
-                try:
-                    diff = pipeline.build_diff(old_scan, new_scan, before_old=None, rules=None)
-                except ValueError as e:
-                    msg = str(e)
-                    if "differ" in msg.lower() or "target" in msg.lower():
-                        output.error("Targets differ")
-                    else:
-                        output.error(msg)
-                    return 2
-                except Exception as e:
-                    output.error(str(e))
-                    return 2
-            else:
-                # treat as domains?
-                pass
+            try:
+                old_scan = storage.load_scan(str(first_path) if first_path.exists() else first)
+            except Exception as e:
+                output.error(str(e))
+                return 2
+            try:
+                new_scan = storage.load_scan(str(second_path) if second_path.exists() else second)
+            except Exception as e:
+                output.error(str(e))
+                return 2
+            try:
+                diff = pipeline.build_diff(old_scan, new_scan, before_old=None, rules=None)
+            except ValueError as e:
+                msg = str(e)
+                if "differ" in msg.lower() or "target" in msg.lower():
+                    output.error("Targets differ")
+                else:
+                    output.error(msg)
+                return 2
+            except Exception as e:
+                output.error(str(e))
+                return 2
         else:
             # domain mode
             try:

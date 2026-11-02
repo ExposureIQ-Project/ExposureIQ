@@ -85,7 +85,11 @@ def result_from_snapshot(snapshot: dict, saved_to) -> dict:
 def list_saved(directory=RESULTS_DIR, limit: int = 200) -> list:
     """Newest first. An unreadable file is listed with an error, never hidden."""
     try:
-        paths = sorted(Path(directory).glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
+        paths = sorted(
+            Path(directory).glob("*.json"),
+            key=lambda item: (item.stat().st_mtime, item.name),
+            reverse=True,
+        )
     except OSError:
         return []
     entries = []
