@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 
 from exposureiq.report import branding
+from exposureiq.report.branding import hex_to_rgb as _rgb
 
 PAGE_WIDTH = 595.276
 PAGE_HEIGHT = 841.89
@@ -41,11 +42,6 @@ _BOLD_WIDTHS = (
     611, 389, 556, 333, 611, 556, 778, 556, 556, 500,
     389, 280, 389, 584,
 )
-
-
-def _rgb(value: str) -> tuple[float, float, float]:
-    value = value.lstrip("#")
-    return tuple(int(value[index:index + 2], 16) / 255 for index in (0, 2, 4))
 
 
 def _clean(text) -> str:
@@ -184,7 +180,7 @@ class ReportPdf:
         )
 
     def wrapped(self, value, x: float = MARGIN, width: float = CONTENT_WIDTH,
-                size: float = 9.5, leading: float = 13, color: str = branding.SLATE,
+                size: float = 9.5, leading: float = 13, color: str = branding.PRINT_SECONDARY,
                 bold: bool = False) -> None:
         for line in wrap(value, width, size, bold):
             self.text(x, self.y, line, size, bold, color)
@@ -209,9 +205,9 @@ class ReportPdf:
             self._logo(MARGIN, 24, 20)
             self.text(MARGIN + 26, 39, "Exposure", 11, True, branding.DARK)
             self.text(MARGIN + 26 + measure("Exposure", 11, True), 39, "IQ", 11, True,
-                      branding.TEAL)
+                      branding.PRINT_ACCENT_TEXT)
             self.text(MARGIN, 39, self.report.get("target", ""), 8, False,
-                      branding.MUTED, align="right", width=CONTENT_WIDTH)
+                      branding.PRINT_MUTED, align="right", width=CONTENT_WIDTH)
             self.line(MARGIN, 50, PAGE_WIDTH - MARGIN, 50, branding.LINE, 0.8)
             self.y = 76
         else:
@@ -223,7 +219,7 @@ class ReportPdf:
 
     def heading(self, title: str, kicker: str | None = None) -> None:
         if kicker:
-            self.text(MARGIN, self.y, kicker.upper(), 8, True, branding.TEAL)
+            self.text(MARGIN, self.y, kicker.upper(), 8, True, branding.PRINT_ACCENT_TEXT)
             self.y += 16
         self.text(MARGIN, self.y, title, 20, True, branding.DARK)
         self.y += 14
@@ -231,18 +227,18 @@ class ReportPdf:
         self.y += 14
 
     def lede(self, text: str) -> None:
-        self.wrapped(text, size=9.5, leading=13.5, color=branding.MUTED)
+        self.wrapped(text, size=9.5, leading=13.5, color=branding.PRINT_MUTED)
         self.y += 10
 
     def subheading(self, text: str) -> None:
         self.ensure(34)
-        self.text(MARGIN, self.y, text.upper(), 8.5, True, branding.SLATE)
+        self.text(MARGIN, self.y, text.upper(), 8.5, True, branding.PRINT_SECONDARY)
         self.y += 15
 
-    def bullet(self, text: str, color: str = branding.SLATE, size: float = 9) -> None:
+    def bullet(self, text: str, color: str = branding.PRINT_SECONDARY, size: float = 9) -> None:
         lines = wrap(text, CONTENT_WIDTH - 14, size)
         self.ensure(len(lines) * 12 + 4)
-        self.text(MARGIN, self.y, "\u2022", size + 1, True, branding.TEAL)
+        self.text(MARGIN, self.y, "\u2022", size + 1, True, branding.PRINT_ACCENT_TEXT)
         for line in lines:
             self.text(MARGIN + 12, self.y, line, size, False, color)
             self.y += 12
@@ -275,7 +271,7 @@ class ReportPdf:
         self._op(" ".join(path) + " h f")
         # Light dot.
         cx, cy, radius = branding.LOGO_DOT
-        self._circle(px(cx), py(cy), radius * scale, "#F4F7FA")
+        self._circle(px(cx), py(cy), radius * scale, branding.TEXT_PRIMARY)
 
     def _circle(self, cx: float, top: float, radius: float, color: str) -> None:
         red, green, blue = _rgb(color)
@@ -297,27 +293,27 @@ class ReportPdf:
         self.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, branding.DARK)
         self.rect(0, 0, 9, PAGE_HEIGHT, branding.TEAL)
         self._logo(MARGIN, 52, 46)
-        self.text(MARGIN + 56, 74, "Exposure", 18, True, "#FFFFFF")
+        self.text(MARGIN + 56, 74, "Exposure", 18, True, branding.TEXT_PRIMARY)
         self.text(MARGIN + 56 + measure("Exposure", 18, True), 74, "IQ", 18, True,
                   branding.TEAL)
-        self.text(MARGIN + 56, 89, "ATTACK SURFACE MANAGEMENT", 7, False, "#94A3B8")
+        self.text(MARGIN + 56, 89, "ATTACK SURFACE MANAGEMENT", 7, False, branding.TEXT_SUBTLE)
 
         self.text(MARGIN, 165, (report.get("title") or "Security Assessment Report").upper(),
                   8.5, True, branding.TEAL)
-        self.text(MARGIN, 205, report.get("target", ""), 34, True, "#FFFFFF")
+        self.text(MARGIN, 205, report.get("target", ""), 34, True, branding.TEXT_PRIMARY)
         self.text(MARGIN, 232, f"Scan {report.get('scan_id', '')}  \u00b7  "
-                  f"{report.get('started_label', '')}", 9, False, "#94A3B8")
+                  f"{report.get('started_label', '')}", 9, False, branding.TEXT_SUBTLE)
 
         risk = report.get("risk") or {}
         self.rect(MARGIN, 250, 104, 20, risk.get("color", branding.TEAL))
-        self.text(MARGIN, 264, risk.get("label", "").upper(), 8, True, "#FFFFFF",
+        self.text(MARGIN, 264, risk.get("label", "").upper(), 8, True, branding.DARK,
                   align="center", width=104)
 
         self.text(MARGIN, 304, "EXECUTIVE SUMMARY", 8.5, True, branding.TEAL)
         self.y = 320
         for paragraph in report.get("executive_summary") or []:
             self.wrapped(paragraph, width=CONTENT_WIDTH - 16, size=9.5, leading=13.5,
-                         color="#CBD5E1")
+                         color=branding.TEXT_SECONDARY)
             self.y += 5
 
         counts = report.get("severity") or {}
@@ -332,17 +328,17 @@ class ReportPdf:
         top = 610
         for index, (name, value, color) in enumerate(cards):
             x = MARGIN + index * (width + gap)
-            self.rect(x, top, width, 64, "#1B2436")
+            self.rect(x, top, width, 64, branding.INNER_SURFACE)
             self.rect(x, top, 3, 64, color)
             self.text(x + 12, top + 30, str(value), 24, True, color)
             label = "TOTAL FINDINGS" if name == "total" else f"{name.upper()} SEVERITY"
-            self.text(x + 12, top + 47, label, 6.5, True, "#94A3B8")
+            self.text(x + 12, top + 47, label, 6.5, True, branding.TEXT_SUBTLE)
 
-        self.line(MARGIN, 792, PAGE_WIDTH - MARGIN, 792, "#334155", 0.8)
+        self.line(MARGIN, 792, PAGE_WIDTH - MARGIN, 792, branding.LINE, 0.8)
         self.text(MARGIN, 806, "CONFIDENTIAL  \u00b7  Prepared for the owner of "
-                  f"{report.get('target', '')}", 7, False, "#64748B")
+                  f"{report.get('target', '')}", 7, False, branding.MUTED)
         self.text(MARGIN, 806, f"Generated {report.get('generated_label', '')}", 7,
-                  False, "#64748B", align="right", width=CONTENT_WIDTH)
+                  False, branding.MUTED, align="right", width=CONTENT_WIDTH)
 
     # -------------------------------------------------------------- findings
     def findings(self) -> None:
@@ -363,10 +359,10 @@ class ReportPdf:
 
     def _table_header(self, headers: tuple, widths: tuple) -> None:
         height = 22
-        self.rect(MARGIN, self.y, CONTENT_WIDTH, height, branding.DARK)
+        self.rect(MARGIN, self.y, CONTENT_WIDTH, height, branding.TABLE_HEADER)
         x = MARGIN
         for header, width in zip(headers, widths):
-            self.text(x + 4, self.y + 14, header.upper(), 7, True, "#FFFFFF")
+            self.text(x + 4, self.y + 14, header.upper(), 7, True, branding.TEXT_PRIMARY)
             x += width
         self.y += height
 
@@ -394,16 +390,16 @@ class ReportPdf:
             self._table_header(("Severity", "Asset", "Finding and evidence", "Recommendation"),
                                widths)
         if index % 2 == 1:
-            self.rect(MARGIN, self.y, CONTENT_WIDTH, row_height, branding.PAPER)
+            self.rect(MARGIN, self.y, CONTENT_WIDTH, row_height, branding.PRINT_SURFACE)
 
         severity = finding.get("severity", "low")
         color = branding.SEVERITY_COLORS.get(severity, branding.SEVERITY_COLORS["low"])
         label = branding.SEVERITY_LABELS.get(severity, severity.title()).upper()
         self.rect(x_sev + 4, self.y + 7, 42, 13, color)
-        self.text(x_sev + 4, self.y + 17, label, 6.2, True, "#FFFFFF",
+        self.text(x_sev + 4, self.y + 17, label, 6.2, True, branding.DARK,
                   align="center", width=42)
         self.text(x_sev + 4, self.y + 31, finding.get("id") or "", 6.5, False,
-                  branding.MUTED)
+                  branding.PRINT_MUTED)
 
         self.text(x_asset + 4, self.y + 15, finding.get("host") or "", 8.5, True,
                   branding.DARK)
@@ -411,21 +407,21 @@ class ReportPdf:
         if finding.get("ip"):
             endpoint = finding["ip"] + (f":{finding['port']}" if finding.get("port") else "")
         if endpoint:
-            self.text(x_asset + 4, self.y + 26, endpoint, 7, False, branding.MUTED)
+            self.text(x_asset + 4, self.y + 26, endpoint, 7, False, branding.PRINT_MUTED)
 
         cursor = self.y + 12
         for line in title_lines:
             self.text(x_find + 4, cursor, line, 8.5, True, branding.DARK)
             cursor += 9.5
         for line in detail_lines:
-            self.text(x_find + 4, cursor, line, 8, False, branding.SLATE)
+            self.text(x_find + 4, cursor, line, 8, False, branding.PRINT_SECONDARY)
             cursor += 9.5
         self.text(x_find + 4, cursor + 1, finding.get("rule") or "", 6.5, False,
-                  branding.MUTED)
+                  branding.PRINT_MUTED)
 
         cursor = self.y + 12
         for line in rec_lines:
-            self.text(x_rec + 4, cursor, line, 8, False, branding.SLATE)
+            self.text(x_rec + 4, cursor, line, 8, False, branding.PRINT_SECONDARY)
             cursor += 9.5
 
         self.y += row_height
@@ -435,11 +431,11 @@ class ReportPdf:
         lines = wrap(text, CONTENT_WIDTH - 28, 9.5)
         height = max(44, len(lines) * 13 + 24)
         self.ensure(height)
-        self.rect(MARGIN, self.y, CONTENT_WIDTH, height, branding.PAPER)
+        self.rect(MARGIN, self.y, CONTENT_WIDTH, height, branding.PRINT_SURFACE)
         self.rect(MARGIN, self.y, 4, height, branding.TEAL)
         cursor = self.y + 18
         for line in lines:
-            self.text(MARGIN + 16, cursor, line, 9.5, False, branding.SLATE)
+            self.text(MARGIN + 16, cursor, line, 9.5, False, branding.PRINT_SECONDARY)
             cursor += 13
         self.y += height + 10
 
@@ -469,7 +465,7 @@ class ReportPdf:
         width = (CONTENT_WIDTH - gap * 2) / 3
         for index, (name, value, color) in enumerate(labels):
             x = MARGIN + index * (width + gap)
-            self.rect(x, self.y, width, 50, branding.PAPER)
+            self.rect(x, self.y, width, 50, branding.INNER_SURFACE)
             self.rect(x, self.y, 3, 50, color)
             self.text(x + 12, self.y + 24, str(value), 19, True, color)
             self.text(x + 12, self.y + 39, name.upper(), 7, True, branding.MUTED)
@@ -489,21 +485,21 @@ class ReportPdf:
                 self.bullet(item, size=8.5)
             if len(lines) > 32:
                 self.wrapped(f"{len(lines) - 32} more change(s) are in the JSON diff output.",
-                             size=8.5, color=branding.MUTED)
+                             size=8.5, color=branding.PRINT_MUTED)
             self.y += 4
 
         notes = diff.get("notes") or []
         if notes:
             self.subheading("Notes")
             for note in notes:
-                self.bullet(note, size=8.5, color=branding.MUTED)
+                self.bullet(note, size=8.5, color=branding.PRINT_MUTED)
 
         old = diff.get("old") or {}
         new = diff.get("new") or {}
         self.y += 4
         self.wrapped(f"Compared scan {old.get('scan_id', '?')} ({old.get('started_at', '?')}) "
                      f"with {new.get('scan_id', '?')} ({new.get('started_at', '?')}).",
-                     size=8, color=branding.MUTED)
+                     size=8, color=branding.PRINT_MUTED)
 
     # ---------------------------------------------------------------- charts
     def charts(self) -> None:
@@ -515,7 +511,7 @@ class ReportPdf:
         self._donut(MARGIN + 90, 250, 66, 22, counts)
 
         legend_x = MARGIN + 210
-        self.text(legend_x, 200, "FINDINGS BY SEVERITY", 8, True, branding.SLATE)
+        self.text(legend_x, 200, "FINDINGS BY SEVERITY", 8, True, branding.PRINT_SECONDARY)
         cursor = 224
         total = counts.get("total") or 0
         for name in ("high", "medium", "low"):
@@ -527,12 +523,12 @@ class ReportPdf:
             percent = round(value * 100 / total) if total else 0
             finding_word = "finding" if value == 1 else "findings"
             self.text(legend_x + 16, cursor + 14, f"{value} {finding_word} \u00b7 {percent}%",
-                      8, False, branding.MUTED)
+                      8, False, branding.PRINT_MUTED)
             cursor += 34
 
         self._line_chart(self.report.get("history") or [], MARGIN, 360, CONTENT_WIDTH, 190)
         self.text(MARGIN, 585, f"{len(self.report.get('history') or [])} saved scan(s) for "
-                  "this target.", 8, False, branding.MUTED)
+                  "this target.", 8, False, branding.PRINT_MUTED)
 
     def _donut(self, cx: float, top: float, radius: float, thickness: float,
                counts: dict) -> None:
@@ -549,7 +545,7 @@ class ReportPdf:
                        start, start + sweep)
             start += sweep
         self.text(cx, top + 3, str(total), 26, True, branding.DARK, align="center", width=0)
-        self.text(cx, top + 18, "FINDINGS", 7, True, branding.MUTED, align="center", width=0)
+        self.text(cx, top + 18, "FINDINGS", 7, True, branding.PRINT_MUTED, align="center", width=0)
 
     def _ring(self, cx: float, top: float, radius: float, thickness: float, color: str,
               start: float, end: float) -> None:
@@ -574,18 +570,18 @@ class ReportPdf:
         maximum = max(values) if values else 0
         maximum = max(1, math.ceil(maximum / 4)) * 4
 
-        self.text(x + left, top - 2, "ASSETS OVER TIME", 8, True, branding.SLATE)
+        self.text(x + left, top - 2, "ASSETS OVER TIME", 8, True, branding.PRINT_SECONDARY)
         for step in range(5):
             value = maximum * step / 4
             line_top = top + 16 + plot_height - plot_height * step / 4
             self.line(x + left, line_top, x + left + plot_width, line_top,
                       branding.LINE, 0.6)
             self.text(x + left - 6, line_top + 3, f"{value:.0f}", 7, False,
-                      branding.MUTED, align="right", width=0)
+                      branding.PRINT_MUTED, align="right", width=0)
 
         if not points:
             self.text(x + left + plot_width / 2, top + 70, "No scan history yet", 9, False,
-                      branding.MUTED, align="center", width=0)
+                      branding.PRINT_MUTED, align="center", width=0)
             return
 
         count = len(points)
@@ -601,16 +597,16 @@ class ReportPdf:
             self._op(f"{px:.2f} {PAGE_HEIGHT - py:.2f} {'m' if index == 0 else 'l'}")
         self._op("S")
         for px, py in zip(xs, ys):
-            self._circle(px, py, 3.2, branding.WHITE)
+            self._circle(px, py, 3.2, branding.PRINT_SURFACE)
             self._ring(px, py, 3.2, 1.4, branding.TEAL, 0, 360)
 
         step = max(1, math.ceil(count / 8))
         for index, (px, point) in enumerate(zip(xs, points)):
             if index % step == 0 or index == count - 1:
                 self.text(px, top + 16 + plot_height + 16, point.get("label") or "?", 7,
-                          False, branding.MUTED, align="center", width=0)
+                          False, branding.PRINT_MUTED, align="center", width=0)
         self.text(x + left + plot_width / 2, top + height + 12, "SCAN DATE", 7, True,
-                  branding.MUTED, align="center", width=0)
+                  branding.PRINT_MUTED, align="center", width=0)
 
     # ------------------------------------------------------------- inventory
     def inventory(self) -> None:
@@ -642,12 +638,12 @@ class ReportPdf:
                 self._table_header(("Host", "IP addresses", "Open ports", "Technologies",
                                     "Findings"), widths)
             if index % 2 == 1:
-                self.rect(MARGIN, self.y, CONTENT_WIDTH, row_height, branding.PAPER)
+                self.rect(MARGIN, self.y, CONTENT_WIDTH, row_height, branding.PRINT_SURFACE)
             x = MARGIN
             for column, (lines, width) in enumerate(zip(wrapped, widths)):
                 for line_index, line in enumerate(lines):
                     self.text(x + 4, self.y + 13 + line_index * 9.5, line, 7.5,
-                              column == 0, branding.DARK if column == 0 else branding.SLATE)
+                              column == 0, branding.DARK if column == 0 else branding.PRINT_SECONDARY)
                 x += width
             self.y += row_height
             self.line(MARGIN, self.y, PAGE_WIDTH - MARGIN, self.y, branding.LINE, 0.5)
@@ -679,10 +675,10 @@ class ReportPdf:
             label = branding.SEVERITY_LABELS[name].upper()
             self.ensure(20)
             self.rect(MARGIN, self.y - 8, 46, 12, color)
-            self.text(MARGIN, self.y + 1, label, 6.5, True, "#FFFFFF", align="center",
+            self.text(MARGIN, self.y + 1, label, 6.5, True, branding.DARK, align="center",
                       width=46)
             self.text(MARGIN + 54, self.y, self.report["severity_help"][name], 8.5,
-                      False, branding.SLATE)
+                      False, branding.PRINT_SECONDARY)
             self.y += 20
         self.y += 6
 
@@ -697,22 +693,23 @@ class ReportPdf:
         )
         for label, value in details:
             self.ensure(18)
-            self.text(MARGIN, self.y, label, 8.5, True, branding.SLATE)
+            self.text(MARGIN, self.y, label, 8.5, True, branding.PRINT_SECONDARY)
             self.text(MARGIN + 120, self.y, value, 8.5, False, branding.DARK)
             self.y += 16
 
         self.y += 10
         self.ensure(84)
         box_top = self.y
-        self.rect(MARGIN, box_top, CONTENT_WIDTH, 76, "#FFFBEB")
+        self.rect(MARGIN, box_top, CONTENT_WIDTH, 76, branding.PRINT_SURFACE)
         self.rect(MARGIN, box_top, 4, 76, branding.AMBER)
-        self.text(MARGIN + 14, box_top + 18, "POINT-IN-TIME ASSESSMENT", 8, True, "#78350F")
+        self.text(MARGIN + 14, box_top + 18, "POINT-IN-TIME ASSESSMENT", 8, True,
+                  branding.PRINT_ACCENT_TEXT)
         self.y = box_top + 30
         self.wrapped("This report describes the state seen during one scan. A clean "
                      "result is not proof that the target is secure, and a finding is not "
                      "proof of exploitability. Re-scan regularly and review changes.",
                      x=MARGIN + 14, width=CONTENT_WIDTH - 28, size=8.5, leading=12,
-                     color="#78350F")
+                     color=branding.PRINT_SECONDARY)
         self.y = box_top + 84
 
     # ---------------------------------------------------------------- finish
@@ -726,9 +723,9 @@ class ReportPdf:
                       branding.LINE, 0.6)
             self.text(MARGIN, PAGE_HEIGHT - 28,
                       "ExposureIQ  \u00b7  Confidential  \u00b7  "
-                      f"{self.report.get('target', '')}", 7, False, branding.MUTED)
+                      f"{self.report.get('target', '')}", 7, False, branding.PRINT_MUTED)
             self.text(MARGIN, PAGE_HEIGHT - 28, f"Page {index + 1} of {total}", 7, False,
-                      branding.MUTED, align="right", width=CONTENT_WIDTH)
+                      branding.PRINT_MUTED, align="right", width=CONTENT_WIDTH)
 
     def build(self) -> bytes:
         self.cover()

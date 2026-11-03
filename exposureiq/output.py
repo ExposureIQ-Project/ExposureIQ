@@ -10,16 +10,43 @@ import logging
 import re
 
 from rich.console import Console
+from rich.default_styles import DEFAULT_STYLES
 from rich.logging import RichHandler
+from rich.style import Style
 from rich.text import Text
+from rich.theme import Theme
 
-TEAL = "#16B8A6"
-INDIGO = "#7C83FD"
-AMBER = "#F59E0B"
-DARK = "#111827"
-SEVERITY_STYLES = {"high": "bold red", "medium": AMBER, "low": "dim blue"}
+from exposureiq.report import branding
 
-console = Console()
+TEAL = branding.TEAL
+INDIGO = branding.INDIGO
+AMBER = branding.AMBER
+DARK = branding.DARK
+SEVERITY_STYLES = {"high": f"bold {branding.HIGH}", "medium": AMBER,
+                   "low": f"dim {branding.LOW}"}
+
+# Rich's log labels and automatic value highlighting must not introduce a
+# second palette. Retain their existing bold/italic/dim/underline attributes.
+_RICH_COLORS = {
+    "logging.keyword": TEAL,
+    "logging.level.debug": branding.MUTED,
+    "logging.level.info": INDIGO,
+    "logging.level.warning": AMBER,
+    "logging.level.error": branding.HIGH,
+    "log.time": branding.MUTED,
+    **dict.fromkeys(("repr.ellipsis", "repr.indent", "repr.none", "repr.uuid"), branding.MUTED),
+    **dict.fromkeys(("repr.str", "repr.attrib_value", "repr.path", "repr.filename"), branding.TEXT_SECONDARY),
+    **dict.fromkeys(("repr.number", "repr.number_complex", "repr.bool_true", "repr.bool_false",
+                     "repr.ipv6", "repr.url"), INDIGO),
+    **dict.fromkeys(("repr.ipv4", "repr.eui48", "repr.eui64", "repr.tag_name", "repr.call"), TEAL),
+    "repr.attrib_name": branding.TEXT_SUBTLE,
+    "repr.error": branding.HIGH,
+}
+_RICH_THEME = Theme({
+    **{name: DEFAULT_STYLES[name] + Style(color=color) for name, color in _RICH_COLORS.items()},
+    "logging.level.critical": Style(bold=True, color=DARK, bgcolor=branding.HIGH),
+})
+console = Console(theme=_RICH_THEME)
 
 _UTF = (console.encoding or "").lower().startswith("utf")
 OK_MARK = "✓" if _UTF else "+"
@@ -110,7 +137,7 @@ def status(text: str):
 
 
 def ok(text: str) -> None:
-    console.print(Text.assemble((f"  {OK_MARK} ", "bold green"), text))
+    console.print(Text.assemble((f"  {OK_MARK} ", f"bold {TEAL}"), text))
 
 
 def info(text: str) -> None:
@@ -122,7 +149,7 @@ def warn(text: str) -> None:
 
 
 def error(text: str) -> None:
-    console.print(Text.assemble(("  error: ", "bold red"), text))
+    console.print(Text.assemble(("  error: ", f"bold {branding.HIGH}"), text))
 
 
 def _more(shown: int, total: int) -> None:
@@ -286,7 +313,7 @@ def diff_report(diff: dict, show_all: bool = False) -> None:
     from rich.console import Console
     from rich.text import Text
 
-    console = Console()
+    console = Console(theme=_RICH_THEME)
 
     target = diff.get("target") or (diff.get("new") or {}).get("target") or ""
     old_meta = diff.get("old") or {}
@@ -346,13 +373,13 @@ def diff_report(diff: dict, show_all: bool = False) -> None:
             msg = _fmt(c)
             k = c.get("kind", "")
             if _is_new(c) and not (k.endswith(".removed") or k in ("port.closed", "finding.resolved") or c.get("status") == "confirmed"):
-                console.print(Text.assemble(("  + ", "bold green"), (msg, "green")))
+                console.print(Text.assemble(("  + ", f"bold {TEAL}"), (msg, TEAL)))
             elif _is_gone(c):
-                console.print(Text.assemble(("  - ", "bold red"), (msg, "red")))
+                console.print(Text.assemble(("  - ", f"bold {branding.HIGH}"), (msg, branding.HIGH)))
             elif c.get("direction") == "better":
-                console.print(Text.assemble(("  ~ ", "bold green"), (msg, "green")))
+                console.print(Text.assemble(("  ~ ", f"bold {TEAL}"), (msg, TEAL)))
             elif c.get("direction") == "worse":
-                console.print(Text.assemble(("  ! ", "bold red"), (msg, "red")))
+                console.print(Text.assemble(("  ! ", f"bold {branding.HIGH}"), (msg, branding.HIGH)))
             else:
                 console.print(Text(f"  • {msg}", style="dim"))
 

@@ -477,11 +477,19 @@ def test_finding_table_shows_port_endpoint_and_valid_severity_colors(capsys):
     from rich.style import Style
 
     from exposureiq.fingerprint.severity import build_findings
+    from exposureiq.report import branding
 
     styles = {severity: Style.parse(style) for severity, style in cli.output.SEVERITY_STYLES.items()}
-    assert styles["high"].color.name == "red" and styles["high"].bold
+    assert styles["high"].color.name == branding.HIGH.lower() and styles["high"].bold
     assert styles["medium"].color.name == cli.output.AMBER.lower()
-    assert styles["low"].color.name == "blue" and styles["low"].dim
+    assert styles["low"].color.name == branding.LOW.lower() and styles["low"].dim
+    for name, color in (("logging.level.warning", branding.AMBER),
+                        ("logging.level.error", branding.HIGH),
+                        ("repr.ipv4", branding.TEAL), ("repr.ipv6", branding.INDIGO)):
+        assert cli.output.console.get_style(name).color.name == color.lower()
+    critical = cli.output.console.get_style("logging.level.critical")
+    assert critical.color.name == branding.DARK.lower()
+    assert critical.bgcolor.name == branding.HIGH.lower()
     assets = [{"host": "example.com", "findings": build_findings([
         {"rule": "ports.database_exposed", "detail": "MySQL is open", "ip": "203.0.113.10", "port": 3306},
     ])}]

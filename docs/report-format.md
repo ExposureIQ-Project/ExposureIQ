@@ -88,6 +88,13 @@ CSS/SVG, so it works offline and in print. The PDF uses the standard Helvetica
 fonts and vector drawing; it does not require WeasyPrint, ReportLab, a headless
 browser, or an internet connection.
 
+The same palette is shared with Rich terminal output and the Textual TUI.
+Screen reports use dark panels, teal accents, and red/amber/blue for
+HIGH/MEDIUM/LOW severity. PDF body pages and HTML print pages stay white for
+printing, with pale row fills and dark palette text. Bright severity badges
+use dark text for contrast. The PDF's 0–1 RGB values are converted from the
+shared hex colours by `branding.hex_to_rgb()`.
+
 ## PDF limitations
 
 - The PDF writer uses the PDF standard fonts (Helvetica and Helvetica-Bold) with
