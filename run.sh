@@ -10,7 +10,8 @@
 #   (see 'exposureiq scan --help' for all options)
 #
 # Only scan domains you own or have permission to test. Finding subdomains only
-# reads public data, but port scanning (--ports) sends real traffic.
+# reads public data, but the HTTP, TLS, and port steps of a normal scan send real
+# traffic and run only for targets authorised in scope.txt.
 
 set -euo pipefail
 

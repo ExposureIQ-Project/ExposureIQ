@@ -252,7 +252,7 @@ def test_real_storage_round_trip(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "build_scan", storage.build_scan)
     monkeypatch.setattr(cli, "save_scan", storage.save_scan)
     path = tmp_path / "scan.json"
-    assert run("example.com", "-o", str(path)) == 0
+    assert run("example.com", "--no-report", "-o", str(path)) == 0
     scan = storage.load_scan(str(path))                         # valid according to the findings format
     assert scan["target"] == "example.com"
     assert [a["host"] for a in scan["assets"]] == ["example.com", "api.example.com"]
@@ -431,7 +431,7 @@ def test_real_checks_runner_saves_valid_json_and_skips_out_of_scope(monkeypatch,
     monkeypatch.setattr(runner, "fetch_front_page", fetch)
     monkeypatch.setattr(runner, "check_https", lambda host, response: [])
     path = tmp_path / "checks.json"
-    assert run("example.com", "--checks", "-o", str(path)) == 0
+    assert run("example.com", "--checks", "--no-report", "-o", str(path)) == 0
     scan = storage.load_scan(str(path))
     assert calls == ["api.example.com"]
     assert scan["assets"][0]["technologies"] == [] and scan["assets"][0]["findings"] == []

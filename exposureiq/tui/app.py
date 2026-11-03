@@ -708,6 +708,8 @@ class ExposureIQApp(App[int]):
                      f"Subdomains  {len(result['names'])}\nHosts  {len(assets)}\n"
                      f"Unique IPs  {len(groups)}\n{when}\n"
                      f"Saved file\n{result['saved_to'] or 'Not saved'}\n\n")
+        if not preview:
+            notes.append(f"Report PDF\n{result.get('report_to') or 'Not generated'}\n\n")
         warnings = list(dict.fromkeys(result.get("warnings", []) + self.warnings))
         if warnings:
             notes.append("Warnings (a missing result is not proof of safety)\n", style=output.AMBER)

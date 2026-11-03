@@ -294,7 +294,7 @@ def test_results_diff_tab_shows_changes_since_the_previous_scan(tmp_path):
             await pilot.pause()
             assert app.mode == "results"
             assert app.query_one("#scan-diff-tab", TabPane).display
-            assert "1 things got worse" in text(app.query_one("#scan-diff-headline", Static))
+            assert "1 thing got worse" in text(app.query_one("#scan-diff-headline", Static))
             assert "example.com" in text(app.query_one("#scan-diff-body", Static))
             await pilot.press("q")
 

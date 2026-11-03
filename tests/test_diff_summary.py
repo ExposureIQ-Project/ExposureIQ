@@ -52,7 +52,7 @@ def test_counts_and_headline():
         "neutral": 1,
     }
     assert result["headline"] == (
-        "2 things got worse, 1 got better, 1 other changes"
+        "2 things got worse, 1 got better, 1 other change"
     )
 
 

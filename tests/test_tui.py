@@ -214,7 +214,7 @@ def test_tui_demo_shared_pipeline_is_fake_only_and_saves_json(monkeypatch, tmp_p
     path = tmp_path / "demo_tui.json"
 
     async def exercise():
-        app = ExposureIQApp(args("--demo", "-o", str(path)), stages=cli._stages())
+        app = ExposureIQApp(args("--demo", "--no-report", "-o", str(path)), stages=cli._stages())
         async with app.run_test(size=(120, 40)) as pilot:
             await app.worker.wait()
             await pilot.pause()
@@ -228,6 +228,24 @@ def test_tui_demo_shared_pipeline_is_fake_only_and_saves_json(monkeypatch, tmp_p
     snapshot = storage.load_scan(str(path))
     assert snapshot["scan_id"].startswith("DEMO-")
     assert {entry["ip"] for asset in snapshot["assets"] for entry in asset["ips"]} == {"192.0.2.10", "192.0.2.20"}
+
+
+def test_tui_demo_scan_builds_report_and_shows_path(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    path = tmp_path / "demo_tui_report.json"
+
+    async def exercise():
+        app = ExposureIQApp(args("--demo", "-o", str(path)), stages=cli._stages())
+        async with app.run_test(size=(120, 40)) as pilot:
+            await app.worker.wait()
+            await pilot.pause()
+            assert app.result["return_code"] == 0
+            assert app.result["report_to"]
+            assert Path(app.result["report_to"]).is_file()
+            assert "Report PDF" in plain_text(app.query_one("#summary-notes", Static))
+            await pilot.press("q")
+
+    asyncio.run(exercise())
 
 
 def test_tui_restores_logging_after_quit():
