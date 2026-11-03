@@ -61,7 +61,7 @@ def test_build_diff_returns_changes_metadata_and_summary():
     assert diff["summary"]["counts"] == {
         "total": 2, "worse": 1, "better": 1, "neutral": 0,
     }
-    assert diff["summary"]["headline"] == "1 things got worse, 1 got better"
+    assert diff["summary"]["headline"] == "1 thing got worse, 1 got better"
 
 
 def test_build_diff_rejects_different_targets():

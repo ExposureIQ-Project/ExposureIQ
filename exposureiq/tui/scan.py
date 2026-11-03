@@ -34,6 +34,9 @@ class ScanStages:
     load_ports: Callable
     nmap_available: Callable
     demo_scope: Callable
+    # Optional: build a report after a successful save. Tests that do not want
+    # report output simply leave this unset.
+    report_job: Callable | None = None
 
 
 def demo_scope(target: str) -> bool:
@@ -87,7 +90,7 @@ def run_scan(args, stages: ScanStages, report: Callable, control: ScanControl,
         "host_states": {}, "phase_counts": dict.fromkeys(PHASES, 0),
         "phase_states": dict.fromkeys(PHASES, "waiting"),
         "phase_times": dict.fromkeys(PHASES, 0.0), "warnings": [],
-        "saved_to": None, "elapsed": 0.0, "return_code": 0,
+        "saved_to": None, "report_to": None, "elapsed": 0.0, "return_code": 0,
     }
     phase_clock = clock
     scope_check = None
@@ -400,7 +403,23 @@ def run_scan(args, stages: ScanStages, report: Callable, control: ScanControl,
             saved_to = str(path)
             log(f"Saved {len(assets)} hosts to {path}", "ok")
     phase("Save", "done" if saved_to else "skipped", count=len(assets) if saved_to else 0)
-    result.update(saved_to=saved_to, elapsed=time.monotonic() - clock)
+
+    report_to = None
+    if (saved_to and not getattr(args, "no_report", False)
+            and stages.report_job is not None):
+        log("Building PDF report...", "live")
+        try:
+            report_result = stages.report_job(saved_to, Path(saved_to).parent)
+        except Exception as error:  # optional output must never fail the scan
+            log(f"Report could not be generated: {error}", "warn")
+        else:
+            report_to = report_result.get("pdf") or report_result.get("html")
+            if report_to:
+                log(f"Report PDF saved to {report_to}", "ok")
+            else:
+                log("Report generation finished without an output file.", "warn")
+
+    result.update(saved_to=saved_to, report_to=report_to, elapsed=time.monotonic() - clock)
     rows = [("Target", domain), ("Subdomains found", len(names))]
     if args.demo:
         rows.insert(0, ("Mode", "DEMO (fake data; no network)"))
@@ -417,6 +436,8 @@ def run_scan(args, stages: ScanStages, report: Callable, control: ScanControl,
                  ("Technology hints", sum(len(asset.get("technologies", [])) for asset in assets))]
     seconds = int(result["elapsed"])
     rows.append(("Time", f"{seconds // 60}m {seconds % 60}s" if seconds >= 60 else f"{seconds}s"))
+    if saved_to:
+        rows.append(("Report PDF", report_to or "not generated"))
     result["summary_rows"] = rows
     if saved_to and not args.demo:
         try:

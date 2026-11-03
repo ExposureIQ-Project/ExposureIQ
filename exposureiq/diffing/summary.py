@@ -315,12 +315,12 @@ def summarize_diff(diff: dict) -> dict:
     else:
         parts = []
         if worse:
-            parts.append(f"{worse} things got worse")
+            parts.append(f"{worse} thing{'s' if worse != 1 else ''} got worse")
         if better:
             parts.append(f"{better} got better")
         other = total - worse - better
         if other:
-            parts.append(f"{other} other changes")
+            parts.append(f"{other} other change{'s' if other != 1 else ''}")
         headline = ", ".join(parts)
 
     ordered_lines = []

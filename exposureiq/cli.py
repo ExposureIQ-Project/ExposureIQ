@@ -104,6 +104,8 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("domain", help="the domain to scan, for example example.com")
     scan.add_argument("-o", "--output", metavar="FILE", help="JSON file to write (default: results/<domain>_<time>.json)")
     scan.add_argument("--no-save", action="store_true", help="do not write a JSON file")
+    scan.add_argument("--no-report", action="store_true",
+                      help="do not generate a PDF report after saving")
     scan.add_argument("--no-apex", action="store_true", help="do not include the domain itself in the IP lookup")
     scan.add_argument("--no-subfinder", action="store_true", help="skip Subfinder (use crt.sh only, finds fewer)")
     scan.add_argument("--minutes", type=int, default=sub.SUBFINDER_MAX_MINUTES, metavar="N",
@@ -131,13 +133,44 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--all", dest="show_all", action="store_true", help="also show ignored changes")
     diff.add_argument("--results-dir", dest="results_dir", default="results", help="results directory")
     diff.add_argument("--fail-on-worse", action="store_true", help="exit 1 if anything got worse")
+
+    report = commands.add_parser(
+        "report",
+        help="turn a saved scan into an HTML/PDF report",
+        description="Build a branded report from a saved scan: executive summary, "
+                    "findings table, what changed, charts, and asset inventory. "
+                    "A domain argument uses its newest scan in results/.",
+    )
+    report.add_argument("source", help="saved scan JSON, or a domain with saved scans")
+    report.add_argument("-o", "--output", metavar="PATH",
+                        help="output .html/.pdf file or directory (default: report/)")
+    report.add_argument("--format", choices=("html", "pdf", "both"), default=None,
+                        help="output format (default: from the output extension, else both)")
+    report.add_argument("--compare", metavar="OLD.json",
+                        help="earlier scan for the What changed section")
+    report.add_argument("--no-diff", action="store_true",
+                        help="skip the What changed section")
+    report.add_argument("--results-dir", dest="results_dir", default="results",
+                        help="results directory used to find history (default: results)")
+    report.add_argument("--title", default=None, help="report title")
+    report.add_argument("--open", dest="open_report", action="store_true",
+                        help="open the HTML report in the default browser")
     return parser
+
+
+def _auto_report(scan_path: str, results_dir) -> dict:
+    """Build the PDF that follows a successful scan save."""
+    from exposureiq.report.render import generate_report
+
+    return generate_report(scan_path, output="report", format="pdf",
+                           results_dir=str(results_dir))
 
 
 def _stages() -> ScanStages:
     return ScanStages(sub.find_subdomains_by_source, resolve_hosts, build_scan, save_scan,
                       _load_scope, _load_checks, _load_ports,
-                      lambda: shutil.which("nmap") is not None, _demo_scope)
+                      lambda: shutil.which("nmap") is not None, _demo_scope,
+                      report_job=_auto_report)
 
 
 def _use_tui(args) -> bool:
@@ -332,6 +365,47 @@ def run_scope(args) -> int:
         return 1
 
 
+def run_report(args) -> int:
+    """Generate a report without sending any traffic to the target."""
+    from pathlib import Path
+
+    from exposureiq.report.render import generate_report
+
+    try:
+        result = generate_report(
+            args.source,
+            output=args.output,
+            format=args.format,
+            compare=args.compare,
+            results_dir=args.results_dir,
+            include_diff=not args.no_diff,
+            title=args.title,
+        )
+    except (OSError, ValueError) as error:
+        output.error(str(error))
+        return 2
+
+    report = result["report"]
+    counts = report["severity"]
+    output.ok(f"Report for {report['target']}: {counts['total']} finding(s) "
+              f"({counts['high']} high, {counts['medium']} medium, {counts['low']} low)")
+    for label, path in (("HTML", result["html"]), ("PDF", result["pdf"])):
+        if path:
+            output.info(f"{label}  {path}")
+    if result["diff"]:
+        headline = (report.get("diff_summary") or {}).get("headline")
+        output.info(f"What changed: {headline or 'see the report'}")
+    elif args.no_diff:
+        output.info("What changed: skipped (--no-diff).")
+    else:
+        output.info("What changed: no earlier saved scan was found.")
+
+    if args.open_report and result["html"]:
+        import webbrowser
+        webbrowser.open(Path(result["html"]).resolve().as_uri())
+    return 0
+
+
 def run_home(args, *, browser: bool = False) -> int:
     """Bare `exposureiq` starts at home; `--open` alone starts at the file list."""
     try:
@@ -391,13 +465,15 @@ def main(argv=None) -> int:
             parser.print_help()
             return 2
         return run_home(args)
-    if args.command not in ("scan", "scope", "diff"):
+    if args.command not in ("scan", "scope", "diff", "report"):
         parser.print_help()
         return 2
     if args.command == "scope":
         return run_scope(args)
     if args.command == "diff":
         return run_diff(args)
+    if args.command == "report":
+        return run_report(args)
     return run_scan(args)
 
 
