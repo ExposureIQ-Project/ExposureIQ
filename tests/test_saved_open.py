@@ -375,7 +375,7 @@ def test_demo_saved_scan_is_still_labeled_demo(tmp_path):
         async with app.run_test(size=(110, 34)) as pilot:
             await pilot.pause()
             assert app.result["demo"] is True
-            assert "DEMO" in text(app.query_one("#brand", Static))
+            assert "DEMO" in text(app.query_one("#mode-badge", Static))
             assert "DEMO" in text(app.query_one("#summary-notes", Static))
             await pilot.press("q")
 

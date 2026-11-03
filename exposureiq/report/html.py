@@ -266,6 +266,14 @@ def _methodology(report: dict) -> str:
 
 _CSS = f"""
 :root {{
+  --background: {branding.PAGE_BACKGROUND};
+  --panel: {branding.PANEL};
+  --surface: {branding.INNER_SURFACE};
+  --header: {branding.TABLE_HEADER};
+  --text: {branding.TEXT_PRIMARY};
+  --light-text: {branding.TEXT_PRIMARY};
+  --subtle: {branding.TEXT_SUBTLE};
+  --heading: {branding.TEAL};
   --teal: {branding.TEAL};
   --indigo: {branding.INDIGO};
   --amber: {branding.AMBER};
@@ -279,38 +287,41 @@ _CSS = f"""
   --low: {branding.SEVERITY_COLORS['low']};
 }}
 * {{ box-sizing: border-box; }}
-html {{ background: #e9eef5; }}
+html {{ background: var(--background); }}
 body {{
-  margin: 0; color: var(--dark); background: #e9eef5;
+  margin: 0; color: var(--text); background: var(--background);
   font-family: {branding.FONT_STACK}; font-size: 14px; line-height: 1.55;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }}
 .page {{
   width: 210mm; min-height: 297mm; margin: 24px auto; padding: 18mm 16mm;
-  background: #fff; box-shadow: 0 10px 35px rgba(15, 23, 42, .16);
+  background: var(--panel); box-shadow: 0 10px 35px {branding.css_rgba(branding.GRADIENT_END, .16)};
   page-break-after: always; position: relative;
 }}
 .page:last-child {{ page-break-after: auto; }}
 h1, h2, h3, p {{ margin-top: 0; }}
 h1 {{ font-size: 40px; line-height: 1.1; letter-spacing: -.02em; margin-bottom: 12px; }}
-h2 {{ font-size: 24px; letter-spacing: -.01em; margin: 0 0 8px; }}
+h2 {{ font-size: 24px; letter-spacing: -.01em; margin: 0 0 8px; color: var(--heading); }}
 h3 {{ font-size: 14px; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--slate); margin: 24px 0 8px; }}
+      color: var(--heading); margin: 24px 0 8px; }}
 .lede {{ color: var(--muted); margin-bottom: 22px; max-width: 640px; }}
 .muted {{ color: var(--muted); font-size: 12px; }}
 .cover {{
-  background: var(--dark); color: #f8fafc; padding: 20mm 18mm;
+  --text: {branding.TEXT_PRIMARY}; --slate: {branding.TEXT_SECONDARY};
+  --muted: {branding.MUTED}; --subtle: {branding.TEXT_SUBTLE};
+  --heading: {branding.TEAL}; --surface: {branding.INNER_SURFACE};
+  background: var(--background); color: var(--text); padding: 20mm 18mm;
   overflow: hidden;
 }}
 .cover::before {{
   content: ""; position: absolute; right: -120px; top: -130px; width: 420px;
   height: 420px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(22,184,166,.28), rgba(17,24,39,0) 68%);
+  background: radial-gradient(circle, {branding.css_rgba(branding.GLOW, .28)}, {branding.css_rgba(branding.PAGE_BACKGROUND, 0)} 68%);
 }}
 .cover::after {{
   content: ""; position: absolute; left: -140px; bottom: -170px; width: 420px;
   height: 420px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(124,131,253,.22), rgba(17,24,39,0) 68%);
+  background: radial-gradient(circle, {branding.css_rgba(branding.INDIGO, .22)}, {branding.css_rgba(branding.PAGE_BACKGROUND, 0)} 68%);
 }}
 .cover-mark {{ width: 54px; height: 54px; position: relative; z-index: 1; }}
 .cover-mark svg {{ width: 54px; height: 54px; display: block; }}
@@ -318,48 +329,49 @@ h3 {{ font-size: 14px; text-transform: uppercase; letter-spacing: .08em;
   position: relative; z-index: 1; }}
 .brandline strong {{ font-size: 22px; letter-spacing: -.02em; }}
 .brandline strong span {{ color: var(--teal); }}
-.brandline > span {{ color: #94a3b8; font-size: 11px; text-transform: uppercase;
+.brandline > span {{ color: var(--subtle); font-size: 11px; text-transform: uppercase;
   letter-spacing: .14em; }}
 .kicker {{ color: var(--teal); text-transform: uppercase; letter-spacing: .18em;
   font-size: 11px; font-weight: 700; margin: 54px 0 10px; position: relative; z-index: 1; }}
 .cover h1 {{ font-size: 46px; position: relative; z-index: 1; }}
-.cover .meta {{ color: #94a3b8; margin-bottom: 18px; position: relative; z-index: 1; }}
+.cover .meta {{ color: var(--subtle); margin-bottom: 18px; position: relative; z-index: 1; }}
 .risk {{ display: inline-block; padding: 6px 14px; border-radius: 999px;
-  color: #fff; font-weight: 800; font-size: 12px; text-transform: uppercase;
+  color: var(--dark); font-weight: 800; font-size: 12px; text-transform: uppercase;
   letter-spacing: .06em; position: relative; z-index: 1; }}
 .exec {{ margin-top: 34px; position: relative; z-index: 1; }}
 .exec h2 {{ font-size: 15px; text-transform: uppercase; letter-spacing: .12em;
   color: var(--teal); }}
-.exec p {{ color: #cbd5e1; font-size: 13px; max-width: 620px; margin-bottom: 10px; }}
+.exec p {{ color: var(--slate); font-size: 13px; max-width: 620px; margin-bottom: 10px; }}
 .scorecards {{ display: flex; gap: 12px; margin-top: 30px; position: relative; z-index: 1; }}
-.scorecard {{ flex: 1; border: 1px solid rgba(148,163,184,.28); border-radius: 10px;
-  padding: 14px 16px; background: rgba(255,255,255,.04); }}
+.scorecard {{ flex: 1; border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; background: var(--surface); }}
 .scorecard .num {{ display: block; font-size: 30px; font-weight: 800; line-height: 1; }}
-.scorecard .caption {{ display: block; margin-top: 6px; color: #94a3b8; font-size: 11px;
+.scorecard .caption {{ display: block; margin-top: 6px; color: var(--subtle); font-size: 11px;
   text-transform: uppercase; letter-spacing: .08em; }}
-.score-high .num {{ color: #f87171; }}
-.score-medium .num {{ color: #fbbf24; }}
-.score-low .num {{ color: #93c5fd; }}
+.score-high .num {{ color: var(--high); }}
+.score-medium .num {{ color: var(--medium); }}
+.score-low .num {{ color: var(--low); }}
 .score-total .num {{ color: var(--teal); }}
 .confidential {{ position: absolute; left: 18mm; right: 18mm; bottom: 12mm;
-  color: #64748b; font-size: 10px; border-top: 1px solid rgba(148,163,184,.24);
+  color: var(--muted); font-size: 10px; border-top: 1px solid var(--line);
   padding-top: 8px; }}
-.badge {{ display: inline-block; padding: 3px 9px; border-radius: 999px; color: #fff;
+.badge {{ display: inline-block; padding: 3px 9px; border-radius: 999px; color: var(--dark);
   font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }}
 .badge-high {{ background: var(--high); }}
-.badge-medium {{ background: var(--medium); color: #3b2500; }}
+.badge-medium {{ background: var(--medium); }}
 .badge-low {{ background: var(--low); }}
 table {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
 th {{ text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }}
-.findings thead th {{ background: var(--dark); color: #fff; padding: 10px 8px; }}
+.findings, .inventory {{ background: var(--surface); }}
+.findings thead th {{ background: var(--header); color: var(--light-text); padding: 10px 8px; }}
 .findings td {{ padding: 11px 8px; border-bottom: 1px solid var(--line);
   vertical-align: top; }}
 .findings tr {{ page-break-inside: avoid; }}
-.findings tr:nth-child(even) td {{ background: #fbfcfe; }}
+.findings tr:nth-child(even) td {{ background: var(--panel); }}
 .fid {{ color: var(--muted); font-size: 10px; margin-top: 5px; font-family: {branding.MONO_STACK}; }}
 .detail {{ color: var(--slate); margin-top: 4px; }}
 .rule {{ color: var(--muted); font-size: 10px; margin-top: 5px; font-family: {branding.MONO_STACK}; }}
-.inventory thead th {{ background: var(--paper); color: var(--slate); padding: 9px 8px;
+.inventory thead th {{ background: var(--header); color: var(--light-text); padding: 9px 8px;
   border-bottom: 2px solid var(--line); }}
 .inventory td {{ padding: 9px 8px; border-bottom: 1px solid var(--line);
   vertical-align: top; }}
@@ -368,23 +380,24 @@ th {{ text-align: left; font-size: 10px; text-transform: uppercase; letter-spaci
 .diff-headline {{ font-size: 22px; font-weight: 800; letter-spacing: -.01em; margin: 6px 0 18px; }}
 .diff-counts {{ display: flex; gap: 12px; margin-bottom: 22px; }}
 .diff-count {{ flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 12px;
-  color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }}
+  background: {branding.INNER_SURFACE}; color: {branding.MUTED}; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }}
 .diff-count span {{ display: block; font-size: 26px; font-weight: 800; line-height: 1.1; }}
 .diff-count.worse span {{ color: var(--high); }}
 .diff-count.better span {{ color: {branding.GREEN}; }}
-.diff-count.neutral span {{ color: var(--slate); }}
+.diff-count.neutral span {{ color: {branding.TEXT_SECONDARY}; }}
 .highlights, .changes, .notes, .plain, .severity-help {{ margin: 0 0 16px; padding-left: 20px; }}
 .highlights li {{ margin-bottom: 7px; }}
 .changes li {{ margin-bottom: 5px; color: var(--slate); font-size: 12px; }}
 .notes li {{ color: var(--muted); font-size: 11px; }}
 .charts {{ display: flex; gap: 20px; align-items: stretch; }}
 .card {{ flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 18px;
-  background: #fff; }}
+  background: var(--surface); }}
 .card.wide {{ flex: 1.35; }}
 .card h3 {{ margin-top: 0; }}
 .chart {{ width: 100%; height: auto; display: block; }}
 .chart-donut {{ max-width: 220px; margin: 0 auto 10px; }}
-.donut-total {{ font-size: 34px; font-weight: 800; fill: var(--dark); }}
+.donut-total {{ font-size: 34px; font-weight: 800; fill: var(--text); }}
+.chart-line circle {{ fill: var(--surface); }}
 .donut-label {{ font-size: 10px; fill: var(--muted); text-transform: uppercase;
   letter-spacing: .08em; }}
 .axis-label {{ font-size: 9px; fill: var(--muted); }}
@@ -401,8 +414,9 @@ th {{ text-align: left; font-size: 10px; text-transform: uppercase; letter-spaci
 .details th {{ width: 150px; color: var(--slate); padding: 6px 0; }}
 .details td {{ padding: 6px 0; }}
 .disclaimer {{ margin-top: 26px; border: 1px solid var(--line); border-left: 4px solid var(--amber);
-  background: #fffbeb; padding: 14px 16px; border-radius: 6px; color: #78350f;
+  background: var(--paper); padding: 14px 16px; border-radius: 6px; color: var(--slate);
   font-size: 12px; }}
+.disclaimer strong {{ color: var(--amber); }}
 code {{ font-family: {branding.MONO_STACK}; font-size: .92em; background: var(--paper);
   padding: 1px 4px; border-radius: 3px; }}
 footer.report-footer {{ color: var(--muted); font-size: 10px; margin-top: 28px;
@@ -410,7 +424,15 @@ footer.report-footer {{ color: var(--muted); font-size: 10px; margin-top: 28px;
   justify-content: space-between; }}
 @page {{ size: A4; margin: 0; }}
 @media print {{
-  html, body {{ background: #fff; }}
+  :root {{
+    --text: {branding.DARK}; --panel: {branding.PRINT_PAGE};
+    --surface: {branding.PRINT_SURFACE}; --paper: {branding.PRINT_SURFACE};
+    --slate: {branding.PRINT_SECONDARY}; --muted: {branding.PRINT_MUTED};
+    --heading: {branding.PRINT_ACCENT_TEXT};
+  }}
+  html, body {{ background: {branding.PRINT_PAGE}; }}
+  .chart {{ background: var(--surface) !important; }}
+  .disclaimer strong {{ color: {branding.PRINT_ACCENT_TEXT}; }}
   .page {{ width: auto; min-height: 297mm; margin: 0; padding: 16mm;
     box-shadow: none; page-break-after: always; }}
   .page:last-child {{ page-break-after: auto; }}

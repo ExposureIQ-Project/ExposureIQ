@@ -4,16 +4,21 @@ import logging
 import time
 from pathlib import Path
 
+from rich.cells import cell_len
+from rich.segment import Segment
 from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.geometry import Size
 from textual.message import Message
+from textual.strip import Strip
 from textual.theme import Theme
-from textual.widgets import Button, DataTable, Input, ProgressBar, Static, TabbedContent, TabPane, Tabs
+from textual.widgets import Button, DataTable, Input, ProgressBar, Rule, Static, TabbedContent, TabPane, Tabs
 
 from exposureiq import output, storage
+from exposureiq.report import branding
 from exposureiq.tui.control import ScanCancelled, ScanControl
 from exposureiq.tui.confirm_scope import ScopeConfirmation
 from exposureiq.tui.rerun import rerun_hosts
@@ -23,8 +28,59 @@ from exposureiq.tui.user_scope import MAX_HOSTS, append_hosts, eligible_hosts
 from exposureiq.diffing import pipeline as diff_pipeline
 from exposureiq.diffing import summary as diff_summary
 
-_SEVERITY = {"high": "bold #EF4444", "medium": output.AMBER, "low": "#60A5FA"}
+_SEVERITY = {"high": f"bold {branding.TUI_HIGH} on {branding.HIGH_BACKGROUND}",
+             "medium": branding.AMBER, "low": branding.LOW}
 _SPINNER = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
+_HOME_LOGO = (
+    "▄████████ ▀████    ▐████▀    ▄███████▄  ▄██████▄     ▄████████ ███    █▄     ▄████████    ▄████████  ▄█  ████████▄  \n"
+    "  ███    ███   ███▌   ████▀    ███    ███ ███    ███   ███    ███ ███    ███   ███    ███   ███    ███ ███  ███    ███ \n"
+    "  ███    █▀     ███  ▐███      ███    ███ ███    ███   ███    █▀  ███    ███   ███    ███   ███    █▀  ███▌ ███    ███ \n"
+    " ▄███▄▄▄        ▀███▄███▀      ███    ███ ███    ███   ███        ███    ███  ▄███▄▄▄▄██▀  ▄███▄▄▄     ███▌ ███    ███ \n"
+    "▀▀███▀▀▀        ████▀██▄     ▀█████████▀  ███    ███ ▀███████████ ███    ███ ▀▀███▀▀▀▀▀   ▀▀███▀▀▀     ███▌ ███    ███ \n"
+    "  ███    █▄    ▐███  ▀███      ███        ███    ███          ███ ███    ███ ▀███████████   ███    █▄  ███  ███    ███ \n"
+    "  ███    ███  ▄███     ███▄    ███        ███    ███    ▄█    ███ ███    ███   ███    ███   ███    ███ ███  ███  ▀ ███ \n"
+    "  ██████████ ████       ███▄  ▄████▀       ▀██████▀   ▄████████▀  ████████▀    ███    ███   ██████████ █▀    ▀██████▀▄█\n"
+    "                                                                               ███    ███ "
+)
+_HOME_LOGO_WIDTH = max(cell_len(line) for line in _HOME_LOGO.splitlines())
+
+
+def _append_labeled_row(text: Text, label: str, value) -> None:
+    """Align existing details without changing their values."""
+    text.append(f"{label:<12}", style=branding.TUI_LABEL)
+    text.append(f"{value}\n", style=branding.TEXT_PRIMARY)
+
+
+class _PhaseTable(DataTable):
+    """Draw separators in each row's spare line, not as extra data rows."""
+    COMPONENT_CLASSES = DataTable.COMPONENT_CLASSES | {"datatable--separator"}
+
+    def render_line(self, y: int) -> Strip:
+        header = self.header_height if self.show_header else 0
+        if y >= header:
+            offset = y - header + self.scroll_offset.y
+            for row in self.ordered_rows:
+                if offset < row.height:
+                    if row.height > 1 and offset == row.height - 1:
+                        style = self.rich_style + self.get_component_rich_style("datatable--separator")
+                        return Strip([Segment("─" * self.size.width, style)])
+                    break
+                offset -= row.height
+        return super().render_line(y)
+
+
+class _ResultsTabs(TabbedContent):
+    """Keep all existing tabs, with one shared findings row beneath them."""
+
+    def compose(self) -> ComposeResult:
+        content = super().compose()
+        yield next(content)  # The normal tab bar and its keyboard handling.
+        with Horizontal(id="severity-counts"):
+            yield Static("Findings", id="severity-label", markup=False)
+            yield Static("HIGH 0", id="severity-high", classes="severity-chip", markup=False)
+            yield Static("MEDIUM 0", id="severity-medium", classes="severity-chip", markup=False)
+            yield Static("LOW 0", id="severity-low", classes="severity-chip", markup=False)
+        yield from content
 
 
 class ScanEvent(Message):
@@ -57,82 +113,141 @@ class ExposureIQApp(App[int]):
         Binding("shift+tab", "focus_previous", "Previous", show=False),
     ]
     CSS = """
-    Screen { background: #111827; color: #E5E7EB; }
-    #topbar { height: 3; background: #111827; border-bottom: solid #16B8A6; }
-    #brand { height: 3; padding: 0 1; content-align: left middle; background: #111827; }
-    #back { width: 5; min-width: 5; height: 3; border: none; background: #111827;
-            color: #16B8A6; text-style: bold; }
-    #back:hover { background: #1F2937; }
-    #home { height: 1fr; padding: 1 2; align: center middle; }
-    #home-center { width: auto; height: auto; align: center middle; content-align: center middle; }
-    #ascii-logo { height: auto; color: #16B8A6; text-style: bold; text-align: center; }
+    Screen { background: $background; color: $body-text; }
+    .panel, DataTable {
+        background: $surface; border: round $panel-border; padding: 1 2;
+        border-title-color: $primary; border-title-style: bold;
+        border-subtitle-color: $footnote;
+    }
+    .detail-panel {
+        background: $panel; border: round $secondary;
+        border-title-color: $secondary; border-title-style: bold;
+    }
+    Button, Button.-primary, Button.-success, Button:hover, Button.-primary:hover,
+    Button.-success:hover, Button.-active {
+        border: round $panel-border; padding: 0 2;
+        background: transparent; background-tint: transparent; tint: transparent;
+    }
+    Button { color: $foreground; }
+    Button.-primary, Button.-success {
+        color: $primary; border: round $primary;
+    }
+    Button:disabled { color: $text-muted; text-opacity: 1; border: round $panel-border; }
+    Button:focus, Button.-primary:focus, Button.-success:focus { background-tint: transparent; border: round $primary; }
+    Input { background: transparent; color: $foreground; border: round $panel-border; padding: 0 2; }
+    Input:focus { background-tint: transparent; border: round $primary; }
+    Input.-invalid, Input.-invalid:focus { border: round $error; }
+    Tab { color: $tab-inactive; }
+    Tab:hover, Tab.-active, Tabs:focus Tab.-active { color: $primary; }
+    Tab.-active, Tabs:focus Tab.-active { text-style: bold; background: transparent; }
+    Tab:disabled { color: $text-disabled; }
+    Underline > .underline--bar { color: $primary; background: $tab-divider; }
+    Tabs:focus .underline--bar { background: $tab-divider; }
+    #topbar { height: 4; background: $panel; border-bottom: solid $primary; padding: 0 1; }
+    #brand { width: 1fr; height: 3; padding: 0 1; content-align: left middle; background: $panel; }
+    #header-actions { width: auto; height: 3; margin-left: 1; padding-right: 1; }
+    #mode-badge {
+        width: auto; height: 3; padding: 0 1; border: round $secondary;
+        background: transparent; color: $secondary; text-style: bold; content-align: center middle;
+    }
+    #mode-badge.demo { color: $warning; border: round $demo-border; }
+    #back { width: 5; min-width: 5; height: 3; padding: 0; border: round $panel-border;
+            color: $primary; text-style: bold; }
+    #home { height: 1fr; align: center middle; }
+    #home-center { width: 100%; max-width: 120; height: auto; align: center middle; content-align: center middle; }
+    #ascii-logo { height: auto; color: $primary; text-style: bold; text-align: center; }
     #home-bar { height: auto; margin-top: 1; align: center middle; }
     #home-domain { width: 40; height: 3; }
     #home-scan { height: 3; margin-left: 1; }
-    .home-heading { height: auto; margin-top: 1; color: #16B8A6; text-style: bold; }
+    .home-heading { height: auto; margin-top: 1; color: $primary; text-style: bold; }
     #home-actions { height: auto; margin-top: 1; align: center middle; }
     #home-actions Button { margin-right: 1; }
     #saved-open { margin-top: 1; }
     #saved-diff-domain { margin-top: 1; margin-left: 1; }
     #browser-actions { height: auto; }
-    #home-scan-note { height: auto; color: #9CA3AF; text-align: center; }
-    #home-note { height: auto; margin-top: 1; color: #9CA3AF; text-align: center; }
-    #home-message { height: auto; margin-top: 1; text-align: center; }
+    #home-scan-note { height: auto; margin-top: 1; color: $footnote; text-align: center; }
+    #home-note { height: auto; margin-top: 1; color: $footnote; text-align: center; }
+    #home-message { display: none; height: auto; margin-top: 1; text-align: center; }
+    #home-message.has-message { display: block; }
     #browser { height: 1fr; padding: 1 2; }
     #saved-table { height: 1fr; }
-    #browser-note { height: auto; color: #9CA3AF; }
-    #scan-status { height: 1; margin: 1 2 0 2; color: #7C83FD; text-style: bold; }
-    #scanning { height: 1fr; padding: 1 2; }
-    #scan-layout { height: auto; }
-    #phase-list { width: 1fr; height: auto; border: round #16B8A6; padding: 1 2; }
+    #browser-note { height: auto; margin-top: 1; color: $footnote; }
+    #scan-status { height: 1; margin: 0 2; color: $secondary; text-style: bold; }
+    #scanning { height: 1fr; padding: 0 2; }
+    #scan-layout { height: auto; align-vertical: top; }
+    #phase-list { width: 47fr; height: 10; }
     .phase { height: 1; }
-    #live-panel { width: 1fr; height: auto; margin-left: 2; border: round #7C83FD; padding: 0 2; }
+    #live-panel { width: 53fr; height: 10; margin-left: 1; }
     #counters { height: 4; }
-    #elapsed { height: 1; margin-top: 1; color: #7C83FD; }
-    #scan-progress { width: 100%; margin: 1 0; }
-    #scan-progress Bar > .bar--indeterminate { color: #16B8A6; }
-    #live-log { height: 1; padding: 0 1; border-left: thick #F59E0B; text-wrap: nowrap; text-overflow: ellipsis; }
-    #safety { height: auto; margin: 1 0 0 0; color: #9CA3AF; }
+    #elapsed { height: 1; color: $secondary; }
+    #scan-progress { width: 100%; }
+    #scan-progress Bar > .bar--indeterminate { color: $primary; }
+    #live-log { height: 3; margin-top: 1; padding: 0 2; border: round $warning; text-wrap: nowrap; text-overflow: ellipsis; }
+    #safety { height: auto; margin: 1 0 0 0; color: $footnote; }
     #results { height: 1fr; margin: 0 1; }
-    TabPane { padding: 1; }
-    DataTable { height: 1fr; background: #111827; }
-    DataTable > .datatable--header { background: #1F2937; color: #16B8A6; text-style: bold; }
-    DataTable > .datatable--cursor { background: #283855; }
-    #severity-counts { height: 2; margin: 0 1; }
+    #results > ContentSwitcher { height: 1fr; overflow: hidden hidden; }
+    TabPane { height: 100%; padding: 1; }
+    DataTable { height: 1fr; color: $body-text; }
+    DataTable:focus, DataTable:focus > .datatable--header { background-tint: transparent; }
+    DataTable > .datatable--header { background: $table-header; color: $primary; text-style: bold; }
+    DataTable > .datatable--odd-row { background: $surface; }
+    DataTable > .datatable--even-row { background: $surface; }
+    DataTable > .datatable--separator { color: $row-divider; background: $surface; }
+    DataTable > .datatable--cursor, DataTable > .datatable--fixed-cursor,
+    DataTable:focus > .datatable--cursor, DataTable:focus > .datatable--fixed-cursor {
+        background: $block-cursor-background; color: $foreground;
+    }
+    DataTable > .datatable--hover, DataTable > .datatable--header-hover,
+    DataTable > .datatable--header-cursor { background: $block-cursor-background; }
+    #severity-counts { height: 3; margin: 1 1 0 1; }
+    #severity-label { width: auto; height: 3; margin-right: 1; content-align: left middle; color: $foreground; text-style: bold; }
+    .severity-chip { width: auto; height: 3; margin-right: 1; padding: 0 1; background: transparent; text-style: bold; content-align: center middle; }
+    #severity-high { color: $severity-high; border: round $severity-high; }
+    #severity-medium { color: $warning; border: round $warning; }
+    #severity-low { color: $severity-low; border: round $severity-low; }
     #summary-layout { height: 1fr; }
-    #phase-counts { width: 1fr; }
-    #summary-info { width: 1fr; height: 1fr; margin-left: 2; padding: 1 2; border: round #7C83FD; }
+    #phase-counts { width: 47fr; }
+    #summary-info { width: 53fr; height: 1fr; margin-left: 1; }
     #summary-notes { height: auto; }
-    #scope-skipped-panel { height: auto; border: round #F59E0B; padding: 0 1; margin-bottom: 1; }
-    #scope-skipped-text { height: auto; color: #F59E0B; }
+    #scope-skipped-panel { height: auto; border: round $warning; margin-bottom: 1; }
+    #scope-skipped-text { height: auto; color: $warning; }
     #add-scope { margin-top: 1; }
-    #user-scope-saved { height: auto; margin: 0 2; color: #16B8A6; }
-    #result-log { height: 1; margin: 0 2; color: #7C83FD; text-wrap: nowrap; text-overflow: ellipsis; }
-    #rerun-panel { height: auto; max-height: 40%; border: round #16B8A6; margin: 0 2; padding: 0 1; }
+    #user-scope-saved { height: auto; margin: 0 2; color: $primary; }
+    #result-log { height: 1; margin: 0 2; color: $secondary; text-wrap: nowrap; text-overflow: ellipsis; }
+    #rerun-panel { height: auto; max-height: 40%; border: round $primary; margin: 0 2; }
     #rerun-hosts { height: auto; max-height: 8; }
     #finding-layout { height: 1fr; }
-    #findings-table { width: 3fr; }
-    #finding-side { width: 2fr; height: 1fr; margin-left: 1; padding: 1; border: round #7C83FD; }
-    #finding-detail { height: auto; }
+    #findings-table { width: 47fr; }
+    #finding-side { width: 53fr; height: 1fr; margin-left: 1; }
+    #finding-title, #finding-detail, #finding-recommendation { height: auto; }
+    #finding-title { margin-bottom: 1; text-style: bold; }
+    #finding-detail { color: $foreground; }
+    #finding-next-step { height: 1; color: $primary; text-style: bold; margin-bottom: 1; }
+    #finding-recommendation { color: $body-text; }
+    .details-divider { height: 1; margin: 0 0 1 0; color: $detail-divider; }
+    #finding-side.empty-findings .finding-extra { display: none; }
     #diff-view { height: 1fr; padding: 1 2; }
-    #diff-target { height: auto; color: #16B8A6; text-style: bold; }
-    #diff-meta { height: auto; color: #9CA3AF; }
+    #diff-target { height: auto; color: $primary; text-style: bold; }
+    #diff-meta { height: auto; color: $text-muted; }
     #diff-headline { height: auto; margin-top: 1; text-style: bold; }
     #diff-sections { height: 1fr; }
     .diff-section { height: auto; margin-top: 1; }
-    .diff-worse { color: #EF4444; text-style: bold; }
-    .diff-better { color: #16B8A6; text-style: bold; }
-    .diff-other { color: #9CA3AF; }
-    #diff-notes { height: auto; color: #9CA3AF; }
+    .diff-worse { color: $error; text-style: bold; }
+    .diff-better { color: $primary; text-style: bold; }
+    .diff-other { color: $text-muted; }
+    #diff-notes { height: auto; color: $text-muted; }
     #diff-message { height: auto; margin-top: 1; }
     #scan-diff-scroll { height: 1fr; }
-    #keys { height: 1; dock: bottom; padding: 0 2; color: #9CA3AF; background: #1F2937; text-wrap: nowrap; }
+    #footer { height: auto; dock: bottom; padding: 0 2; background: $footer-background; }
+    #keys { width: 1fr; height: auto; min-height: 1; color: $key-hint; background: $footer-background; }
+    #footer-note { width: auto; max-width: 38%; height: auto; margin-left: 1; color: $primary; text-align: right; }
     Screen.compact #scan-layout { layout: vertical; }
     Screen.compact #phase-list, Screen.compact #live-panel { width: 100%; margin-left: 0; }
     Screen.compact #live-panel { margin-top: 1; }
-    Screen.narrow #finding-layout { layout: vertical; }
-    Screen.narrow #findings-table { width: 100%; height: 1fr; }
-    Screen.narrow #finding-side { width: 100%; height: 1fr; margin-left: 0; }
+    Screen.compact #summary-layout, Screen.compact #finding-layout { layout: vertical; }
+    Screen.compact #phase-counts, Screen.compact #summary-info,
+    Screen.compact #findings-table, Screen.compact #finding-side { width: 100%; height: 1fr; margin-left: 0; }
+    Screen.compact #summary-info, Screen.compact #finding-side { margin-top: 1; }
     """
     HORIZONTAL_BREAKPOINTS = [(0, "compact"), (72, "narrow"), (100, "wide")]
 
@@ -166,10 +281,67 @@ class ExposureIQApp(App[int]):
         self._log_handler = None
         self._diff_target = None
         self.register_theme(Theme(
-            name="exposureiq", primary=output.TEAL, secondary=output.INDIGO,
-            accent=output.INDIGO, warning=output.AMBER, error="#EF4444",
-            success=output.TEAL, background=output.DARK, surface=output.DARK,
-            panel="#1F2937", foreground="#E5E7EB", dark=True,
+            name="exposureiq", primary=branding.TEAL, secondary=branding.INDIGO,
+            accent=branding.TEAL, warning=branding.AMBER, error=branding.HIGH,
+            success=branding.TEAL, background=branding.PANEL,
+            surface=branding.INNER_SURFACE, panel=branding.PANEL,
+            foreground=branding.TEXT_PRIMARY, dark=True,
+            variables={
+                "primary": branding.TEAL, "secondary": branding.INDIGO,
+                "accent": branding.TEAL, "warning": branding.AMBER,
+                "error": branding.HIGH, "success": branding.TEAL,
+                "background": branding.PANEL, "surface": branding.INNER_SURFACE,
+                "panel": branding.PANEL, "foreground": branding.TEXT_PRIMARY,
+                "text": branding.TEXT_PRIMARY, "text-muted": branding.MUTED,
+                "text-disabled": branding.TEXT_DISABLED,
+                "text-primary": branding.TEAL, "text-secondary": branding.INDIGO,
+                "text-accent": branding.TEAL, "text-warning": branding.AMBER,
+                "text-error": branding.HIGH, "text-success": branding.TEAL,
+                "border": branding.TEAL, "border-blurred": branding.LINE,
+                "table-header": branding.TUI_TABLE_HEADER,
+                "body-text": branding.TUI_BODY_TEXT,
+                "tab-inactive": branding.TUI_TAB_INACTIVE,
+                "footnote": branding.TUI_FOOTNOTE, "label": branding.TUI_LABEL,
+                "key-hint": branding.TUI_KEY_HINT,
+                "panel-border": branding.TUI_PANEL_BORDER,
+                "tab-divider": branding.TUI_TAB_DIVIDER,
+                "row-divider": branding.TUI_ROW_DIVIDER,
+                "detail-divider": branding.TUI_DETAIL_DIVIDER,
+                "demo-background": branding.DEMO_BACKGROUND,
+                "demo-border": branding.DEMO_BORDER,
+                "severity-high": branding.TUI_HIGH, "severity-low": branding.LOW,
+                "high-background": branding.HIGH_BACKGROUND,
+                "medium-background": branding.MEDIUM_BACKGROUND,
+                "low-background": branding.LOW_BACKGROUND,
+                "surface-lighten-1": branding.BORDER_SOFT,
+                "surface-darken-1": branding.BORDER_MUTED,
+                "primary-lighten-3": branding.GLOW, "primary-darken-3": branding.LINE,
+                "primary-darken-2": branding.BUTTON_FILL,
+                "success-lighten-2": branding.GLOW, "success-darken-3": branding.LINE,
+                "success-darken-2": branding.BUTTON_FILL,
+                "button-fill": branding.BUTTON_FILL,
+                "button-foreground": branding.TEXT_PRIMARY,
+                "button-color-foreground": branding.BUTTON_TEXT,
+                "button-focus-text-style": "b",
+                "block-cursor-background": branding.HIGHLIGHT,
+                "block-cursor-foreground": branding.TEXT_PRIMARY,
+                "block-cursor-blurred-background": branding.HIGHLIGHT,
+                "block-cursor-blurred-foreground": branding.TEXT_PRIMARY,
+                "block-hover-background": branding.HIGHLIGHT,
+                "input-cursor-background": branding.TEAL,
+                "input-cursor-foreground": branding.BUTTON_TEXT,
+                "input-selection-background": branding.HIGHLIGHT,
+                "input-selection-foreground": branding.TEXT_PRIMARY,
+                "screen-selection-background": branding.HIGHLIGHT,
+                "screen-selection-foreground": branding.TEXT_PRIMARY,
+                "scrollbar": branding.LINE, "scrollbar-hover": branding.BORDER_SOFT,
+                "scrollbar-active": branding.TEAL,
+                "scrollbar-background": branding.PANEL,
+                "scrollbar-background-hover": branding.PANEL,
+                "scrollbar-background-active": branding.PANEL,
+                "scrollbar-corner-color": branding.PANEL,
+                "footer-background": branding.PANEL,
+            },
         ))
         self.theme = "exposureiq"
 
@@ -177,11 +349,13 @@ class ExposureIQApp(App[int]):
         with Horizontal(id="topbar"):
             yield Button("←", id="back")
             yield Static(Text.assemble(("ExposureIQ", f"bold {output.TEAL}"),
-                                       (f" · v{self.version}", "dim")), id="brand")
+                                       (f" · v{self.version}", branding.TUI_BREADCRUMB)), id="brand")
+            with Horizontal(id="header-actions"):
+                yield Static(id="mode-badge", markup=False)
         yield Static("Scanning", id="scan-status", markup=False)
         with VerticalScroll(id="home"):
             with Vertical(id="home-center"):
-                yield Static("▄████████ ▀████    ▐████▀    ▄███████▄  ▄██████▄     ▄████████ ███    █▄     ▄████████    ▄████████  ▄█  ████████▄  \n  ███    ███   ███▌   ████▀    ███    ███ ███    ███   ███    ███ ███    ███   ███    ███   ███    ███ ███  ███    ███ \n  ███    █▀     ███  ▐███      ███    ███ ███    ███   ███    █▀  ███    ███   ███    ███   ███    █▀  ███▌ ███    ███ \n ▄███▄▄▄        ▀███▄███▀      ███    ███ ███    ███   ███        ███    ███  ▄███▄▄▄▄██▀  ▄███▄▄▄     ███▌ ███    ███ \n▀▀███▀▀▀        ████▀██▄     ▀█████████▀  ███    ███ ▀███████████ ███    ███ ▀▀███▀▀▀▀▀   ▀▀███▀▀▀     ███▌ ███    ███ \n  ███    █▄    ▐███  ▀███      ███        ███    ███          ███ ███    ███ ▀███████████   ███    █▄  ███  ███    ███ \n  ███    ███  ▄███     ███▄    ███        ███    ███    ▄█    ███ ███    ███   ███    ███   ███    ███ ███  ███  ▀ ███ \n  ██████████ ████       ███▄  ▄████▀       ▀██████▀   ▄████████▀  ████████▀    ███    ███   ██████████ █▀    ▀██████▀▄█\n                                                                               ███    ███ ", id="ascii-logo", markup=False)
+                yield Static("ExposureIQ", id="ascii-logo", markup=False)
                 with Horizontal(id="home-bar"):
                     yield Input(placeholder="example.com", id="home-domain")
                     yield Button("Scan", id="home-scan", variant="primary")
@@ -203,31 +377,31 @@ class ExposureIQApp(App[int]):
             yield Static(id="diff-target", markup=False)
             yield Static(id="diff-meta", markup=False)
             yield Static(id="diff-headline", markup=False)
-            with VerticalScroll(id="diff-sections"):
+            with VerticalScroll(id="diff-sections", classes="panel detail-panel"):
                 yield Static(id="diff-body", markup=False)
             yield Static(id="diff-notes", markup=False)
             yield Static(id="diff-message", markup=False)
         with VerticalScroll(id="scanning"):
             with Horizontal(id="scan-layout"):
-                with Vertical(id="phase-list"):
+                with Vertical(id="phase-list", classes="panel"):
                     for index, phase in enumerate(PHASES):
                         yield Static(f"○  {phase:<12} waiting", id=f"phase-{index}", classes="phase", markup=False)
-                with Vertical(id="live-panel"):
+                with Vertical(id="live-panel", classes="panel detail-panel"):
                     yield Static("Subdomains  0\nHosts       0\nIPs         0\nFindings    0", id="counters", markup=False)
                     yield Static("Elapsed  0.0s", id="elapsed", markup=False)
                     yield ProgressBar(total=None, show_eta=False, show_percentage=False, id="scan-progress")
             yield Static("Preparing scan…", id="live-log", markup=False)
             yield Static("Active HTTP/TLS and ports require the unchanged scope gate. "
                          "Out-of-scope targets are skipped. No crawling or exploits.", id="safety", markup=False)
-        with TabbedContent(initial="summary-tab", id="results"):
+        with _ResultsTabs(initial="summary-tab", id="results"):
             with TabPane("Summary", id="summary-tab"):
-                with Vertical(id="scope-skipped-panel"):
+                with Vertical(id="scope-skipped-panel", classes="panel"):
                     yield Static(id="scope-skipped-text", markup=False)
                     yield Button("Add to scope and scan", id="add-scope", variant="success")
-                yield Static(id="severity-counts", markup=False)
                 with Horizontal(id="summary-layout"):
-                    yield DataTable(id="phase-counts", cursor_type="row")
-                    with VerticalScroll(id="summary-info"):
+                    yield _PhaseTable(id="phase-counts", cursor_type="row")
+                    with VerticalScroll(id="summary-info", classes="panel detail-panel"):
+                        yield Rule(line_style="solid", classes="details-divider")
                         yield Static(id="summary-notes", markup=False)
             with TabPane("Subdomains", id="subdomains-tab"):
                 yield DataTable(id="subdomains-table", cursor_type="row", zebra_stripes=True)
@@ -238,9 +412,15 @@ class ExposureIQApp(App[int]):
             with TabPane("Findings", id="findings-tab"):
                 with Horizontal(id="finding-layout"):
                     yield DataTable(id="findings-table", cursor_type="row", zebra_stripes=True,
-                                    cursor_foreground_priority="renderable")
-                    with VerticalScroll(id="finding-side"):
+                                    cursor_foreground_priority="renderable",
+                                    cursor_background_priority="renderable")
+                    with VerticalScroll(id="finding-side", classes="panel detail-panel empty-findings"):
+                        yield Rule(line_style="solid", classes="details-divider finding-extra")
+                        yield Static(id="finding-title", classes="finding-extra", markup=False)
                         yield Static("Select a finding to see its detail and Fix.", id="finding-detail", markup=False)
+                        yield Rule(line_style="solid", classes="details-divider finding-extra")
+                        yield Static("NEXT STEP", id="finding-next-step", classes="finding-extra", markup=False)
+                        yield Static(id="finding-recommendation", classes="finding-extra", markup=False)
             with TabPane("Ports", id="ports-tab"):
                 yield Static(id="ports-skip-notes", markup=False)
                 yield DataTable(id="ports-table", cursor_type="row", zebra_stripes=True)
@@ -248,16 +428,18 @@ class ExposureIQApp(App[int]):
                 yield Static("Compare with previous saved scan", id="scan-diff-title", markup=False)
                 yield Static(id="scan-diff-meta", markup=False)
                 yield Static(id="scan-diff-headline", markup=False)
-                with VerticalScroll(id="scan-diff-scroll"):
+                with VerticalScroll(id="scan-diff-scroll", classes="panel detail-panel"):
                     yield Static(id="scan-diff-body", markup=False)
                 yield Static(id="scan-diff-message", markup=False)
-        with Vertical(id="rerun-panel"):
+        with Vertical(id="rerun-panel", classes="panel"):
             yield Static("Web-only re-run (no port scans)", markup=False)
             yield DataTable(id="rerun-hosts", cursor_type="row")
         yield Static(id="user-scope-saved", markup=False)
         yield Static(id="result-log", markup=False)
-        yield Static("q / Ctrl+C quit/cancel   a add scope   Tab panels   ↑↓←→ move   Enter detail",
-                     id="keys", markup=False)
+        with Horizontal(id="footer"):
+            yield Static("q / Ctrl+C quit/cancel   a add scope   Tab panels   ↑↓←→ move   Enter detail",
+                         id="keys", markup=False)
+            yield Static(id="footer-note", markup=False)
 
     def on_mount(self) -> None:
         self.query_one("#results").display = False
@@ -274,6 +456,9 @@ class ExposureIQApp(App[int]):
             pass
         self.query_one("#phase-list").border_title = "Phases"
         self.query_one("#live-panel").border_title = "Live totals"
+        self.query_one("#phase-counts").border_title = "PHASES"
+        self.query_one("#summary-info").border_title = "SCAN SUMMARY"
+        self.query_one("#finding-side").border_title = "SELECTED FINDING"
         self.set_interval(0.1, self._tick)
         self._log_handler = _ScanLogHandler(self)
         self._previous_handlers = logging.getLogger().handlers[:]
@@ -303,28 +488,53 @@ class ExposureIQApp(App[int]):
         text = Text()
         text.append("ExposureIQ", style=f"bold {output.TEAL}")
         if target:
-            # Keep the domain and scan time visible even in an 80-column terminal.
-            text.append(f"  |  {target}", style="bold")
+            text.append(" | ", style=branding.TUI_BREADCRUMB)
+            text.append(target, style=branding.TEXT_PRIMARY)
         else:
-            text.append(f" · v{self.version}", style="dim")
-        if started_at:
-            text.append(f"  ·  {display_time(started_at)}", style="dim")
+            text.append(f" · v{self.version}", style=branding.TUI_BREADCRUMB)
+        if not suffix:
+            suffix = "scan"
+            if self.mode == "results" and self.result:
+                tab = self.query_one("#results", TabbedContent).active
+                tab_name = "diff" if tab == "scan-diff-tab" else tab.removesuffix("-tab")
+                view = "saved scan" if self.result.get("mode") == "preview" else "scan"
+                suffix = f"{view} / {tab_name}"
         if suffix:
-            text.append(f"  ·  {suffix}", style=output.INDIGO)
+            text.append(f" / {suffix}", style=branding.TUI_BREADCRUMB)
+        if started_at:
+            # Use the second header line so the scan time is not lost to the badge.
+            text.append(f"\n{display_time(started_at)}", style=branding.TUI_BREADCRUMB)
         if demo is None:
             demo = bool(getattr(self.args, "demo", False))
+        badge = self.query_one("#mode-badge", Static)
+        badge.set_class(demo, "demo")
         if demo:
-            text.append("  |  DEMO (fake data)", style=f"bold {output.AMBER}")
+            badge.update("DEMO · FAKE DATA")
+        elif self.mode == "results" and self.result and self.result.get("mode") == "preview":
+            badge.update("SAVED · READ ONLY")
+        else:
+            badge.update({"home": "HOME", "browser": "SAVED RESULTS", "scanning": "SCANNING",
+                          "results": "RESULTS", "diff": "READ ONLY"}[self.mode])
         self.query_one("#brand", Static).update(text)
 
-    def _keys(self, text):
+    def _keys(self, text, note=""):
         self.query_one("#keys", Static).update(text)
+        self.query_one("#footer-note", Static).update(note)
+        self.query_one("#footer-note").display = bool(note)
+
+    @on(TabbedContent.TabActivated, "#results")
+    def results_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        if self.mode == "results" and self.result:
+            self._set_title(self.result["target"], self.result.get("started_at"),
+                            demo=bool(self.result.get("demo")))
 
     def _set_back(self, visible):
         self.query_one("#back", Button).display = visible
 
     def _home_message(self, text, style=None):
-        self.query_one("#home-message", Static).update(Text(text, style=style or output.AMBER))
+        message = self.query_one("#home-message", Static)
+        message.set_class(bool(text), "has-message")
+        message.update(Text(text, style=style or output.AMBER))
 
     def _hide_all_views(self):
         for selector in ("#home", "#browser", "#scanning", "#results", "#scan-status", "#result-log",
@@ -351,15 +561,17 @@ class ExposureIQApp(App[int]):
         field.focus()
         self.call_after_refresh(field.focus)
 
-    def _fit_home_logo(self) -> None:
-        """Hide the large logo on short terminals so the controls stay visible."""
+    def _fit_home_logo(self, size: Size | None = None) -> None:
+        """Use the full art only when it fits, keeping a title on small screens."""
+        size = size or self.size
         try:
-            self.query_one("#ascii-logo", Static).display = self.size.height >= 30
+            logo = self.query_one("#ascii-logo", Static)
+            logo.update(_HOME_LOGO if size.width >= _HOME_LOGO_WIDTH and size.height >= 30 else "ExposureIQ")
         except Exception:
             pass
 
     def on_resize(self, event) -> None:
-        self._fit_home_logo()
+        self._fit_home_logo(event.size)
 
     def _show_saved_list(self):
         self.mode = "browser"
@@ -368,7 +580,7 @@ class ExposureIQApp(App[int]):
         self.query_one("#browser").display = True
         self._set_back(True)
         self._set_title(suffix="saved results", demo=False)
-        self._keys("Enter open   d Diff   ← back   Tab move   q quit")
+        self._keys("Enter open   d Diff   ← back   Tab move   q quit", "NO PROBES SENT")
         self._populate_saved()
         try:
             self.query_one("#diff-view").display = False
@@ -398,7 +610,7 @@ class ExposureIQApp(App[int]):
         try:
             snapshot = storage.load_scan(str(path))
         except (OSError, ValueError) as error:
-            self._home_message(f"Could not open {path}: {error}", "#EF4444")
+            self._home_message(f"Could not open {path}: {error}", branding.HIGH)
             return False
         self.result = result_from_snapshot(snapshot, path)
         self._finished, self.exit_code = True, 0
@@ -438,7 +650,8 @@ class ExposureIQApp(App[int]):
         self._set_back(False)
         self._set_title(target)
         self._reset_phases()
-        self._keys("q / Ctrl+C quit/cancel   Tab panels   ↑↓←→ move   Enter detail")
+        self._keys("q / Ctrl+C quit/cancel   Tab panels   ↑↓←→ move   Enter detail",
+                   "NO PROBES SENT" if self.args.demo else "Scanning")
         self._started = time.monotonic()
 
     def _reset_phases(self) -> None:
@@ -492,7 +705,7 @@ class ExposureIQApp(App[int]):
         try:
             path, added = append_hosts(domain, [domain], typed)
         except (OSError, ValueError) as error:
-            self._home_message(f"Could not add {domain} to your user scope: {error}", "#EF4444")
+            self._home_message(f"Could not add {domain} to your user scope: {error}", branding.HIGH)
             return
         if added:
             self._home_message(f"Added {domain} to your user scope: {path}. "
@@ -584,7 +797,7 @@ class ExposureIQApp(App[int]):
 
     def _render_phase(self, phase: str) -> None:
         state = self.phase_states[phase]
-        icon, color = {"waiting": ("○", "#9CA3AF"), "spinner": (_SPINNER[self._frame], output.INDIGO),
+        icon, color = {"waiting": ("○", branding.MUTED), "spinner": (_SPINNER[self._frame], output.INDIGO),
                        "done": ("✓", output.TEAL), "skipped": ("–", output.AMBER)}[state]
         count = f"  {self.phase_counts[phase]}" if state == "done" else ""
         self.query_one(f"#phase-{PHASES.index(phase)}", Static).update(
@@ -623,7 +836,7 @@ class ExposureIQApp(App[int]):
             self._finished, self.exit_code = True, 1
             self.query_one("#scan-status", Static).update("Scan stopped; discovery or storage failed")
             self.query_one("#live-log", Static).update(Text(
-                output.readable_message(data["message"], verbose=self.verbose), style="bold #EF4444"))
+                output.readable_message(data["message"], verbose=self.verbose), style=f"bold {branding.HIGH}"))
             self.query_one("#scan-progress", ProgressBar).display = False
         elif kind == "scope_saved":
             self.result["user_scope_path"] = data["path"]
@@ -648,14 +861,14 @@ class ExposureIQApp(App[int]):
             self._show_results()
             self.query_one("#scan-status", Static).update("Scope/web update failed — see warnings")
             self.query_one("#result-log", Static).update(Text(
-                output.readable_message(data["message"], verbose=self.verbose), style="bold #EF4444"))
+                output.readable_message(data["message"], verbose=self.verbose), style=f"bold {branding.HIGH}"))
 
-    def _table(self, selector: str, columns: tuple, rows: list) -> DataTable:
+    def _table(self, selector: str, columns: tuple, rows: list, *, row_height: int = 1) -> DataTable:
         table = self.query_one(selector, DataTable)
         table.clear(columns=True)
         table.add_columns(*(Text(column) for column in columns))
         for row in rows:
-            table.add_row(*(cell if isinstance(cell, Text) else Text(str(cell)) for cell in row))
+            table.add_row(*(cell if isinstance(cell, Text) else Text(str(cell)) for cell in row), height=row_height)
         return table
 
     def _show_results(self) -> None:
@@ -671,12 +884,13 @@ class ExposureIQApp(App[int]):
         self._set_title(result["target"], result.get("started_at"), demo=bool(result.get("demo")))
         if preview:
             self.query_one("#scan-status", Static).update("Saved scan · read-only preview — no probes sent")
-            self._keys("← saved results   Tab panels   ↑↓←→ move   Enter detail   q quit")
+            self._keys("← saved results   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
         else:
+            status = "Scan finished" if not self.exit_code else "Scan finished — results could not be saved"
             self.query_one("#scan-status", Static).update(
-                "Scan finished" if not self.exit_code else "Scan finished — results could not be saved")
+                status)
             self._keys("← saved results   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
-                       "q / Ctrl+C quit/cancel")
+                       "q / Ctrl+C quit/cancel", "NO PROBES SENT" if result.get("demo") else status)
         if result.get("user_scope_path"):
             self.query_one("#user-scope-saved").display = True
             self.query_one("#user-scope-saved", Static).update(f"User scope saved to {result['user_scope_path']}")
@@ -684,32 +898,38 @@ class ExposureIQApp(App[int]):
         for asset in assets:
             for finding in asset.get("findings", []):
                 counts[finding["severity"]] += 1
-        severity_text = Text("Findings  ", style="bold")
         for severity, count in counts.items():
-            severity_text.append(f"{severity.upper()} {count}    ", style=_SEVERITY[severity])
-        self.query_one("#severity-counts", Static).update(severity_text)
-        self._table("#phase-counts", ("Phase", "State", "Count", "Seconds"), [
+            self.query_one(f"#severity-{severity}", Static).update(f"{severity.upper()} {count}")
+        phases = self._table("#phase-counts", ("Phase", "State", "Count", "Seconds"), [
             (phase, result["phase_states"][phase], result["phase_counts"][phase],
              f"{result['phase_times'][phase]:.1f}") for phase in PHASES
-        ])
+        ], row_height=2)
         groups = output.grouped_ips(assets)
+        phases.border_subtitle = (f"{len(result['names'])} subdomains / {len(assets)} hosts / "
+                                  f"{len(groups)} unique IPs")
         if preview:
             mode = ("DEMO — saved fake data; read-only preview (no probes sent)"
                     if result["demo"] else result.get("mode_detail") or "Saved scan — read-only preview")
-            when = f"Scan time  {result.get('started_time') or 'unknown'}\n"
+            time_label, time_value = "Scan time", result.get("started_time") or "unknown"
         else:
             mode = ("DEMO — fake data; no network" if result["demo"]
                     else result.get("mode_detail") or "Active checks limited to authorized scope")
-            when = f"Time  {result['elapsed']:.1f}s\n"
-        notes = Text()
-        style = output.TEAL if result.get("mode") == "full" else output.AMBER
+            time_label, time_value = "Time", f"{result['elapsed']:.1f}s"
+        notes = Text(style=branding.TUI_BODY_TEXT)
+        style = (output.INDIGO if preview else
+                 output.TEAL if result.get("mode") == "full" else output.AMBER)
         notes.append(f"{mode}\n", style=style)
-        notes.append(f"\nTarget  {result['target']}\n"
-                     f"Subdomains  {len(result['names'])}\nHosts  {len(assets)}\n"
-                     f"Unique IPs  {len(groups)}\n{when}\n"
-                     f"Saved file\n{result['saved_to'] or 'Not saved'}\n\n")
+        if result["demo"]:
+            notes.stylize(output.AMBER, 0, 4)
+        notes.append("\n")
+        for label, value in (("Target", result["target"]), ("Subdomains", len(result["names"])),
+                             ("Hosts", len(assets)), ("Unique IPs", len(groups)), (time_label, time_value)):
+            _append_labeled_row(notes, label, value)
+        notes.append("\nSaved file\n", style=branding.TUI_LABEL)
+        notes.append(f"{result['saved_to'] or 'Not saved'}\n\n", style=branding.TEXT_PRIMARY)
         if not preview:
-            notes.append(f"Report PDF\n{result.get('report_to') or 'Not generated'}\n\n")
+            notes.append("Report PDF\n", style=branding.TUI_LABEL)
+            notes.append(f"{result.get('report_to') or 'Not generated'}\n\n", style=branding.TEXT_PRIMARY)
         warnings = list(dict.fromkeys(result.get("warnings", []) + self.warnings))
         if warnings:
             notes.append("Warnings (a missing result is not proof of safety)\n", style=output.AMBER)
@@ -764,6 +984,10 @@ class ExposureIQApp(App[int]):
         if findings:
             self._show_finding("0")
         else:
+            self.query_one("#finding-side").add_class("empty-findings")
+            self.query_one("#finding-side").border_title = "FINDING DETAILS"
+            self.query_one("#finding-title", Static).update("")
+            self.query_one("#finding-recommendation", Static).update("")
             self.query_one("#finding-detail", Static).update(
                 "No findings returned. Out-of-scope targets or failed requests are not proof of safety.")
         self._table("#ports-table", ("IP", "Port", "Protocol", "Service"), [
@@ -789,17 +1013,25 @@ class ExposureIQApp(App[int]):
         if key not in self.finding_rows:
             return
         host, finding = self.finding_rows[key]
-        detail = Text()
-        detail.append(finding["title"] + "\n", style=_SEVERITY[finding["severity"]])
-        detail.append(f"\nHost: {host}\nID: {finding['id']}\nRule: {finding['rule']}\n")
+        side = self.query_one("#finding-side")
+        side.remove_class("empty-findings")
+        position = list(self.finding_rows).index(key) + 1
+        side.border_title = f"SELECTED FINDING / {position:02d} OF {len(self.finding_rows):02d}"
+        title_color = branding.TUI_HIGH if finding["severity"] == "high" else _SEVERITY[finding["severity"]]
+        self.query_one("#finding-title", Static).update(Text(finding["title"], style=f"bold {title_color}"))
+        detail = Text(style=branding.TUI_BODY_TEXT)
+        for label, value in (("Host:", host), ("ID:", finding["id"]), ("Rule:", finding["rule"])):
+            _append_labeled_row(detail, label, value)
         if "ip" in finding:
-            detail.append(f"IP: {finding['ip']}\n")
+            _append_labeled_row(detail, "IP:", finding["ip"])
         if "port" in finding:
-            detail.append(f"Port: {finding['port']}\n")
-        detail.append(f"\n{finding['detail']}\n\n")
-        detail.append("Fix: ", style=f"bold {output.TEAL}")
-        detail.append(finding["recommendation"])
+            _append_labeled_row(detail, "Port:", finding["port"])
+        detail.append(f"\n{finding['detail']}\n")
         self.query_one("#finding-detail", Static).update(detail)
+        recommendation = Text(style=branding.TUI_BODY_TEXT)
+        recommendation.append("Fix: ", style=f"bold {output.TEAL}")
+        recommendation.append(finding["recommendation"])
+        self.query_one("#finding-recommendation", Static).update(recommendation)
 
     @on(DataTable.RowSelected, "#findings-table")
     def select_finding(self, event: DataTable.RowSelected) -> None:
@@ -973,19 +1205,19 @@ class ExposureIQApp(App[int]):
                     kind = c.get("kind", "")
                     is_gone = kind in gone_kinds or status == "confirmed"
                     if is_gone:
-                        body.append("  - ", style="bold red")
-                        body.append(msg + "\n", style="#EF4444")
+                        body.append("  - ", style=f"bold {branding.HIGH}")
+                        body.append(msg + "\n", style=branding.HIGH)
                     elif kind in ("host.new", "ip.new", "port.opened", "tech.new", "finding.new"):
-                        body.append("  + ", style="bold green")
-                        body.append(msg + "\n", style="#4ADE80")
+                        body.append("  + ", style=f"bold {branding.TEAL}")
+                        body.append(msg + "\n", style=branding.TEAL)
                     elif c.get("direction") == "worse":
-                        body.append("  ! ", style="bold red")
-                        body.append(msg + "\n", style="#EF4444")
+                        body.append("  ! ", style=f"bold {branding.HIGH}")
+                        body.append(msg + "\n", style=branding.HIGH)
                     elif c.get("direction") == "better":
-                        body.append("  ~ ", style="bold green")
-                        body.append(msg + "\n", style="#4ADE80")
+                        body.append("  ~ ", style=f"bold {branding.TEAL}")
+                        body.append(msg + "\n", style=branding.TEAL)
                     else:
-                        body.append("  • " + msg + "\n", style="#9CA3AF")
+                        body.append("  • " + msg + "\n", style=branding.MUTED)
             self.query_one("#diff-body").update(body)
             notes = diff.get("notes") or []
             note_text = "\n".join([n for n in notes if isinstance(n, str)])
@@ -1120,19 +1352,19 @@ class ExposureIQApp(App[int]):
                         kind = c.get("kind", "")
                         is_gone = kind in gone_kinds or status == "confirmed"
                         if is_gone:
-                            body.append("  - ", style="bold red")
-                            body.append(msg + "\n", style="#EF4444")
+                            body.append("  - ", style=f"bold {branding.HIGH}")
+                            body.append(msg + "\n", style=branding.HIGH)
                         elif kind in ("host.new", "ip.new", "port.opened", "tech.new", "finding.new"):
-                            body.append("  + ", style="bold green")
-                            body.append(msg + "\n", style="#4ADE80")
+                            body.append("  + ", style=f"bold {branding.TEAL}")
+                            body.append(msg + "\n", style=branding.TEAL)
                         elif c.get("direction") == "worse":
-                            body.append("  ! ", style="bold red")
-                            body.append(msg + "\n", style="#EF4444")
+                            body.append("  ! ", style=f"bold {branding.HIGH}")
+                            body.append(msg + "\n", style=branding.HIGH)
                         elif c.get("direction") == "better":
-                            body.append("  ~ ", style="bold green")
-                            body.append(msg + "\n", style="#4ADE80")
+                            body.append("  ~ ", style=f"bold {branding.TEAL}")
+                            body.append(msg + "\n", style=branding.TEAL)
                         else:
-                            body.append("  • " + msg + "\n", style="#9CA3AF")
+                            body.append("  • " + msg + "\n", style=branding.MUTED)
                 self.query_one("#scan-diff-body").update(body)
                 self.query_one("#scan-diff-message").update("")
             except Exception:

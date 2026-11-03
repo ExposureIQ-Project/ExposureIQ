@@ -13,16 +13,15 @@ from exposureiq.tui.user_scope import MAX_HOSTS, eligible_hosts, responsibility
 class ScopeConfirmation(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "cancel", "Cancel", priority=True)]
     CSS = """
-    ScopeConfirmation { align: center middle; background: #111827 75%; }
-    #scope-dialog { width: 80; max-width: 94%; height: 30; max-height: 96%;
-                    background: #111827; border: round #16B8A6; padding: 0 1; }
+    ScopeConfirmation { align: center middle; background: $background 75%; }
+    #scope-dialog { width: 80; max-width: 94%; height: 30; max-height: 96%; }
     #scope-body { height: 1fr; }
     #scope-cap, #scope-responsibility, #scope-type-label { height: auto; margin-bottom: 1; }
-    #scope-cap { color: #F59E0B; }
-    #scope-hosts { height: 3; max-height: 6; border: round #7C83FD; margin-bottom: 1; padding: 0 1; }
+    #scope-cap { color: $warning; }
+    #scope-hosts { height: 5; max-height: 8; margin-bottom: 1; }
     #scope-host-names { height: auto; }
-    #scope-domain-input { height: 3; }
-    #scope-actions { height: 3; align-horizontal: right; }
+    #scope-domain-input { height: 3; margin-top: 1; }
+    #scope-actions { height: 3; margin-top: 1; align-horizontal: right; }
     #scope-actions Button { margin-left: 1; }
     """
 
@@ -34,14 +33,14 @@ class ScopeConfirmation(ModalScreen[str | None]):
         self.total = len(all_names)
 
     def compose(self) -> ComposeResult:
-        with Vertical(id="scope-dialog"):
+        with Vertical(id="scope-dialog", classes="panel detail-panel"):
             with VerticalScroll(id="scope-body"):
                 noun = "host name" if self.total == 1 else "host names"
                 cap = (f"{self.total} eligible hosts; only the first {MAX_HOSTS} will be added. "
                        "IP addresses will NOT be added." if self.total > MAX_HOSTS else
                        f"{self.total} {noun} will be added. IP addresses will NOT be added.")
                 yield Static(cap, id="scope-cap", markup=False)
-                with VerticalScroll(id="scope-hosts"):
+                with VerticalScroll(id="scope-hosts", classes="panel"):
                     yield Static("\n".join(self.hosts), id="scope-host-names", markup=False)
                 yield Static(responsibility(self.domain), id="scope-responsibility", markup=False)
                 yield Static(f"Type {self.domain} exactly to accept responsibility:",

@@ -30,7 +30,8 @@ def severity_donut(counts: dict, size: int = 220, thickness: int = 34) -> str:
     circumference = 2 * math.pi * radius
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
-        f'class="chart chart-donut" role="img" aria-label="Findings by severity">',
+        f'class="chart chart-donut" role="img" aria-label="Findings by severity" '
+        f'style="background:{branding.INNER_SURFACE}">',
         "<title>Findings by severity</title>",
         f'<circle cx="{centre}" cy="{centre}" r="{radius:.2f}" fill="none" '
         f'stroke="{branding.LINE}" stroke-width="{thickness}"/>',
@@ -53,9 +54,9 @@ def severity_donut(counts: dict, size: int = 220, thickness: int = 34) -> str:
 
     parts += [
         f'<text x="{centre}" y="{centre - 2}" text-anchor="middle" '
-        f'class="donut-total">{total}</text>',
+        f'class="donut-total" fill="{branding.TEXT_PRIMARY}">{total}</text>',
         f'<text x="{centre}" y="{centre + 18}" text-anchor="middle" '
-        f'class="donut-label">findings</text>',
+        f'class="donut-label" fill="{branding.MUTED}">findings</text>',
         "</svg>",
     ]
     return "".join(parts)
@@ -87,14 +88,15 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-        f'class="chart chart-line" role="img" aria-label="Assets over time">',
+        f'class="chart chart-line" role="img" aria-label="Assets over time" '
+        f'style="background:{branding.INNER_SURFACE}">',
         "<title>Assets over time</title>",
     ]
 
     if not points:
         parts += [
             f'<text x="{width / 2}" y="{height / 2}" text-anchor="middle" '
-            f'class="chart-empty">No scan history yet</text>',
+            f'class="chart-empty" fill="{branding.MUTED}">No scan history yet</text>',
             "</svg>",
         ]
         return "".join(parts)
@@ -112,7 +114,7 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
         )
         parts.append(
             f'<text x="{left - 10}" y="{y + 3:.2f}" text-anchor="end" '
-            f'class="axis-label">{value:.0f}</text>'
+            f'class="axis-label" fill="{branding.MUTED}">{value:.0f}</text>'
         )
 
     count = len(points)
@@ -136,7 +138,7 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
     label_step = max(1, math.ceil(count / 8))
     for index, (x, y, point) in enumerate(zip(xs, ys, points)):
         parts.append(
-            f'<g><circle cx="{x:.2f}" cy="{y:.2f}" r="4" fill="{branding.WHITE}" '
+            f'<g><circle cx="{x:.2f}" cy="{y:.2f}" r="4" fill="{branding.INNER_SURFACE}" '
             f'stroke="{branding.TEAL}" stroke-width="2"/>'
             f'<title>{_escape(point.get("label") or "?")}: '
             f'{int(point.get("assets") or 0)} assets, '
@@ -145,16 +147,16 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
         if index % label_step == 0 or index == count - 1:
             parts.append(
                 f'<text x="{x:.2f}" y="{top + plot_height + 20}" '
-                f'text-anchor="middle" class="axis-label">'
+                f'text-anchor="middle" class="axis-label" fill="{branding.MUTED}">'
                 f'{_escape(point.get("label") or "?")}</text>'
             )
 
     parts.append(
-        f'<text x="{left}" y="{height - 4}" class="axis-title">Scan date</text>'
+        f'<text x="{left}" y="{height - 4}" class="axis-title" fill="{branding.MUTED}">Scan date</text>'
     )
     parts.append(
         f'<text x="{left - 10}" y="{top - 8}" text-anchor="end" '
-        f'class="axis-title">Hosts</text>'
+        f'class="axis-title" fill="{branding.MUTED}">Hosts</text>'
     )
     parts.append("</svg>")
     return "".join(parts)

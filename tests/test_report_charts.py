@@ -1,16 +1,23 @@
 """Tests for the pure SVG chart helpers."""
 
+from exposureiq.report import branding
 from exposureiq.report.charts import assets_over_time, severity_donut, severity_legend
 
 
 def test_donut_contains_each_severity_and_the_total():
-    svg = severity_donut({"high": 2, "medium": 1, "low": 0, "total": 3})
+    svg = severity_donut({"high": 1, "medium": 1, "low": 1, "total": 3})
 
     assert svg.startswith("<svg")
     assert svg.endswith("</svg>")
     assert ">3</text>" in svg
     assert "stroke-dasharray" in svg
-    assert svg.count("<circle") == 3  # background + two non-zero segments
+    assert svg.count("<circle") == 4  # background + three non-zero segments
+    colors = [branding.SEVERITY_COLORS[name] for name in ("high", "medium", "low")]
+    assert len(set(colors)) == 3
+    for color in colors:
+        assert f'stroke="{color}"' in svg
+    assert f'fill="{branding.TEXT_PRIMARY}"' in svg
+    assert f'fill="{branding.MUTED}"' in svg
 
 
 def test_donut_handles_zero_findings():
@@ -36,6 +43,8 @@ def test_line_chart_draws_points_and_labels():
     ])
 
     assert "<polyline" in svg
+    assert f'stroke="{branding.TEAL}"' in svg
+    assert f'fill="{branding.INNER_SURFACE}"' in svg
     assert "01 Oct" in svg
     assert "29 Oct" in svg
     assert svg.count("<g>") == 3
