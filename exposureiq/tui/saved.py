@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from exposureiq import output, storage
+from exposureiq.paths import saved_json_paths
 
 RESULTS_DIR = Path("results")
 
@@ -86,21 +87,22 @@ def list_saved(directory=RESULTS_DIR, limit: int = 200) -> list:
     """Newest first. An unreadable file is listed with an error, never hidden."""
     try:
         paths = sorted(
-            Path(directory).glob("*.json"),
-            key=lambda item: (item.stat().st_mtime, item.name),
+            saved_json_paths(directory),
+            key=lambda item: (item.stat().st_mtime, str(item)),
             reverse=True,
         )
     except OSError:
         return []
     entries = []
     for path in paths[:limit]:
+        name = str(path.relative_to(directory))
         try:
             snapshot = storage.load_scan(str(path))
         except (OSError, ValueError) as error:
-            entries.append({"path": str(path), "name": path.name, "target": "unreadable",
+            entries.append({"path": str(path), "name": name, "target": "unreadable",
                             "started": "", "scan_id": "", "error": str(error)})
         else:
-            entries.append({"path": str(path), "name": path.name, "target": snapshot["target"],
+            entries.append({"path": str(path), "name": name, "target": snapshot["target"],
                             "started": display_time(snapshot.get("started_at")),
                             "scan_id": snapshot.get("scan_id", ""), "error": None})
     return entries

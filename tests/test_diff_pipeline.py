@@ -125,7 +125,7 @@ def test_ignore_rules_split_changes_without_losing_them():
     assert any("hidden by ignore rules" in note for note in diff["notes"])
 
 
-def test_diff_domain_uses_the_two_newest_scans_and_third_for_confirmation(tmp_path):
+def test_diff_domain_uses_baseline_through_newest_and_all_steps(tmp_path):
     save(tmp_path / "one.json", "2026-10-01T00:00:00Z", [asset("old.example.com")])
     save(tmp_path / "two.json", "2026-10-02T00:00:00Z", [asset("www.example.com")])
     save(tmp_path / "three.json", "2026-10-03T00:00:00Z", [asset("www.example.com")])
@@ -134,10 +134,13 @@ def test_diff_domain_uses_the_two_newest_scans_and_third_for_confirmation(tmp_pa
 
     diff = pipeline.diff_domain("https://Example.com/path", results_dir=tmp_path)
 
-    assert diff["old"]["scan_id"] == "2026-10-02T00-00-00Z"
+    assert diff["old"]["scan_id"] == "2026-10-01T00-00-00Z"
     assert diff["new"]["scan_id"] == "2026-10-03T00-00-00Z"
-    assert kinds(diff["changes"]) == ["host.removed"]
-    assert diff["changes"][0]["status"] == "confirmed"
+    assert kinds(diff["changes"]) == ["host.new", "host.removed"]
+    assert diff["changes"][1]["status"] == "confirmed"
+    assert len(diff["history"]) == 2
+    assert diff["history"][-1]["old"]["scan_id"] == "2026-10-02T00-00-00Z"
+    assert diff["history"][-1]["changes"][0]["status"] == "confirmed"
 
 
 def test_diff_domain_requires_two_scans(tmp_path):

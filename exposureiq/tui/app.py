@@ -21,6 +21,7 @@ from exposureiq import output, storage
 from exposureiq.report import branding
 from exposureiq.tui.control import ScanCancelled, ScanControl
 from exposureiq.tui.confirm_scope import ScopeConfirmation
+from exposureiq.tui.export import ExportDialog
 from exposureiq.tui.rerun import rerun_hosts
 from exposureiq.tui.saved import display_time, list_saved, result_from_snapshot
 from exposureiq.tui.scan import PHASES, ScanStages, run_scan
@@ -49,6 +50,45 @@ def _append_labeled_row(text: Text, label: str, value) -> None:
     """Align existing details without changing their values."""
     text.append(f"{label:<12}", style=branding.TUI_LABEL)
     text.append(f"{value}\n", style=branding.TEXT_PRIMARY)
+
+
+def _diff_body(diff: dict) -> Text:
+    """One readable baseline/history view for the browser and results tab."""
+    body = Text()
+    categories = (
+        ("Subdomains/Hosts", ("host.new", "host.removed")),
+        ("IP addresses", ("ip.new", "ip.removed")),
+        ("Open ports / services", ("port.opened", "port.closed", "port.service_changed")),
+        ("Technologies", ("tech.new", "tech.removed", "tech.version_changed")),
+        ("Findings", ("finding.new", "finding.resolved", "finding.severity_changed")),
+    )
+    changes = diff.get("changes") or []
+    for title, kinds in categories:
+        items = [change for change in changes if isinstance(change, dict) and change.get("kind") in kinds]
+        if not items:
+            continue
+        body.append(f"\n{title}\n", style=f"bold {branding.TEAL}")
+        for change in items:
+            direction = change.get("direction")
+            color = branding.HIGH if direction == "worse" else branding.TEAL if direction == "better" else branding.MUTED
+            prefix = "!" if direction == "worse" else "~" if direction == "better" else "•"
+            body.append(f"  {prefix} {diff_summary.describe_change(change)}\n", style=color)
+    for note in diff.get("notes") or []:
+        body.append(f"\nNote: {note}\n", style=branding.MUTED)
+    history = diff.get("history") or []
+    if history:
+        body.append("\nScan-by-scan history\n", style=f"bold {branding.TEAL}")
+        body.append("Overall counts above are net changes; the steps retain temporary issues.\n", style=branding.MUTED)
+        for step in history:
+            old, new = step.get("old") or {}, step.get("new") or {}
+            summary = step.get("summary") or {}
+            body.append(f"\n{old.get('scan_id', '?')} → {new.get('scan_id', '?')}\n", style="bold")
+            body.append(f"{summary.get('headline') or 'No changes'}\n")
+            for line in summary.get("lines") or []:
+                body.append(f"  • {line}\n")
+            for note in step.get("notes") or []:
+                body.append(f"  Note: {note}\n", style=branding.MUTED)
+    return body
 
 
 class _PhaseTable(DataTable):
@@ -89,6 +129,12 @@ class ScanEvent(Message):
         self.data = data
 
 
+class ReportExported(Message):
+    def __init__(self, result: dict, fmt: str, *, path: str | None = None, error: str | None = None):
+        super().__init__()
+        self.result, self.fmt, self.path, self.error = result, fmt, path, error
+
+
 class _ScanLogHandler(logging.Handler):
     def __init__(self, app):
         super().__init__(logging.WARNING)
@@ -109,6 +155,7 @@ class ExposureIQApp(App[int]):
         Binding("ctrl+c", "cancel_scan", "Cancel", priority=True),
         Binding("a", "add_scope", "Add to scope"),
         Binding("d", "diff_view", "Diff"),
+        Binding("e", "export_report", "Export"),
         Binding("tab", "focus_next", "Next panel"),
         Binding("shift+tab", "focus_previous", "Previous", show=False),
     ]
@@ -151,6 +198,7 @@ class ExposureIQApp(App[int]):
         background: transparent; color: $secondary; text-style: bold; content-align: center middle;
     }
     #mode-badge.demo { color: $warning; border: round $demo-border; }
+    #export-report { display: none; width: auto; min-width: 12; height: 3; margin-left: 1; }
     #back { width: 5; min-width: 5; height: 3; padding: 0; border: round $panel-border;
             color: $primary; text-style: bold; }
     #home { height: 1fr; align: center middle; }
@@ -208,7 +256,7 @@ class ExposureIQApp(App[int]):
     #summary-layout { height: 1fr; }
     #phase-counts { width: 47fr; }
     #summary-info { width: 53fr; height: 1fr; margin-left: 1; }
-    #summary-notes { height: auto; }
+    #summary-notes, #report-exports { height: auto; }
     #scope-skipped-panel { height: auto; border: round $warning; margin-bottom: 1; }
     #scope-skipped-text { height: auto; color: $warning; }
     #add-scope { margin-top: 1; }
@@ -276,6 +324,8 @@ class ExposureIQApp(App[int]):
         self._frame = 0
         self._finished = False
         self._rerunning = False
+        self._exporting = False
+        self.export_worker = None
         self.rerun_states = {}
         self.worker = None
         self._log_handler = None
@@ -352,6 +402,7 @@ class ExposureIQApp(App[int]):
                                        (f" · v{self.version}", branding.TUI_BREADCRUMB)), id="brand")
             with Horizontal(id="header-actions"):
                 yield Static(id="mode-badge", markup=False)
+                yield Button("Export", id="export-report", variant="primary", disabled=True)
         yield Static("Scanning", id="scan-status", markup=False)
         with VerticalScroll(id="home"):
             with Vertical(id="home-center"):
@@ -370,7 +421,7 @@ class ExposureIQApp(App[int]):
             yield DataTable(id="saved-table", cursor_type="row", zebra_stripes=True)
             with Horizontal(id="browser-actions"):
                 yield Button("Open selected file", id="saved-open", variant="primary")
-                yield Button("View diff for domain", id="saved-diff-domain", variant="default")
+                yield Button("View selected scan history", id="saved-diff-domain", variant="default")
             yield Static("Select a file, then Enter or Open selected. Diff available if domain has 2+ scans.",
                          id="browser-note", markup=False)
         with VerticalScroll(id="diff-view"):
@@ -403,6 +454,7 @@ class ExposureIQApp(App[int]):
                     with VerticalScroll(id="summary-info", classes="panel detail-panel"):
                         yield Rule(line_style="solid", classes="details-divider")
                         yield Static(id="summary-notes", markup=False)
+                        yield Static(id="report-exports", markup=False)
             with TabPane("Subdomains", id="subdomains-tab"):
                 yield DataTable(id="subdomains-table", cursor_type="row", zebra_stripes=True)
             with TabPane("Hosts", id="hosts-tab"):
@@ -472,7 +524,7 @@ class ExposureIQApp(App[int]):
         elif self.home_mode:
             self._show_home()
         else:
-            target = "example.com" if self.args.demo else self.args.domain
+            target = "example.com" if self.args.demo or getattr(self.args, "demos", False) else self.args.domain
             self._show_scanning(target)
             self.worker = self._run_scan()
 
@@ -505,7 +557,7 @@ class ExposureIQApp(App[int]):
             # Use the second header line so the scan time is not lost to the badge.
             text.append(f"\n{display_time(started_at)}", style=branding.TUI_BREADCRUMB)
         if demo is None:
-            demo = bool(getattr(self.args, "demo", False))
+            demo = bool(getattr(self.args, "demo", False) or getattr(self.args, "demos", False))
         badge = self.query_one("#mode-badge", Static)
         badge.set_class(demo, "demo")
         if demo:
@@ -538,7 +590,7 @@ class ExposureIQApp(App[int]):
 
     def _hide_all_views(self):
         for selector in ("#home", "#browser", "#scanning", "#results", "#scan-status", "#result-log",
-                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel"):
+                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report"):
             try:
                 self.query_one(selector).display = False
             except Exception:
@@ -651,7 +703,7 @@ class ExposureIQApp(App[int]):
         self._set_title(target)
         self._reset_phases()
         self._keys("q / Ctrl+C quit/cancel   Tab panels   ↑↓←→ move   Enter detail",
-                   "NO PROBES SENT" if self.args.demo else "Scanning")
+                   "NO PROBES SENT" if self.args.demo or getattr(self.args, "demos", False) else "Scanning")
         self._started = time.monotonic()
 
     def _reset_phases(self) -> None:
@@ -735,10 +787,19 @@ class ExposureIQApp(App[int]):
         if self.mode == "browser":
             self._open_diff_from_browser()
             return
+        if self.mode == "results" and self.result and self.result.get("saved_to"):
+            try:
+                selected = storage.load_scan(self.result["saved_to"])
+            except (OSError, ValueError) as error:
+                self.query_one("#result-log", Static).update(f"Could not load scan history: {error}")
+                return
+            self._show_diff_browser(selected["target"], selected=selected,
+                                    history_dir=Path(self.result["saved_to"]).parent)
+            return
         self._show_diff_browser()
 
     def _open_diff_from_browser(self) -> None:
-        target = None
+        target, selected = None, None
         try:
             table = self.query_one("#saved-table", DataTable)
             if table.row_count and table.cursor_row is not None:
@@ -749,6 +810,7 @@ class ExposureIQApp(App[int]):
                         from exposureiq import storage
                         snap = storage.load_scan(path)
                         target = snap.get("target")
+                        selected = snap
                     except Exception:
                         pass
         except Exception:
@@ -769,8 +831,7 @@ class ExposureIQApp(App[int]):
                             break
             except Exception:
                 target = None
-        self._show_diff_browser()
-        self._load_diff_for_target(target)
+        self._show_diff_browser(target, selected=selected)
 
     @work(thread=True, exclusive=True, exit_on_error=False)
     def _run_scan(self) -> None:
@@ -873,6 +934,10 @@ class ExposureIQApp(App[int]):
 
     def _show_results(self) -> None:
         result, assets = self.result, self.result["assets"]
+        custom_output = getattr(self.args, "output", None)
+        if custom_output and result.get("saved_to") and result.get("mode") != "preview":
+            root = Path(custom_output)
+            self.results_dir = root.parent if root.suffix.lower() == ".json" else root
         self.mode = "results"
         preview = result.get("mode") == "preview"
         self._hide_all_views()
@@ -880,16 +945,17 @@ class ExposureIQApp(App[int]):
         self.query_one("#results").display = True
         self.query_one("#scan-status").display = True
         self.query_one("#result-log").display = True
+        self._update_export_button()
         self._set_back(True)
         self._set_title(result["target"], result.get("started_at"), demo=bool(result.get("demo")))
         if preview:
             self.query_one("#scan-status", Static).update("Saved scan · read-only preview — no probes sent")
-            self._keys("← saved results   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
+            self._keys("← saved results   e Export   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
         else:
             status = "Scan finished" if not self.exit_code else "Scan finished — results could not be saved"
             self.query_one("#scan-status", Static).update(
                 status)
-            self._keys("← saved results   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
+            self._keys("← saved results   e Export   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
                        "q / Ctrl+C quit/cancel", "NO PROBES SENT" if result.get("demo") else status)
         if result.get("user_scope_path"):
             self.query_one("#user-scope-saved").display = True
@@ -927,6 +993,11 @@ class ExposureIQApp(App[int]):
             _append_labeled_row(notes, label, value)
         notes.append("\nSaved file\n", style=branding.TUI_LABEL)
         notes.append(f"{result['saved_to'] or 'Not saved'}\n\n", style=branding.TEXT_PRIMARY)
+        if result.get("demo_count"):
+            notes.append("Demo history\n", style=branding.TUI_LABEL)
+            notes.append(f"{len(result.get('saved_scans', []))} of {result['demo_count']} snapshots saved; "
+                         f"{len(result.get('demo_reports', []))} PDFs.\n"
+                         "Showing scan 10. Open scans 3–4 to see peak exposure, then scan 10 for recovery.\n\n")
         if not preview:
             notes.append("Report PDF\n", style=branding.TUI_LABEL)
             notes.append(f"{result.get('report_to') or 'Not generated'}\n\n", style=branding.TEXT_PRIMARY)
@@ -956,8 +1027,9 @@ class ExposureIQApp(App[int]):
             "Confirm ownership or written permission to add host names and run web checks only.")
         button = self.query_one("#add-scope", Button)
         button.display = bool(candidates) and not result.get("demo", False) and not preview
-        button.disabled = self._rerunning
+        button.disabled = self._rerunning or self._exporting
         self.query_one("#summary-notes", Static).update(notes)
+        self._update_report_exports()
         host_states = result.get("host_states", {})
         self._table("#subdomains-table", ("Subdomain", "Active checks"), [
             (name, host_states.get(name, "skipped: no IP address")) for name in result["names"]
@@ -1054,14 +1126,87 @@ class ExposureIQApp(App[int]):
         self.action_quit()
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
-        if action in ("quit", "add_scope") and isinstance(self.focused, Input):
-            return False  # Let the user type q/a in a domain box.
+        if action in ("quit", "add_scope", "export_report") and isinstance(self.focused, Input):
+            return False  # Let the user type q/a/e in a domain box.
+        if action == "export_report":
+            return self._can_export() and not isinstance(self.screen, (ScopeConfirmation, ExportDialog))
         if action == "add_scope":
-            return bool(self._finished and not self._rerunning and self.result
+            return bool(self._finished and not self._rerunning and not self._exporting and self.result
                         and self.mode == "results" and self.result.get("mode") != "preview"
-                        and not self.result.get("demo") and not isinstance(self.screen, ScopeConfirmation)
+                        and not self.result.get("demo") and not isinstance(self.screen, (ScopeConfirmation, ExportDialog))
                         and eligible_hosts(self.result["target"], self.result.get("skipped_hosts", [])))
         return True
+
+    # ----------------------------------------------------------------- exports
+    def _can_export(self) -> bool:
+        return bool(self.mode == "results" and self._finished and self.result
+                    and self.result.get("saved_to") and not self._rerunning and not self._exporting)
+
+    def _update_export_button(self) -> None:
+        button = self.query_one("#export-report", Button)
+        button.display = self.mode == "results"
+        button.disabled = not self._can_export()
+        self.query_one("#add-scope", Button).disabled = self._rerunning or self._exporting
+        button.label = "Exporting…" if self._exporting else "Export"
+        button.tooltip = ("Export a domain HTML dashboard or this scan's DOCX to report/<domain>/." if self.result
+                          and self.result.get("saved_to") else "Reports require a saved scan. Saving was skipped or failed.")
+
+    def _update_report_exports(self) -> None:
+        paths = (self.result or {}).get("report_exports") or {}
+        text = Text()
+        for fmt in ("html", "docx"):
+            if paths.get(fmt):
+                text.append(f"Report {fmt.upper()}\n", style=branding.TUI_LABEL)
+                text.append(f"{paths[fmt]}\n\n", style=branding.TEXT_PRIMARY)
+        panel = self.query_one("#report-exports", Static)
+        panel.update(text)
+        panel.display = bool(paths)
+
+    @on(Button.Pressed, "#export-report")
+    def export_button(self) -> None:
+        self.action_export_report()
+
+    def action_export_report(self) -> None:
+        if self.check_action("export_report", ()):
+            self.push_screen(ExportDialog(self.result["target"]), self._export_chosen)
+
+    def _export_chosen(self, fmt: str | None) -> None:
+        if fmt is None or fmt not in ("html", "docx") or not self._can_export():
+            return
+        self._exporting = True
+        self._update_export_button()
+        self.query_one("#result-log", Static).update(f"Exporting {fmt.upper()} report…")
+        # Capture this scan, not whichever result might be opened while we work.
+        self.export_worker = self._export_report(self.result, fmt)
+
+    @work(thread=True, exclusive=True, group="report-export", exit_on_error=False)
+    def _export_report(self, result: dict, fmt: str) -> None:
+        try:
+            from exposureiq.report.render import DEFAULT_REPORT_DIR, generate_report
+
+            exported = generate_report(result["saved_to"], output=str(DEFAULT_REPORT_DIR),
+                                       format=fmt, results_dir=Path(result["saved_to"]).parent)
+        except Exception as error:
+            self.post_message(ReportExported(result, fmt, error=str(error)))
+        else:
+            self.post_message(ReportExported(result, fmt, path=exported[fmt]))
+
+    def on_report_exported(self, message: ReportExported) -> None:
+        self._exporting = False
+        self._update_export_button()
+        if message.error is None:
+            message.result.setdefault("report_exports", {})[message.fmt] = message.path
+        if self.result is message.result and self.mode == "results":
+            self._update_report_exports()
+            if message.error is not None:
+                text = Text(f"Could not export {message.fmt.upper()} report: {message.error}", style=branding.HIGH)
+            else:
+                text = Text(f"{message.fmt.upper()} report saved to {message.path}", style=output.TEAL)
+            self.query_one("#result-log", Static).update(text)
+        else:
+            self.notify("Report export failed." if message.error is not None else
+                        f"{message.fmt.upper()} report saved to {message.path}",
+                        severity="error" if message.error is not None else "information")
 
     @on(Button.Pressed, "#add-scope")
     def add_scope_button(self) -> None:
@@ -1080,6 +1225,7 @@ class ExposureIQApp(App[int]):
         if typed != self.result["target"]:
             return
         self._rerunning = True
+        self._update_export_button()
         self.rerun_states = dict.fromkeys(hosts[:MAX_HOSTS], "waiting")
         self.query_one("#rerun-panel").display = True
         self.query_one("#add-scope", Button).disabled = True
@@ -1101,21 +1247,21 @@ class ExposureIQApp(App[int]):
         except Exception as error:
             report({"kind": "rerun_failed", "message": f"Scope/web update failed: {error}"})
 
-    def _show_diff_browser(self) -> None:
+    def _show_diff_browser(self, target: str | None = None, *, selected: dict | None = None,
+                           history_dir: str | Path | None = None) -> None:
         self.mode = "diff"
+        self._hide_all_views()
         self.query_one("#topbar").display = True
-        self.query_one("#home").display = False
-        self.query_one("#browser").display = False
-        self.query_one("#scanning").display = False
-        self.query_one("#results").display = False
-        try:
-            self.query_one("#diff-view").display = False
-        except Exception:
-            pass
         self.query_one("#diff-view").display = True
-        self._load_diff_for_target(None)
+        self._set_back(True)
+        self._set_title(target, suffix="scan history",
+                        demo=bool(selected and diff_pipeline.is_demo(selected)))
+        self._keys("← saved results   ↑↓ scroll   q quit", "NO PROBES SENT")
+        self._load_diff_for_target(target, selected=selected, history_dir=history_dir)
 
-    def _load_diff_for_target(self, target: str | None) -> None:
+    def _load_diff_for_target(self, target: str | None, *, selected: dict | None = None,
+                              history_dir: str | Path | None = None) -> None:
+        directory = self.results_dir if history_dir is None else history_dir
         try:
             self.query_one("#diff-body").update("")
             self.query_one("#diff-notes").update("")
@@ -1128,7 +1274,7 @@ class ExposureIQApp(App[int]):
         t = target
         if t is None:
             try:
-                entries = list_saved(self.results_dir)
+                entries = list_saved(directory)
                 for e in entries:
                     if e.get("target") and e.get("target") != "unreadable":
                         t = e["target"]
@@ -1143,7 +1289,13 @@ class ExposureIQApp(App[int]):
             return
         self._diff_target = t
         try:
-            diff = diff_pipeline.diff_domain(t, results_dir=self.results_dir)
+            if selected is None:
+                diff = diff_pipeline.diff_domain(t, results_dir=directory)
+            else:
+                history = diff_pipeline.find_scan_history(selected, directory)
+                diff = diff_pipeline.build_history_diff(selected, history)
+                if diff is None:
+                    raise ValueError("Need at least two saved scans through the selected scan.")
         except ValueError as e:
             try:
                 self.query_one("#diff-target").update(f"Diff  {t}")
@@ -1167,58 +1319,14 @@ class ExposureIQApp(App[int]):
         new_meta = diff.get("new") or {}
         try:
             self.query_one("#diff-target").update(f"Diff  {target_name}")
-            meta = f"old: {old_meta.get('started_at','?')} ({old_meta.get('scan_id','')})  |  new: {new_meta.get('started_at','?')} ({new_meta.get('scan_id','')})"
+            self._set_title(target_name, new_meta.get("started_at"), suffix="scan history",
+                            demo=diff_pipeline.is_demo(new_meta))
+            meta = (f"baseline: {old_meta.get('started_at', '?')} ({old_meta.get('scan_id', '')})  |  "
+                    f"selected: {new_meta.get('started_at', '?')} ({new_meta.get('scan_id', '')})")
             self.query_one("#diff-meta").update(meta)
             summary = diff.get("summary") or {}
             self.query_one("#diff-headline").update(summary.get("headline") or "")
-            changes = diff.get("changes") or []
-            from rich.text import Text as _Text
-            body = _Text()
-            categories = [
-                ("Subdomains/Hosts", ("host.new", "host.removed")),
-                ("IP addresses", ("ip.new", "ip.removed")),
-                ("Open ports / services", ("port.opened", "port.closed", "port.service_changed")),
-                ("Technologies", ("tech.new", "tech.removed", "tech.version_changed")),
-                ("Findings", ("finding.new", "finding.resolved", "finding.severity_changed")),
-            ]
-            gone_kinds = ("host.removed", "ip.removed", "port.closed", "tech.removed", "finding.resolved")
-            for title, kinds in categories:
-                items = [c for c in changes if isinstance(c, dict) and c.get("kind") in kinds]
-                if not items:
-                    continue
-                if body.plain:
-                    body.append("\n")
-                body.append(title + "\n", style=f"bold {output.TEAL}")
-                for c in items:
-                    try:
-                        msg = diff_summary.describe_change(c)
-                    except Exception:
-                        msg = ""
-                    if not msg:
-                        continue
-                    status = c.get("status")
-                    if status == "confirmed":
-                        if "not seen this time" in msg:
-                            msg = msg.replace("not seen this time", "removed")
-                        elif "removed" not in msg:
-                            msg = msg + " (removed)"
-                    kind = c.get("kind", "")
-                    is_gone = kind in gone_kinds or status == "confirmed"
-                    if is_gone:
-                        body.append("  - ", style=f"bold {branding.HIGH}")
-                        body.append(msg + "\n", style=branding.HIGH)
-                    elif kind in ("host.new", "ip.new", "port.opened", "tech.new", "finding.new"):
-                        body.append("  + ", style=f"bold {branding.TEAL}")
-                        body.append(msg + "\n", style=branding.TEAL)
-                    elif c.get("direction") == "worse":
-                        body.append("  ! ", style=f"bold {branding.HIGH}")
-                        body.append(msg + "\n", style=branding.HIGH)
-                    elif c.get("direction") == "better":
-                        body.append("  ~ ", style=f"bold {branding.TEAL}")
-                        body.append(msg + "\n", style=branding.TEAL)
-                    else:
-                        body.append("  • " + msg + "\n", style=branding.MUTED)
-            self.query_one("#diff-body").update(body)
+            self.query_one("#diff-body").update(_diff_body(diff))
             notes = diff.get("notes") or []
             note_text = "\n".join([n for n in notes if isinstance(n, str)])
             self.query_one("#diff-notes").update(note_text)
@@ -1227,147 +1335,33 @@ class ExposureIQApp(App[int]):
 
 
     def _update_scan_diff_tab(self) -> None:
+        """Read history through the exact saved scan, including read-only previews."""
         try:
-            try:
-                tab = self.query_one("#scan-diff-tab", TabPane)
-            except Exception:
-                return
-            # Only show for non-preview, saved scans
-            result = getattr(self, "result", None)
-            if not result or result.get("mode") == "preview":
-                tab.display = False
-                return
-            saved_to = result.get("saved_to")
-            if not saved_to:
-                tab.display = False
-                return
-            target = result.get("target")
-            if not target:
-                tab.display = False
-                return
-            try:
-                entries = list_saved(self.results_dir)
-            except Exception:
-                entries = []
-            # find other scans for same target (different path)
-            norm_target = None
-            try:
-                from exposureiq.discovery import subdomains as sub
-
-                norm_target = sub.normalize_domain(target)
-            except Exception:
-                norm_target = str(target).strip().lower()
-            others = []
-            for e in entries:
-                try:
-                    e_target = e.get("target")
-                    if e_target is None:
-                        continue
-                    try:
-                        en = sub.normalize_domain(e_target)
-                    except Exception:
-                        en = str(e_target).strip().lower()
-                    if en != norm_target:
-                        continue
-                    ep = e.get("path")
-                    if ep and str(Path(ep).resolve()) == str(Path(saved_to).resolve()):
-                        continue
-                    if ep:
-                        others.append(ep)
-                except Exception:
-                    continue
-            if not others:
-                tab.display = False
-                return
-            tab.display = True
-            # load diff between previous and current
-            try:
-                from exposureiq import storage
-
-                new_scan = storage.load_scan(saved_to)
-                # list_saved() is newest first, so others[0] is the previous scan.
-                old_path = others[0]
-                old_scan = storage.load_scan(old_path)
-                before_old = storage.load_scan(others[1]) if len(others) > 1 else None
-            except Exception as e:
-                try:
-                    self.query_one("#scan-diff-body").update("")
-                    self.query_one("#scan-diff-message").update(f"Could not load diff: {e}")
-                    self.query_one("#scan-diff-meta").update("")
-                    self.query_one("#scan-diff-headline").update("")
-                except Exception:
-                    pass
-                return
-            try:
-                diff = diff_pipeline.build_diff(old_scan, new_scan, before_old=before_old)
-            except Exception as e:
-                try:
-                    self.query_one("#scan-diff-body").update("")
-                    self.query_one("#scan-diff-message").update(str(e))
-                    self.query_one("#scan-diff-meta").update("")
-                    self.query_one("#scan-diff-headline").update("")
-                except Exception:
-                    pass
-                return
-            old_meta = diff.get("old") or {}
-            new_meta = diff.get("new") or {}
-            try:
-                self.query_one("#scan-diff-meta").update(
-                    f"old: {old_meta.get('started_at','?')} ({old_meta.get('scan_id','')})  |  new: {new_meta.get('started_at','?')} ({new_meta.get('scan_id','')})"
-                )
-                summary = diff.get("summary") or {}
-                self.query_one("#scan-diff-headline").update(summary.get("headline") or "")
-                changes = diff.get("changes") or []
-                from rich.text import Text as _Text
-
-                body = _Text()
-                categories = [
-                    ("Subdomains/Hosts", ("host.new", "host.removed")),
-                    ("IP addresses", ("ip.new", "ip.removed")),
-                    ("Open ports / services", ("port.opened", "port.closed", "port.service_changed")),
-                    ("Technologies", ("tech.new", "tech.removed", "tech.version_changed")),
-                    ("Findings", ("finding.new", "finding.resolved", "finding.severity_changed")),
-                ]
-                gone_kinds = ("host.removed", "ip.removed", "port.closed", "tech.removed", "finding.resolved")
-                for title, kinds in categories:
-                    items = [c for c in changes if isinstance(c, dict) and c.get("kind") in kinds]
-                    if not items:
-                        continue
-                    if body.plain:
-                        body.append("\n")
-                    body.append(title + "\n", style=f"bold {output.TEAL}")
-                    for c in items:
-                        try:
-                            msg = diff_summary.describe_change(c)
-                        except Exception:
-                            msg = ""
-                        if not msg:
-                            continue
-                        status = c.get("status")
-                        if status == "confirmed":
-                            if "not seen this time" in msg:
-                                msg = msg.replace("not seen this time", "removed")
-                            elif "removed" not in msg:
-                                msg = msg + " (removed)"
-                        kind = c.get("kind", "")
-                        is_gone = kind in gone_kinds or status == "confirmed"
-                        if is_gone:
-                            body.append("  - ", style=f"bold {branding.HIGH}")
-                            body.append(msg + "\n", style=branding.HIGH)
-                        elif kind in ("host.new", "ip.new", "port.opened", "tech.new", "finding.new"):
-                            body.append("  + ", style=f"bold {branding.TEAL}")
-                            body.append(msg + "\n", style=branding.TEAL)
-                        elif c.get("direction") == "worse":
-                            body.append("  ! ", style=f"bold {branding.HIGH}")
-                            body.append(msg + "\n", style=branding.HIGH)
-                        elif c.get("direction") == "better":
-                            body.append("  ~ ", style=f"bold {branding.TEAL}")
-                            body.append(msg + "\n", style=branding.TEAL)
-                        else:
-                            body.append("  • " + msg + "\n", style=branding.MUTED)
-                self.query_one("#scan-diff-body").update(body)
-                self.query_one("#scan-diff-message").update("")
-            except Exception:
-                pass
+            tab = self.query_one("#scan-diff-tab", TabPane)
         except Exception:
-            pass
+            return
+        result = self.result
+        saved_to = result.get("saved_to") if result else None
+        for name in ("meta", "headline", "body", "message"):
+            self.query_one(f"#scan-diff-{name}", Static).update("")
+        if not saved_to:
+            tab.display = False
+            return
+        try:
+            selected = storage.load_scan(saved_to)
+            directory = Path(saved_to).parent
+            history = diff_pipeline.find_scan_history(selected, directory)
+            diff = diff_pipeline.build_history_diff(selected, history)
+        except (OSError, ValueError) as error:
+            tab.display = True
+            self.query_one("#scan-diff-message", Static).update(f"Could not load scan history: {error}")
+            return
+        tab.display = diff is not None
+        if diff is None:
+            return
+        old, new = diff.get("old") or {}, diff.get("new") or {}
+        self.query_one("#scan-diff-meta", Static).update(
+            f"baseline: {old.get('started_at', '?')} ({old.get('scan_id', '')})  |  "
+            f"selected: {new.get('started_at', '?')} ({new.get('scan_id', '')})")
+        self.query_one("#scan-diff-headline", Static).update((diff.get("summary") or {}).get("headline") or "")
+        self.query_one("#scan-diff-body", Static).update(_diff_body(diff))

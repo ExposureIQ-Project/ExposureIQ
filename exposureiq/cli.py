@@ -102,7 +102,8 @@ def build_parser() -> argparse.ArgumentParser:
                                            "subdomains; a domain that is not listed is discovered passively. "
                                            "--passive skips every active step.")
     scan.add_argument("domain", help="the domain to scan, for example example.com")
-    scan.add_argument("-o", "--output", metavar="FILE", help="JSON file to write (default: results/<domain>_<time>.json)")
+    scan.add_argument("-o", "--output", metavar="PATH",
+                      help="JSON file or output root (default: results/<domain>/); --demos adds _01..10 to a JSON name")
     scan.add_argument("--no-save", action="store_true", help="do not write a JSON file")
     scan.add_argument("--no-report", action="store_true",
                       help="do not generate a PDF report after saving")
@@ -113,7 +114,10 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--passive", action="store_true", help="skip all active web, TLS, and port probes")
     scan.add_argument("--plain", action="store_true", help="use compact plain output instead of the terminal UI")
     scan.add_argument("--verbose", action="store_true", help="include raw warnings, and finding details/Fix in plain output")
-    scan.add_argument("--demo", action="store_true", help="use clearly labeled example.com sample data; no network")
+    demos = scan.add_mutually_exclusive_group()
+    demos.add_argument("--demo", action="store_true", help="use one labeled example.com sample scan; no network")
+    demos.add_argument("--demos", action="store_true",
+                       help="make 10 fixed example.com demo scans: regression, peak exposure, then recovery; no network")
     scan.add_argument("--ports", action="store_true", help=argparse.SUPPRESS)
     scan.add_argument("--checks", action="store_true", help=argparse.SUPPRESS)
     scan.add_argument("--limit", type=int, default=30, metavar="N", help="rows to show per table (default: %(default)s)")
@@ -127,7 +131,7 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--verbose", action="store_true", help="include raw warning details")
 
     diff = commands.add_parser("diff", help="compare saved scans")
-    diff.add_argument("first", help="domain or OLD.json path")
+    diff.add_argument("first", help="domain, selected scan.json, or OLD.json path")
     diff.add_argument("second", nargs="?", help="NEW.json path (if comparing two files)")
     diff.add_argument("--json", action="store_true", help="output JSON only to stdout")
     diff.add_argument("--all", dest="show_all", action="store_true", help="also show ignored changes")
@@ -136,20 +140,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     report = commands.add_parser(
         "report",
-        help="turn a saved scan into an HTML/PDF report",
+        help="build a domain HTML dashboard or a saved-scan PDF/DOCX report",
         description="Build a branded report from a saved scan: executive summary, "
                     "findings table, what changed, charts, and asset inventory. "
-                    "A domain argument uses its newest scan in results/.",
+                    "HTML includes a domain home with every saved scan. PDF/DOCX use the selected scan.",
     )
     report.add_argument("source", help="saved scan JSON, or a domain with saved scans")
     report.add_argument("-o", "--output", metavar="PATH",
-                        help="output .html/.pdf file or directory (default: report/)")
-    report.add_argument("--format", choices=("html", "pdf", "both"), default=None,
-                        help="output format (default: from the output extension, else both)")
+                        help="output .html/.pdf/.docx file or root (default: report/<domain>/)")
+    report.add_argument("--format", choices=("html", "pdf", "docx", "both"), default=None,
+                        help="output format (default: from the output extension, else HTML + PDF)")
     report.add_argument("--compare", metavar="OLD.json",
                         help="earlier scan for the What changed section")
     report.add_argument("--no-diff", action="store_true",
-                        help="skip the What changed section")
+                        help="disable saved-scan change comparisons")
     report.add_argument("--results-dir", dest="results_dir", default="results",
                         help="results directory used to find history (default: results)")
     report.add_argument("--title", default=None, help="report title")
@@ -184,7 +188,7 @@ def run_scan(args) -> int:
         output.error(str(error))
         return 2
 
-    if args.demo:
+    if args.demo or args.demos:
         args.domain = "example.com"
     stages, control = _stages(), ScanControl()
     try:
@@ -238,7 +242,9 @@ def run_diff(args) -> int:
                 output.error(str(e))
                 return 2
             try:
-                diff = pipeline.build_diff(old_scan, new_scan, before_old=None, rules=None)
+                directory = second_path.parent if results_dir == "results" else results_dir
+                history = pipeline.find_scan_history(new_scan, directory)
+                diff = pipeline.build_history_diff(new_scan, history, baseline=old_scan)
             except ValueError as e:
                 msg = str(e)
                 if "differ" in msg.lower() or "target" in msg.lower():
@@ -249,8 +255,16 @@ def run_diff(args) -> int:
             except Exception as e:
                 output.error(str(e))
                 return 2
+        elif first_path.is_file() or first.lower().endswith(".json"):
+            # Selected saved-scan mode: stop at this file, not the newest scan.
+            selected = storage.load_scan(str(first_path))
+            directory = first_path.parent if results_dir == "results" else results_dir
+            history = pipeline.find_scan_history(selected, directory)
+            diff = pipeline.build_history_diff(selected, history)
+            if diff is None:
+                raise ValueError(f"Need at least two saved scans through {selected['scan_id']} in {directory}.")
         else:
-            # domain mode
+            # Domain mode includes all compatible history through the newest.
             try:
                 diff = pipeline.diff_domain(first, results_dir=results_dir)
             except ValueError as e:
@@ -267,9 +281,11 @@ def run_diff(args) -> int:
 
     if getattr(args, "json", False):
         # valid JSON only on stdout
-        out = {"target": diff.get("target"), "old": diff.get("old"), "new": diff.get("new"), 
-               "changes": diff.get("changes"), "ignored": diff.get("ignored") if args.show_all else [], 
-               "notes": diff.get("notes"), "summary": diff.get("summary")}
+        out = {"target": diff.get("target"), "old": diff.get("old"), "new": diff.get("new"),
+               "changes": diff.get("changes"), "ignored": diff.get("ignored") if args.show_all else [],
+               "notes": diff.get("notes"), "summary": diff.get("summary"),
+               "history": [{**step, "ignored": step.get("ignored", []) if args.show_all else []}
+                           for step in diff.get("history", [])]}
         print(json.dumps(out))
         if args.fail_on_worse and diff.get("summary", {}).get("counts", {}).get("worse", 0) > 0:
             return 1
@@ -381,7 +397,7 @@ def run_report(args) -> int:
             include_diff=not args.no_diff,
             title=args.title,
         )
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, ImportError) as error:
         output.error(str(error))
         return 2
 
@@ -389,9 +405,11 @@ def run_report(args) -> int:
     counts = report["severity"]
     output.ok(f"Report for {report['target']}: {counts['total']} finding(s) "
               f"({counts['high']} high, {counts['medium']} medium, {counts['low']} low)")
-    for label, path in (("HTML", result["html"]), ("PDF", result["pdf"])):
+    for label, path in (("HTML", result["html"]), ("PDF", result["pdf"]), ("DOCX", result["docx"])):
         if path:
             output.info(f"{label}  {path}")
+    if result.get("domain"):
+        output.info(f"Domain dashboard: {len(result['domain']['reports'])} saved scan(s), newest first.")
     if result["diff"]:
         headline = (report.get("diff_summary") or {}).get("headline")
         output.info(f"What changed: {headline or 'see the report'}")
@@ -458,7 +476,7 @@ def main(argv=None) -> int:
                 return run_open(args)
             if not sys.stdout.isatty():
                 output.error("--open needs a FILE when output is not a terminal.")
-                output.info("Try: exposureiq --open results/<file>.json")
+                output.info("Try: exposureiq --open results/<domain>/<file>.json")
                 return 2
             return run_home(args, browser=True)
         if not sys.stdout.isatty():

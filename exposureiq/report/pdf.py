@@ -245,33 +245,33 @@ class ReportPdf:
 
     # ------------------------------------------------------------------ logo
     def _logo(self, x: float, top: float, size: float) -> None:
-        scale = size / 512
-        def px(value: float) -> float:
-            return x + value * scale
-        def py(value: float) -> float:
-            return top + value * scale
-        # Outer triangle with the inner triangle cut out (even-odd fill).
-        self._op(f"{_fmt_rgb(branding.TEAL)} rg")
-        points = branding.LOGO_TRIANGLES
-        path = []
-        for triangle in points:
-            first = True
-            for point_x, point_y in triangle:
-                path.append(f"{px(point_x):.2f} {PAGE_HEIGHT - py(point_y):.2f} "
-                            f"{'m' if first else 'l'}")
-                first = False
-            path.append("h")
-        self._op(" ".join(path) + " f*")
-        # Indigo parallelogram.
-        self._op(f"{_fmt_rgb(branding.INDIGO)} rg")
-        path = []
-        for index, (point_x, point_y) in enumerate(branding.LOGO_PARALLELOGRAM):
-            path.append(f"{px(point_x):.2f} {PAGE_HEIGHT - py(point_y):.2f} "
-                        f"{'m' if index == 0 else 'l'}")
-        self._op(" ".join(path) + " h f")
-        # Light dot.
+        scale = size / branding.LOGO_SIZE
+
+        def point(px: float, py: float) -> str:
+            return f"{x + px * scale:.2f} {PAGE_HEIGHT - top - py * scale:.2f}"
+
+        self._op("q")
+        radius, edge = branding.LOGO_RADIUS, branding.LOGO_SIZE
+        bend = radius * .5522847498
+        self._op(f"{_fmt_rgb(branding.PAGE_BACKGROUND)} rg {point(radius, 0)} m {point(edge - radius, 0)} l")
+        self._op(f"{point(edge - radius + bend, 0)} {point(edge, radius - bend)} {point(edge, radius)} c")
+        self._op(f"{point(edge, edge - radius)} l")
+        self._op(f"{point(edge, edge - radius + bend)} {point(edge - radius + bend, edge)} {point(edge - radius, edge)} c")
+        self._op(f"{point(radius, edge)} l")
+        self._op(f"{point(radius - bend, edge)} {point(0, edge - radius + bend)} {point(0, edge - radius)} c")
+        self._op(f"{point(0, radius)} l {point(0, radius - bend)} {point(radius - bend, 0)} {point(radius, 0)} c h f")
+        self._op(f"{_fmt_rgb(branding.TEAL)} RG 2 J 0 j {branding.LOGO_FRAME_WIDTH * scale:.2f} w")
+        for frame in branding.LOGO_FRAMES:
+            for index, (px, py) in enumerate(frame):
+                self._op(f"{point(px, py)} {'m' if index == 0 else 'l'}")
+            self._op("S")
+        self._op(f"{branding.LOGO_CROSSBAR_WIDTH * scale:.2f} w")
+        for index, (px, py) in enumerate(branding.LOGO_CROSSBAR):
+            self._op(f"{point(px, py)} {'m' if index == 0 else 'l'}")
+        self._op("S")
         cx, cy, radius = branding.LOGO_DOT
-        self._circle(px(cx), py(cy), radius * scale, branding.TEXT_PRIMARY)
+        self._circle(x + cx * scale, top + cy * scale, radius * scale, branding.TEAL)
+        self._op("Q")
 
     def _circle(self, cx: float, top: float, radius: float, color: str) -> None:
         red, green, blue = _rgb(color)
@@ -325,7 +325,7 @@ class ReportPdf:
         )
         gap = 10
         width = (CONTENT_WIDTH - gap * 3) / 4
-        top = 610
+        top = max(610, self.y + 16)
         for index, (name, value, color) in enumerate(cards):
             x = MARGIN + index * (width + gap)
             self.rect(x, top, width, 64, branding.INNER_SURFACE)
@@ -447,13 +447,17 @@ class ReportPdf:
                   "only called confirmed when a later scan agrees.")
         diff = self.report.get("diff")
         if not diff:
-            self._empty_box("No earlier saved scan was found. This report describes the "
-                            "current exposure only. Run another scan of the same target and "
-                            "generate the report again to see what changed.")
+            message = ("Change comparisons were disabled for this export. Enable comparisons "
+                       "when exporting to see what changed." if not self.report.get("comparison_enabled", True) else
+                       "No earlier saved scan was found. This report describes the "
+                       "current exposure only. Run another scan of the same target and "
+                       "generate the report again to see what changed.")
+            self._empty_box(message)
             return
 
         summary = self.report.get("diff_summary") or {}
-        headline = summary.get("headline") or "Changes compared with the previous scan"
+        self.subheading("Overall change since baseline")
+        headline = summary.get("headline") or "Saved scan changes compared"
         self.text(MARGIN, self.y + 6, headline, 15, True, branding.DARK)
         self.y += 26
 
@@ -481,11 +485,8 @@ class ReportPdf:
         lines = summary.get("lines") or []
         if lines:
             self.subheading("All changes")
-            for item in lines[:32]:
+            for item in lines:
                 self.bullet(item, size=8.5)
-            if len(lines) > 32:
-                self.wrapped(f"{len(lines) - 32} more change(s) are in the JSON diff output.",
-                             size=8.5, color=branding.PRINT_MUTED)
             self.y += 4
 
         notes = diff.get("notes") or []
@@ -499,14 +500,34 @@ class ReportPdf:
         self.y += 4
         self.wrapped(f"Compared scan {old.get('scan_id', '?')} ({old.get('started_at', '?')}) "
                      f"with {new.get('scan_id', '?')} ({new.get('started_at', '?')}).",
-                     size=8, color=branding.PRINT_MUTED)
+                      size=8, color=branding.PRINT_MUTED)
+        steps = diff.get("history") or []
+        if steps:
+            self.y += 8
+            self.subheading("Scan-by-scan history")
+            self.wrapped("Overall counts above are net changes. These steps retain temporary "
+                         "issues and fixes through the selected scan, without later snapshots.",
+                         size=8.5, color=branding.PRINT_MUTED)
+            for step in steps:
+                old, new = step.get("old") or {}, step.get("new") or {}
+                summary = step.get("summary") or {}
+                self.y += 8
+                self.ensure(68)
+                self.subheading(f"{old.get('scan_id', '?')} -> {new.get('scan_id', '?')}")
+                self.wrapped(f"{old.get('started_at', '?')} -> {new.get('started_at', '?')}",
+                             size=8, color=branding.PRINT_MUTED)
+                self.wrapped(summary.get("headline") or "No changes", size=9)
+                for line in summary.get("lines") or []:
+                    self.bullet(line, size=8.5)
+                for note in step.get("notes") or []:
+                    self.bullet(f"Note: {note}", size=8, color=branding.PRINT_MUTED)
 
     # ---------------------------------------------------------------- charts
     def charts(self) -> None:
         self.new_page()
         self.heading("Exposure at a glance", "06 / Charts")
         self.lede("The severity mix shows where attention is needed. The trend shows how "
-                  "the number of discovered hosts has moved across saved scans.")
+                  "hosts and findings changed from the first saved scan through this scan.")
         counts = self.report.get("severity") or {}
         self._donut(MARGIN + 90, 250, 66, 22, counts)
 
@@ -526,9 +547,11 @@ class ReportPdf:
                       8, False, branding.PRINT_MUTED)
             cursor += 34
 
-        self._line_chart(self.report.get("history") or [], MARGIN, 360, CONTENT_WIDTH, 190)
-        self.text(MARGIN, 585, f"{len(self.report.get('history') or [])} saved scan(s) for "
-                  "this target.", 8, False, branding.PRINT_MUTED)
+        self._line_chart(self.report.get("history") or [], MARGIN, 350, CONTENT_WIDTH, 155)
+        self._line_chart(self.report.get("history") or [], MARGIN, 560, CONTENT_WIDTH, 155,
+                         metric="findings")
+        self.text(MARGIN, 755, f"{len(self.report.get('history') or [])} saved scan(s) through "
+                  "the selected scan. No later snapshots are included.", 8, False, branding.PRINT_MUTED)
 
     def _donut(self, cx: float, top: float, radius: float, thickness: float,
                counts: dict) -> None:
@@ -562,15 +585,21 @@ class ReportPdf:
         self._op("S")
 
     def _line_chart(self, points: list, x: float, top: float, width: float,
-                    height: float) -> None:
+                     height: float, *, metric: str = "assets") -> None:
         left, right, bottom = 34, 10, 26
         plot_width = width - left - right
         plot_height = height - bottom - 10
-        values = [int(point.get("assets") or 0) for point in points]
+        values = [int(point.get(metric) or 0) for point in points]
         maximum = max(values) if values else 0
         maximum = max(1, math.ceil(maximum / 4)) * 4
 
-        self.text(x + left, top - 2, "ASSETS OVER TIME", 8, True, branding.PRINT_SECONDARY)
+        self.text(x + left, top - 2, "FINDINGS OVER TIME" if metric == "findings" else "ASSETS OVER TIME",
+                  8, True, branding.PRINT_SECONDARY)
+        if metric == "findings":
+            self.rect(x + width - 178, top - 9, 12, 2, branding.INDIGO)
+            self.text(x + width - 160, top - 2, "All findings", 7, False, branding.PRINT_SECONDARY)
+            self.rect(x + width - 97, top - 9, 12, 2, branding.HIGH)
+            self.text(x + width - 79, top - 2, "High (dashed)", 7, False, branding.PRINT_SECONDARY)
         for step in range(5):
             value = maximum * step / 4
             line_top = top + 16 + plot_height - plot_height * step / 4
@@ -591,14 +620,22 @@ class ReportPdf:
             xs = [x + left + plot_width * index / (count - 1) for index in range(count)]
         ys = [top + 16 + plot_height - plot_height * value / maximum for value in values]
 
-        red, green, blue = _rgb(branding.TEAL)
-        self._op(f"{red:.3f} {green:.3f} {blue:.3f} RG 2.2 w 1 J")
-        for index, (px, py) in enumerate(zip(xs, ys)):
-            self._op(f"{px:.2f} {PAGE_HEIGHT - py:.2f} {'m' if index == 0 else 'l'}")
-        self._op("S")
+        color = branding.INDIGO if metric == "findings" else branding.TEAL
+
+        def series(positions: list, color: str, dashed: bool = False):
+            self._op(f"q {_fmt_rgb(color)} RG 2.2 w 1 J " + ("[4 3] 0 d" if dashed else "[] 0 d"))
+            for index, (px, py) in enumerate(zip(xs, positions)):
+                self._op(f"{px:.2f} {PAGE_HEIGHT - py:.2f} {'m' if index == 0 else 'l'}")
+            self._op("S Q")
+
+        series(ys, color)
+        if metric == "findings":
+            high_ys = [top + 16 + plot_height - plot_height * int(point.get("high") or 0) / maximum
+                       for point in points]
+            series(high_ys, branding.HIGH, dashed=True)
         for px, py in zip(xs, ys):
             self._circle(px, py, 3.2, branding.PRINT_SURFACE)
-            self._ring(px, py, 3.2, 1.4, branding.TEAL, 0, 360)
+            self._ring(px, py, 3.2, 1.4, color, 0, 360)
 
         step = max(1, math.ceil(count / 8))
         for index, (px, point) in enumerate(zip(xs, points)):
@@ -662,11 +699,15 @@ class ReportPdf:
             self.bullet(item)
 
         self.subheading("Scope and safety")
-        self.wrapped("Active probes (HTTP, TLS, and ports) were sent only to hosts "
-                     "authorized in scope.txt. Other hosts were discovered passively and "
-                     "skipped. ExposureIQ does not exploit a service, brute force a login, "
-                     "or crawl beyond the front page. A finding is evidence, not proof of "
-                     "a vulnerability.", size=9, leading=13)
+        scope = ("DEMO: all hosts, ports, certificates and findings are simulated. No discovery, DNS, "
+                 "HTTP, TLS or port probes were sent. No exploitation was attempted."
+                 if self.report.get("demo") else
+                     "Active probes (HTTP, TLS, and ports) were sent only to hosts "
+                      "authorized in scope.txt. Other hosts were discovered passively and "
+                      "skipped. ExposureIQ does not exploit a service, brute force a login, "
+                      "or crawl beyond the front page. A finding is evidence, not proof of "
+                      "a vulnerability.")
+        self.wrapped(scope, size=9, leading=13)
         self.y += 8
 
         self.subheading("Severity levels")

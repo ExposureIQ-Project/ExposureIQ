@@ -2,13 +2,14 @@
 
 This module is pure data work: it never touches the network, never writes a
 file, and never mutates the scan it is given. The result is a plain dictionary
-that both renderers can use, which also makes the report easy to test.
+that every renderer can use, which also makes the report easy to test.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from exposureiq.diffing import pipeline
 from exposureiq.report import branding
 
 SEVERITY_ORDER = ("high", "medium", "low")
@@ -235,30 +236,24 @@ def _port_rows(scan: dict) -> list[dict]:
 
 
 def _history_points(scan: dict, history: list | None) -> list[dict]:
-    scans = [item for item in (history or []) if isinstance(item, dict)]
-    current_key = (_text(scan.get("scan_id")), _text(scan.get("started_at")))
-    if not any((_text(item.get("scan_id")), _text(item.get("started_at"))) == current_key
-               for item in scans):
-        scans.append(scan)
-
-    unique = {}
-    for item in scans:
-        key = (_text(item.get("scan_id")), _text(item.get("started_at")))
-        unique[key] = item
-    ordered = sorted(unique.values(), key=lambda item: (
-        _text(item.get("started_at")), _text(item.get("scan_id"))))
+    ordered = pipeline.scan_history(scan, history)
 
     points = []
     labels = [short_time(item.get("started_at")) for item in ordered]
     duplicates = {label for label in labels if labels.count(label) > 1}
     for item, label in zip(ordered, labels):
         findings = _findings(item)
+        severity = _severity_counts(findings)
         points.append({
+            "scan_id": _text(item.get("scan_id")),
+            "number": len(points) + 1,
             "started_at": _text(item.get("started_at")),
+            "date": format_time(item.get("started_at")),
             "label": short_datetime(item.get("started_at")) if label in duplicates else label,
             "assets": len(_assets(item)),
             "findings": len(findings),
-            "high": sum(1 for finding in findings if finding["severity"] == "high"),
+            "ports": sum(len(row["ports"]) for row in _asset_rows(item)),
+            "high": severity["high"], "medium": severity["medium"], "low": severity["low"],
         })
     return points
 
@@ -270,6 +265,11 @@ def _executive_summary(report: dict) -> list[str]:
     risk = report["risk"]
     paragraphs = []
 
+    if report["demo"]:
+        paragraphs.append(
+            "DEMO: simulated example.com data, not a real assessment. No network "
+            "traffic was sent and no exploitability was tested."
+        )
     paragraphs.append(
         f"ExposureIQ assessed {target} on {report['started_label']}. "
         f"The scan covered {_plural(counts['assets'], 'host')}, "
@@ -297,30 +297,52 @@ def _executive_summary(report: dict) -> list[str]:
 
     summary = report.get("diff_summary")
     if summary:
-        headline = summary.get("headline") or "Changes were compared with the previous scan."
+        headline = summary.get("headline") or "Saved scan changes were compared"
         highlights = summary.get("highlights") or []
         extra = f" For example: {highlights[0]}." if highlights else ""
-        paragraphs.append(f"Compared with the previous scan, {headline[0].lower() + headline[1:]}.{extra}")
+        baseline = ((report.get("diff") or {}).get("old") or {}).get("scan_id") or "earlier"
+        paragraphs.append(f"Compared with baseline scan {baseline}, "
+                          f"{headline[0].lower() + headline[1:]}.{extra}")
+        steps = (report.get("diff") or {}).get("history") or []
+        if steps:
+            paragraphs.append(
+                f"The scan-by-scan history includes {len(steps) + 1} snapshots through "
+                "this scan, including issues that appeared and were later fixed. "
+                "Later snapshots are not used in this report."
+            )
+    elif not report.get("comparison_enabled", True):
+        paragraphs.append(
+            "Change comparisons were disabled for this export. The report describes "
+            "saved exposure only; enable comparisons when exporting to see what changed."
+        )
     else:
         paragraphs.append(
             "There is no earlier saved scan for this target, so this report describes "
             "the current exposure only. Run another scan later to unlock the change section."
         )
 
-    paragraphs.append(
-        "Findings reflect only the hosts that were in scope and the checks ExposureIQ "
-        "ran. Review the evidence and recommendation for each item before assigning work."
-    )
+    if report["demo"]:
+        paragraphs.append(
+            "Demo findings reflect only the simulated evidence in this snapshot. "
+            "Recommendations are examples, not proof of a real vulnerability."
+        )
+    else:
+        paragraphs.append(
+            "Findings reflect only the hosts that were in scope and the checks ExposureIQ "
+            "ran. Review the evidence and recommendation for each item before assigning work."
+        )
     return paragraphs
 
 
 def build_report(scan: dict, *, diff: dict | None = None, history: list | None = None,
-                 generated_at: str | None = None, title: str | None = None) -> dict:
+                 generated_at: str | None = None, title: str | None = None,
+                 comparison_enabled: bool = True) -> dict:
     """Return a renderer-ready report dictionary for one validated scan.
 
     ``diff`` is the Stage 3 diff document (``diffing.pipeline.build_diff``) when
-    an earlier scan exists. ``history`` is a list of older scans for the same
-    target, used by the "assets over time" chart.
+    an earlier scan exists. ``history`` is filtered to compatible snapshots
+    through the selected scan for all trend charts. ``comparison_enabled``
+    distinguishes an opt-out from genuinely missing earlier history.
     """
     if not isinstance(scan, dict):
         raise ValueError("scan must be a dictionary")
@@ -339,6 +361,7 @@ def build_report(scan: dict, *, diff: dict | None = None, history: list | None =
     report = {
         "title": title or "Security Assessment Report",
         "target": target,
+        "demo": pipeline.is_demo(scan),
         "scan_id": _text(scan.get("scan_id")) or "unknown",
         "schema_version": _text(scan.get("schema_version")) or "unknown",
         "started_at": _text(scan.get("started_at")),
@@ -361,6 +384,7 @@ def build_report(scan: dict, *, diff: dict | None = None, history: list | None =
         "technologies": technologies,
         "diff": diff if isinstance(diff, dict) else None,
         "diff_summary": (diff or {}).get("summary") if isinstance(diff, dict) else None,
+        "comparison_enabled": comparison_enabled,
         "history": history_points,
     }
     report["risk"] = _risk(severity)
