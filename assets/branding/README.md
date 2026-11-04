@@ -4,10 +4,11 @@
 | --- | --- |
 | `banner.png` | README header |
 | `icon-tight.svg` | README title inline logo |
-| `icon.svg` | Source of the inline report logo (`exposureiq/report/branding.py`) |
+| `icon.svg` | Current scan aperture mark; shared HTML/PDF/DOCX geometry in `exposureiq/report/branding.py` |
 
-The report embeds a cleaned copy of the icon as inline SVG, so the HTML output is
-portable and does not depend on this folder at render time.
+HTML embeds a cleaned copy as inline SVG, PDF draws the same vector shapes,
+and DOCX embeds a generated PNG. Reports are portable and do not depend on this
+folder at render time. Do not restore the retired triangular logo.
 
 Keep new brand files small and SVG-first where possible. Update this table when
 an asset is added or removed.

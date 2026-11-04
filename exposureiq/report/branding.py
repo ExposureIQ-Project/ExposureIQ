@@ -5,6 +5,9 @@ the HTML report portable and the PDF independent of the repository layout.
 """
 
 import re
+import struct
+import zlib
+from functools import lru_cache
 
 # Backgrounds and surfaces.
 PAGE_BACKGROUND = "#0D141B"
@@ -111,22 +114,65 @@ FONT_STACK = (
 )
 MONO_STACK = '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace'
 
-# Clean drawing extracted from assets/branding/icon.svg. The metadata block of
-# the original file is provenance data and is not needed in a report.
+# The scan aperture mark from assets/branding/icon.svg. Shared geometry keeps
+# HTML, the vector PDF, and the DOCX's embedded PNG on the same current brand.
+LOGO_SIZE = 107
+LOGO_RADIUS = 18
+LOGO_FRAMES = (
+    ((10, 34), (10, 10), (34, 10)),
+    ((73, 10), (97, 10), (97, 34)),
+    ((97, 73), (97, 97), (73, 97)),
+    ((34, 97), (10, 97), (10, 73)),
+)
+LOGO_FRAME_WIDTH = 5
+LOGO_CROSSBAR = ((30, 53.5), (77, 53.5))
+LOGO_CROSSBAR_WIDTH = 3
+LOGO_DOT = (53.5, 53.5, 9)
+
 LOGO_SVG = (
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" '
-    'role="img" aria-label="ExposureIQ logo">'
-    f'<path fill="{TEAL}" fill-rule="evenodd" '
-    'd="M200 80 L40 410 L360 410 Z M200 192 L118 352 L282 352 Z"/>'
-    f'<polygon fill="{INDIGO}" points="250,80 292,80 452,410 410,410"/>'
-    f'<circle fill="{TEXT_PRIMARY}" cx="200" cy="300" r="30"/>'
+    f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {LOGO_SIZE} {LOGO_SIZE}" '
+    'role="img" aria-label="ExposureIQ scan aperture icon">'
+    f'<rect width="{LOGO_SIZE}" height="{LOGO_SIZE}" rx="{LOGO_RADIUS}" fill="{PAGE_BACKGROUND}"/>'
+    f'<g fill="none" stroke="{TEAL}" stroke-linecap="square" stroke-linejoin="miter">'
+    '<path d="M10 34V10h24 M73 10h24v24 M97 73v24H73 M34 97H10V73" stroke-width="5"/>'
+    '<path d="M30 53.5h47" stroke-width="3"/></g>'
+    f'<circle cx="53.5" cy="53.5" r="9" fill="{TEAL}"/>'
     "</svg>"
 )
 
-# Shapes used by the PDF writer. Coordinates are in the 512 x 512 view box.
-LOGO_TRIANGLES = (
-    ((200, 80), (40, 410), (360, 410)),
-    ((200, 192), (118, 352), (282, 352)),
-)
-LOGO_PARALLELOGRAM = ((250, 80), (292, 80), (452, 410), (410, 410))
-LOGO_DOT = (200, 300, 30)
+
+@lru_cache(maxsize=4)
+def logo_png(size: int = 214) -> bytes:
+    """A small embedded Word-compatible icon, drawn without image dependencies."""
+    if isinstance(size, bool) or not isinstance(size, int) or not 16 <= size <= 1024:
+        raise ValueError("logo size must be an integer from 16 to 1024")
+    dark = bytes(round(channel * 255) for channel in hex_to_rgb(PAGE_BACKGROUND))
+    teal = bytes(round(channel * 255) for channel in hex_to_rgb(TEAL))
+    segments = [(start, end, LOGO_FRAME_WIDTH / 2)
+                for frame in LOGO_FRAMES for start, end in zip(frame, frame[1:])]
+    segments.append((*LOGO_CROSSBAR, LOGO_CROSSBAR_WIDTH / 2))
+    rows = bytearray()
+    for row in range(size):
+        rows.append(0)  # PNG's unfiltered scanline marker.
+        y = (row + .5) * LOGO_SIZE / size
+        for column in range(size):
+            x = (column + .5) * LOGO_SIZE / size
+            corner_x = min(max(x, LOGO_RADIUS), LOGO_SIZE - LOGO_RADIUS)
+            corner_y = min(max(y, LOGO_RADIUS), LOGO_SIZE - LOGO_RADIUS)
+            if (x - corner_x) ** 2 + (y - corner_y) ** 2 > LOGO_RADIUS ** 2:
+                rows.extend(b"\x00\x00\x00\x00")
+                continue
+            cx, cy, radius = LOGO_DOT
+            marked = (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2 or any(
+                min(start[0], end[0]) - half <= x <= max(start[0], end[0]) + half
+                and min(start[1], end[1]) - half <= y <= max(start[1], end[1]) + half
+                for start, end, half in segments
+            )
+            rows.extend((teal if marked else dark) + b"\xff")
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return (struct.pack(">I", len(data)) + kind + data
+                + struct.pack(">I", zlib.crc32(kind + data)))
+
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(bytes(rows))) + chunk(b"IEND", b""))

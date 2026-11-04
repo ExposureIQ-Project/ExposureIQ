@@ -5,7 +5,7 @@
 **Discover your attack surface. Track what changes. Turn findings into reports.**
 
 An open-source attack surface management (ASM) tool written in Python: a
-deterministic scanner, scan-to-scan diffing, and a built-in HTML/PDF reporting
+deterministic scanner, scan-to-scan diffing, and built-in HTML/PDF/DOCX reporting
 engine. An optional, advisory-only AI layer is planned; it will only draft text
 from structured findings and will never scan or act.
 
@@ -57,14 +57,15 @@ ExposureIQ is built around three ideas:
 | **Diffing** | New, changed, and removed assets, ports, technologies, findings | Done |
 | | Ignore rules and confirmed-removal checks | Done |
 | | Diff view in the terminal UI | Done |
-| **Reporting** | Branded HTML report with executive summary on page 1 | Done |
+| **Reporting** | Offline domain dashboard with dated scan cards, newest first | Done |
 | | Findings table with severity colours | Done |
 | | "What changed" section from the Stage 3 summary | Done |
-| | Charts: findings by severity, assets over time | Done |
+| | Interactive charts: severity, hosts and findings over time | Done |
 | | PDF export with no external PDF dependency | Done |
 | | Automatic PDF after a successful scan | Done |
 | | `exposureiq report` command | Done |
-| | DOCX output and custom templates | Planned |
+| | TUI Export picker for animated HTML and editable DOCX | Done |
+| | Custom report templates | Planned |
 | **AI (optional)** | Risk prioritisation and plain-language drafting | Planned |
 
 ---
@@ -81,36 +82,86 @@ pip install -e ".[dev]"
 # 1. Scan a domain you own or are authorised to test.
 exposureiq scan example.com
 
-# 2. See what changed since the previous saved scan.
+# 2. See what changed from the first saved scan through the newest.
 exposureiq diff example.com
 
 # 3. Generate an HTML and PDF report from the newest saved scan.
 exposureiq report example.com
 
 # Or choose the files explicitly.
-exposureiq report results/example.com_2026-10-13T20-15-00Z.json -o assessment.pdf
+exposureiq report results/example.com/example.com_2026-10-13T20-15-00Z.json -o assessment.pdf
 ```
 
-`scan` writes JSON to `results/` (git-ignored). After a successful save it also
-builds a PDF automatically in `report/` (git-ignored). `report` writes there by
-default:
+`scan` groups JSON by domain in `results/<domain>/` (git-ignored). After a
+successful save it also builds a PDF in `report/<domain>/` (git-ignored).
+`report` writes there by default too:
 
-- `report/<target>_<scan-id>.html`
-- `report/<target>_<scan-id>.pdf`
+- `report/<domain>/index.html` — one offline home page for all the domain's scans
+- `report/<domain>/<target>_<scan-id>.pdf` — the selected scan
+- `report/<domain>/<target>_<scan-id>.docx` — the selected scan, when requested
+
+Different domains stay separate. Legacy flat JSON files remain readable and are
+not moved. An explicit `scan -o exact.json` filename stays exact; a directory
+output such as `-o custom/` groups snapshots in `custom/<domain>/`.
 
 Use `scan --no-report` if you only want the JSON snapshot.
+
+After a scan, use **Export** in the TUI's top-right corner (or press `e`) and
+choose **HTML** or **DOCX**. HTML refreshes the domain's `index.html`: dated scan
+cards appear newest first, and each opens that scan's detail view. DOCX uses the
+same target/scan-ID name as the default PDF. Saved-scan previews can export too.
+Exports only read saved JSON; they never run another scan or change existing PDFs.
+The button is disabled when saving was skipped or failed.
+
+HTML opens offline as a responsive dashboard matching the app's dark/teal
+styling. Hover a chart to see a snapping dashed cursor, scan number and UTC date;
+click a point to jump to its history changes. Charts grow when first scrolled
+into view, with reduced-motion support. DOCX follows the PDF's styling with a dark
+branded cover, organized sections, colored tables, and editable severity/host/finding
+charts. Text, recommendations, inventory, changes, and chart-data tables stay editable.
 
 Useful report options:
 
 ```bash
 exposureiq report example.com --format html      # HTML only
 exposureiq report example.com --format pdf       # PDF only
+exposureiq report example.com --format docx      # editable Word report
 exposureiq report example.com -o out/report.html # explicit file (format inferred)
 exposureiq report example.com --compare old.json # explicit older scan
-exposureiq report example.com --no-diff          # skip the change section
+exposureiq report example.com --no-diff          # disable comparisons
 ```
 
 The report command is offline: it reads saved JSON and never sends traffic.
+Reports and domain diffs use the first compatible saved scan as the baseline,
+then include each intermediate comparison. Each scan's detail view, PDF, DOCX
+or diff for scan 3 only uses scans 1–3, even if scans 4–10 are already saved.
+The HTML home lists all saved scans, with real and demo trends kept separate.
+Explicit `--compare` or
+`diff OLD.json NEW.json` still selects your chosen baseline.
+
+### Ten-scan demo story (no network)
+
+```bash
+exposureiq scan example.com --demos          # TUI: ten JSON files + ten PDFs
+exposureiq scan example.com --demos --plain  # same files, compact output
+exposureiq diff results/example.com/demo_history_03.json # history from scan 1 through 3
+exposureiq report example.com --format html --open
+exposureiq report results/example.com/demo_history_05.json --format docx
+```
+
+`--demo` still creates one sample scan. `--demos` creates a fixed, repeatable
+story: new deployments increase exposure in scans 3–4, then staged fixes
+return scan 10 to one routine low-severity item. It uses real severity rules
+with simulated ports, certificate/header problems, and service-risk evidence;
+it never runs a real exploit or sends traffic. Browse earlier snapshots in the
+TUI to see the peak, then compare/export scan 10 to see recovery.
+
+Files are `results/example.com/demo_history_01.json` through `_10.json`. Use
+`-o demo-results/` for `demo-results/example.com/`, or `-o story.json` for
+`story_01.json` through `_10.json` in the chosen file's directory.
+`--no-report`, `--no-save`, `--passive`, and `--no-apex` still work. An identical
+repeat reuses the JSON; conflicting files are not overwritten. See the
+[scenario and severity timeline](docs/demo-history.md).
 
 ### Requirements
 
@@ -118,7 +169,8 @@ The report command is offline: it reads saved JSON and never sends traffic.
 - [Nmap](https://nmap.org/) for port scanning (optional; passive discovery still works)
 - [Subfinder](https://github.com/projectdiscovery/subfinder) for broader subdomain
   discovery (optional; crt.sh is the fallback)
-- No PDF library, browser, or network connection is needed to build a report.
+- No PDF library, browser, or network connection is needed to generate HTML/PDF.
+- DOCX uses `python-docx`, installed with the project's Python dependencies.
 
 ---
 
@@ -131,16 +183,18 @@ exposureiq scan <domain>
   -> DNS resolution (A/AAAA)
   -> scoped HTTP/TLS checks and top-100 TCP scan
   -> build and validate a scan snapshot
-  -> save results/<target>_<time>.json
-  -> build report/<target>_<scan-id>.pdf (skip with --no-report)
+  -> save results/<domain>/<target>_<time>.json
+  -> build report/<domain>/<target>_<scan-id>.pdf (skip with --no-report)
 
 exposureiq diff <domain | OLD.json NEW.json>
-  -> pure comparison + ignore rules + readable summary
+  -> baseline-to-selected comparison + each intermediate scan
+  -> ignore rules + readable summary (also accepts a single scan.json)
 
 exposureiq report <domain | scan.json>
   -> load the newest saved scan
-  -> find the previous scan for the same target
-  -> build the report model and render HTML/PDF
+  -> find compatible history through this scan (never later scans)
+  -> compare with the baseline and retain each intermediate change
+  -> build the report model and render HTML/PDF/DOCX
 ```
 
 The findings format is documented in
@@ -177,7 +231,7 @@ ExposureIQ/
 │   ├── discovery/       # subdomains, DNS, scope, Nmap ports
 │   ├── fingerprint/     # technology, headers, HTTPS, risky ports, severity
 │   ├── diffing/         # compare, noise rules, summary, pipeline
-│   ├── report/          # model, HTML, PDF, SVG charts, branding
+│   ├── report/          # model, HTML, PDF, DOCX, SVG charts, branding
 │   ├── tui/             # Textual interface and shared scan pipeline
 │   ├── cli.py           # command-line entry point
 │   ├── output.py        # terminal UI and colours

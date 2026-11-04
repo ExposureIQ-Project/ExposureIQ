@@ -75,9 +75,129 @@ def _demo_ports(target: str) -> list:
     return ports
 
 
+def _demo_paths(output: str | None) -> list[Path]:
+    """A directory uses demo_history_01..10; a JSON name gets _01..10."""
+    from exposureiq.paths import domain_directory
+
+    path = Path(output) if output else Path("results")
+    if output and path.suffix.lower() == ".json":
+        return [path.with_name(f"{path.stem}_{number:02d}{path.suffix}")
+                for number in range(1, 11)]
+    folder = domain_directory(path, "example.com")
+    return [folder / f"demo_history_{number:02d}.json" for number in range(1, 11)]
+
+
+def run_demo_history(args, stages: ScanStages, report: Callable, control: ScanControl,
+                     version: str = "0.1.0") -> dict:
+    """Save a fixed ten-scan story and its PDFs without loading network stages."""
+    from exposureiq import storage
+    from exposureiq.demo_data import DEMO_STORY, build_demo_scans
+    from exposureiq.tui.saved import result_from_snapshot
+
+    clock = time.monotonic()
+    scans = build_demo_scans(passive=args.passive, include_apex=not args.no_apex)
+    result = result_from_snapshot(scans[-1], "")
+    result.update(saved_to=None, report_to=None, saved_scans=[], demo_reports=[],
+                  mode="passive" if args.passive else "full",
+                  mode_detail="DEMO history: simulated data only; no network traffic.",
+                  phase_states=dict.fromkeys(PHASES, "waiting"),
+                  phase_counts=dict.fromkeys(PHASES, 0), demo_count=len(scans))
+
+    def emit(kind: str, **data):
+        control.check()
+        report({"kind": kind, **data})
+
+    def log(message: str, level: str = "info"):
+        if level == "warn":
+            result["warnings"].append(message)
+        emit("log", message=message, level=level)
+
+    def phase(name: str, state: str, count: int, message: str = ""):
+        result["phase_states"][name] = state
+        result["phase_counts"][name] = count
+        emit("phase", phase=name, state=state, count=count, message=message)
+
+    emit("start", target="example.com", version=version, demo=True)
+    log("DEMO history: 10 fixed example.com snapshots. No network, real exploits or real incidents.")
+    phase("Scope", "done", 0, "Simulated fixtures only; no scope files or active probes are used.")
+    phase("Subdomains", "done", len(result["names"]), "Using the ten-part demo story (no discovery calls).")
+    phase("IP lookup", "done", len(result["assets"]), "Using documentation-only IP addresses (no DNS calls).")
+    phase("Web checks", "skipped" if args.passive else "done",
+          0 if args.passive else len(result["assets"]),
+          "Sample web findings skipped (--passive)." if args.passive else "Using simulated front-page and certificate evidence.")
+    phase("Ports", "skipped" if args.passive else "done", len(result["port_rows"]),
+          "Sample ports skipped (--passive)." if args.passive else "Using fixed ports and the existing offline severity rules.")
+    phase("Save", "spinner", 0, "Preparing ten demo snapshots")
+    paths = _demo_paths(args.output)
+    try:
+        if not args.no_save:
+            if stages.save_scan is None:
+                raise ValueError("Saving is unavailable; the demo history needs storage.py.")
+            # Check the entire set before writing. Repeating an identical demo
+            # reuses the JSON; a changed or unrelated file is never overwritten.
+            for scan, path in zip(scans, paths):
+                control.check()
+                if path.exists() and storage.load_scan(str(path)) != scan:
+                    raise ValueError(f"Demo output already contains different data: {path}. Choose another --output directory.")
+        for number, (scan, path, story) in enumerate(zip(scans, paths, DEMO_STORY), 1):
+            control.check()
+            findings = [finding for asset in scan["assets"] for finding in asset["findings"]]
+            counts = {name: sum(finding["severity"] == name for finding in findings)
+                      for name in ("high", "medium", "low")}
+            log(f"DEMO scan {number:02d}/10: {story}. "
+                f"{len(scan['assets'])} hosts; {counts['high']} high, "
+                f"{counts['medium']} medium, {counts['low']} low.")
+            emit("counters", subdomains=sum(asset["host"] != "example.com" for asset in scan["assets"]),
+                 hosts=len(scan["assets"]), ips=len({ip["ip"] for asset in scan["assets"] for ip in asset["ips"]}),
+                 findings=len(findings))
+            if args.no_save:
+                continue
+            if not path.exists():
+                stages.save_scan(scan, str(path))
+            result["saved_scans"].append(str(path))
+            result["saved_to"] = str(path)
+            phase("Save", "spinner", number, f"Demo snapshot {number:02d}/10 saved to {path}")
+            if not getattr(args, "no_report", False) and stages.report_job is not None:
+                control.check()
+                try:
+                    exported = stages.report_job(str(path), path.parent)
+                except Exception as error:
+                    log(f"PDF for demo scan {number:02d} could not be generated: {error}", "warn")
+                else:
+                    pdf = exported.get("pdf")
+                    if pdf:
+                        result["demo_reports"].append(pdf)
+                        if number == 10:
+                            result["report_to"] = pdf
+                        log(f"Demo scan {number:02d} PDF saved to {pdf}", "ok")
+    except (ValueError, OSError) as error:
+        result["return_code"] = 1
+        result["saved_to"] = None  # Never export scan 10 from a partially saved set.
+        log(f"Could not save demo history: {error}", "error")
+    phase("Save", "done" if result["saved_scans"] else "skipped", len(result["saved_scans"]))
+    if args.no_save:
+        log("Demo history not saved (--no-save); no reports were generated.")
+    result["elapsed"] = time.monotonic() - clock
+    result["summary_rows"] = [
+        ("Mode", "DEMO history (fake data; no network)"), ("Target", "example.com"),
+        ("Demo snapshots saved", len(result["saved_scans"])),
+        ("Demo PDFs", len(result["demo_reports"])), ("Selected scan", scans[-1]["scan_id"]),
+        ("Hosts", len(result["assets"])), ("Findings", sum(len(asset["findings"]) for asset in result["assets"])),
+        ("Report PDF", result["report_to"] or "not generated"),
+    ]
+    if result["saved_to"]:
+        log("Showing scan 10. Open the earlier saved demo files to explore the regression and recovery.")
+    emit("data", table="technologies", rows=result["assets"])
+    emit("data", table="findings", rows=result["assets"])
+    emit("result", result=result)
+    return result
+
+
 def run_scan(args, stages: ScanStages, report: Callable, control: ScanControl,
-             version: str = "0.1.0") -> dict:
+              version: str = "0.1.0") -> dict:
     """Run all phases sequentially. The UI calls this in a thread worker."""
+    if getattr(args, "demos", False):
+        return run_demo_history(args, stages, report, control, version)
     domain = "example.com" if args.demo else args.domain
     active = not args.passive
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -388,7 +508,9 @@ def run_scan(args, stages: ScanStages, report: Callable, control: ScanControl,
             control.pause(0.2)
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         prefix = "demo" if args.demo else domain
-        path = Path(args.output) if args.output else Path("results") / f"{prefix}_{stamp}.json"
+        from exposureiq.paths import scan_output_path
+
+        path = scan_output_path(domain, f"{prefix}_{stamp}.json", args.output)
         try:
             snapshot = stages.build_scan(domain, assets, started_at=started_at)
             if args.demo:

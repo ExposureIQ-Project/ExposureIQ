@@ -19,6 +19,18 @@ def example_scan():
     return storage.load_scan(str(EXAMPLE))
 
 
+def test_demo_summary_never_claims_real_scoped_checks_ran():
+    scan = example_scan()
+    scan["scan_id"] = "DEMO-" + scan["scan_id"]
+    report = build_report(scan, generated_at=FIXED_TIME)
+    summary = " ".join(report["executive_summary"])
+    assert report["demo"] and "not a real assessment" in summary
+    assert "simulated evidence" in summary
+    assert "hosts that were in scope" not in summary
+    real_summary = build_report(example_scan(), generated_at=FIXED_TIME)["executive_summary"]
+    assert "hosts that were in scope" in " ".join(real_summary)
+
+
 def test_counts_findings_and_risk():
     report = build_report(example_scan(), generated_at=FIXED_TIME)
 
@@ -80,6 +92,14 @@ def test_executive_summary_mentions_target_and_change():
     assert report["diff_summary"]["headline"] == "1 thing got worse"
 
 
+def test_disabled_comparison_is_not_described_as_missing_history():
+    report = build_report(example_scan(), comparison_enabled=False, generated_at=FIXED_TIME)
+    summary = " ".join(report["executive_summary"])
+    assert report["comparison_enabled"] is False
+    assert "Change comparisons were disabled" in summary
+    assert "no earlier saved scan" not in summary and "Run another scan" not in summary
+
+
 def test_no_findings_is_clear_not_a_claim_of_safety():
     scan = example_scan()
     for asset in scan["assets"]:
@@ -92,7 +112,7 @@ def test_no_findings_is_clear_not_a_claim_of_safety():
     assert "No findings were recorded" in " ".join(report["executive_summary"])
 
 
-def test_history_points_are_sorted_and_deduplicated():
+def test_history_points_are_sorted_deduplicated_and_stop_at_selected_scan():
     current = example_scan()
     older = copy.deepcopy(current)
     older["scan_id"] = "older"
@@ -104,25 +124,24 @@ def test_history_points_are_sorted_and_deduplicated():
 
     report = build_report(
         current,
-        history=[newest, current, older],
+        history=[newest, current, older, older],
         generated_at=FIXED_TIME,
     )
 
     assert [point["started_at"] for point in report["history"]] == [
         "2026-10-01T10:00:00Z",
         "2026-10-13T20:15:00Z",
-        "2026-10-29T10:00:00Z",
     ]
-    assert [point["assets"] for point in report["history"]] == [1, 2, 2]
+    assert [point["assets"] for point in report["history"]] == [1, 2]
 
 
 def test_history_labels_include_time_when_a_day_repeats():
     current = example_scan()
     current["scan_id"] = "a"
-    current["started_at"] = "2026-10-29T10:00:00Z"
+    current["started_at"] = "2026-10-29T18:00:00Z"
     other = copy.deepcopy(current)
     other["scan_id"] = "b"
-    other["started_at"] = "2026-10-29T18:00:00Z"
+    other["started_at"] = "2026-10-29T10:00:00Z"
 
     report = build_report(current, history=[current, other], generated_at=FIXED_TIME)
 

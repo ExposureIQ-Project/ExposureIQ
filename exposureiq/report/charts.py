@@ -44,11 +44,13 @@ def severity_donut(counts: dict, size: int = 220, thickness: int = 34) -> str:
             continue
         length = circumference * count / total
         parts.append(
-            f'<circle cx="{centre}" cy="{centre}" r="{radius:.2f}" fill="none" '
+            f'<circle class="donut-segment" cx="{centre}" cy="{centre}" r="{radius:.2f}" fill="none" '
             f'stroke="{branding.SEVERITY_COLORS[name]}" stroke-width="{thickness}" '
             f'stroke-dasharray="{length:.2f} {circumference - length:.2f}" '
             f'stroke-dashoffset="{-offset:.2f}" '
-            f'transform="rotate(-90 {centre} {centre})"/>'
+            f'transform="rotate(-90 {centre} {centre})">'
+            f'<title>{branding.SEVERITY_LABELS[name]}: {count} '
+            f'{"finding" if count == 1 else "findings"}</title></circle>'
         )
         offset += length
 
@@ -79,8 +81,23 @@ def severity_legend(counts: dict) -> list[dict]:
     return rows
 
 
-def assets_over_time(points: list[dict], width: int = 640, height: int = 240) -> str:
+def assets_over_time(points: list[dict], width: int = 640, height: int = 240, *,
+                     anchors: dict | None = None) -> str:
     """A line chart of host count across the saved scans of one target."""
+    return _trend_chart(points, width, height, metric="assets", title="Assets over time",
+                        axis="Hosts", color=branding.TEAL, anchors=anchors)
+
+
+def findings_over_time(points: list[dict], width: int = 640, height: int = 240, *,
+                       anchors: dict | None = None) -> str:
+    """Total and high-severity findings, so regressions and recovery stay visible."""
+    return _trend_chart(points, width, height, metric="findings", title="Findings over time",
+                        axis="Findings", color=branding.INDIGO, show_high=True, anchors=anchors)
+
+
+def _trend_chart(points: list[dict], width: int, height: int, *, metric: str,
+                  title: str, axis: str, color: str, show_high: bool = False,
+                  anchors: dict | None = None) -> str:
     left, right, top, bottom = 48, 18, 22, 38
     plot_width = max(width - left - right, 1)
     plot_height = max(height - top - bottom, 1)
@@ -88,9 +105,9 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
-        f'class="chart chart-line" role="img" aria-label="Assets over time" '
+        f'class="chart chart-line" role="{"group" if anchors else "img"}" aria-label="{_escape(title)}" '
         f'style="background:{branding.INNER_SURFACE}">',
-        "<title>Assets over time</title>",
+        f"<title>{_escape(title)}</title>",
     ]
 
     if not points:
@@ -101,7 +118,7 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
         ]
         return "".join(parts)
 
-    values = [int(point.get("assets") or 0) for point in points]
+    values = [int(point.get(metric) or 0) for point in points]
     maximum = _nice_max(max(values) if values else 0)
 
     # Horizontal grid and value labels.
@@ -127,23 +144,53 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
     line = " ".join(f"{x:.2f},{y:.2f}" for x, y in zip(xs, ys))
     area = (f"{xs[0]:.2f},{top + plot_height:.2f} " + line +
             f" {xs[-1]:.2f},{top + plot_height:.2f}")
+    parts.append(f'<g class="chart-series" style="transform-origin:{left}px {top + plot_height}px">')
     parts.append(
-        f'<polygon points="{area}" fill="{branding.TEAL}" opacity="0.10"/>'
+        f'<polygon class="chart-area" points="{area}" fill="{color}" opacity="0.10"/>'
     )
     parts.append(
-        f'<polyline points="{line}" fill="none" stroke="{branding.TEAL}" '
+        f'<polyline class="trend-line" pathLength="1" points="{line}" fill="none" stroke="{color}" '
         f'stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
     )
 
-    label_step = max(1, math.ceil(count / 8))
+    if show_high:
+        high_values = [int(point.get("high") or 0) for point in points]
+        high_ys = [top + plot_height - plot_height * value / maximum for value in high_values]
+        high_line = " ".join(f"{x:.2f},{y:.2f}" for x, y in zip(xs, high_ys))
+        parts.append(f'<polyline class="high-trend" points="{high_line}" fill="none" '
+                     f'stroke="{branding.HIGH}" stroke-width="2" stroke-dasharray="5 4" '
+                     'stroke-linejoin="round"><title>High-severity findings</title></polyline>')
+
     for index, (x, y, point) in enumerate(zip(xs, ys, points)):
+        key = (str(point.get("scan_id") or ""), str(point.get("started_at") or ""))
+        anchor = (anchors or {}).get(key, "")
+        number = point.get("number") or index + 1
+        date = point.get("date") or point.get("started_at") or point.get("label") or "unknown date"
+        tag = "a" if anchor else "g"
         parts.append(
-            f'<g><circle cx="{x:.2f}" cy="{y:.2f}" r="4" fill="{branding.INNER_SURFACE}" '
-            f'stroke="{branding.TEAL}" stroke-width="2"/>'
-            f'<title>{_escape(point.get("label") or "?")}: '
-            f'{int(point.get("assets") or 0)} assets, '
-            f'{int(point.get("findings") or 0)} findings</title></g>'
+            f'<{tag} class="chart-node" tabindex="0" '
+            + (f'href="#{_escape(anchor)}" role="link" ' if anchor else 'role="img" ')
+            + f'aria-label="Scan {_escape(number)}, {_escape(date)}" '
+            f'data-x="{x:.2f}" data-y="{y:.2f}" data-anchor="{_escape(anchor)}" '
+            f'data-scan-number="{_escape(number)}" data-scan-id="{_escape(point.get("scan_id") or "")}" '
+            f'data-scan-time="{_escape(point.get("started_at") or "")}" '
+            f'data-scan-date="{_escape(date)}" data-assets="{int(point.get("assets") or 0)}" '
+            f'data-findings="{int(point.get("findings") or 0)}" data-high="{int(point.get("high") or 0)}">'
+            f'<circle class="node-hit" cx="{x:.2f}" cy="{y:.2f}" r="12" fill="transparent" stroke="none"/>'
         )
+        parts.append(
+            f'<circle class="node-dot" cx="{x:.2f}" cy="{y:.2f}" r="4" fill="{branding.INNER_SURFACE}" '
+            f'stroke="{color}" stroke-width="2"/>'
+            f'<title>Scan {_escape(number)} · {_escape(date)}: '
+            f'{int(point.get("assets") or 0)} assets, '
+            f'{int(point.get("findings") or 0)} findings, '
+            f'{int(point.get("high") or 0)} high severity</title></{tag}>'
+        )
+    parts.append("</g>")
+    parts.append(f'<line class="chart-cursor is-hidden" x1="{left}" x2="{left}" '
+                 f'y1="{top}" y2="{top + plot_height}" aria-hidden="true"/>')
+    label_step = max(1, math.ceil(count / 8))
+    for index, (x, point) in enumerate(zip(xs, points)):
         if index % label_step == 0 or index == count - 1:
             parts.append(
                 f'<text x="{x:.2f}" y="{top + plot_height + 20}" '
@@ -155,8 +202,8 @@ def assets_over_time(points: list[dict], width: int = 640, height: int = 240) ->
         f'<text x="{left}" y="{height - 4}" class="axis-title" fill="{branding.MUTED}">Scan date</text>'
     )
     parts.append(
-        f'<text x="{left - 10}" y="{top - 8}" text-anchor="end" '
-        f'class="axis-title" fill="{branding.MUTED}">Hosts</text>'
+        f'<text x="{left}" y="{top - 8}" text-anchor="start" '
+        f'class="axis-title" fill="{branding.MUTED}">{_escape(axis)}</text>'
     )
     parts.append("</svg>")
     return "".join(parts)

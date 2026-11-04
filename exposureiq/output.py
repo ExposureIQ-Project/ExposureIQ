@@ -393,3 +393,19 @@ def diff_report(diff: dict, show_all: bool = False) -> None:
     for n in notes:
         if isinstance(n, str):
             console.print(Text(f"  note: {n}", style="dim"))
+
+    history = diff.get("history") or []
+    if history:
+        console.print(Text("Scan-by-scan history (overall counts above are net changes)",
+                           style=f"bold {TEAL}"))
+        for step in history:
+            old, new = step.get("old") or {}, step.get("new") or {}
+            console.print(Text(f"  {old.get('scan_id', '?')} → {new.get('scan_id', '?')}", style="bold"))
+            console.print(Text(f"  {(step.get('summary') or {}).get('headline') or 'No changes'}"))
+            for line in (step.get("summary") or {}).get("lines") or []:
+                console.print(Text(f"    {line}"))
+            if show_all:
+                for change in step.get("ignored") or []:
+                    console.print(Text(f"    ignored: {_fmt(change)}", style="dim"))
+            for note in step.get("notes") or []:
+                console.print(Text(f"    note: {note}", style="dim"))

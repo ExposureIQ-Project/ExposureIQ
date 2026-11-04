@@ -2,7 +2,7 @@
 
 This module joins the pure comparison (``compare.compare_scans``) with the
 noise controls (``noise``) and the readable summary (``summary``). It reads
-saved scans only in ``diff_domain``; ``build_diff`` works on dictionaries.
+saved scans in the history helpers; the comparison builders work on dictionaries.
 
 The result shape is:
 
@@ -14,17 +14,20 @@ The result shape is:
         "ignored": [...],       # hidden by ignore.txt
         "notes": ["..."],
         "summary": {"headline": ..., "counts": ..., ...},
+        "history": [...],       # adjacent comparisons, in history mode only
     }
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from exposureiq import storage
 from exposureiq.diffing import noise
 from exposureiq.diffing.compare import change_key, compare_scans
 from exposureiq.diffing.summary import summarize_diff
+from exposureiq.paths import saved_json_paths
 
 
 def _target(scan) -> str:
@@ -48,6 +51,69 @@ def _same_target(old: dict, new: dict) -> None:
             f"Targets differ: {old_target or '?'} and {new_target or '?'}. "
             "Only scans of the same target can be compared."
         )
+
+
+def scan_key(scan: dict) -> tuple[str, str]:
+    """The saved snapshot identity, independent of its filename."""
+    return (str(scan.get("scan_id") or ""), str(scan.get("started_at") or ""))
+
+
+def scan_order(scan: dict) -> tuple[str, str]:
+    """Order by the saved UTC time, then scan ID to break same-time ties."""
+    stamp = str(scan.get("started_at") or "")
+    try:
+        moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=timezone.utc)
+        stamp = moment.astimezone(timezone.utc).isoformat()
+    except ValueError:
+        pass  # Older schemas accept non-empty timestamps; keep them readable.
+    return stamp, str(scan.get("scan_id") or "")
+
+
+def is_demo(scan: dict) -> bool:
+    return str(scan.get("scan_id") or "").startswith("DEMO-")
+
+
+def history_group(scan: dict) -> str:
+    """Keep real scans, one-off demos, and the ten-part story separate."""
+    # The ten-part story is separate from unrelated one-off --demo samples.
+    if str(scan.get("scan_id") or "").startswith("DEMO-HISTORY-"):
+        return "demo-history"
+    return "demo" if is_demo(scan) else "real"
+
+
+def scan_history(scan: dict, history: list[dict] | None = None) -> list[dict]:
+    """Same-target snapshots through ``scan``, sorted and deduplicated.
+
+    Never include future snapshots, real/demo mixtures, or a second copy of the
+    selected scan. The caller's selected data wins over a duplicate on disk.
+    """
+    _require_scan(scan, "Selected")
+    selected_order = scan_order(scan)
+    unique = {
+        scan_key(item): item for item in (history or [])
+        if isinstance(item, dict) and _target(item) == _target(scan)
+        and history_group(item) == history_group(scan)
+        and scan_order(item) <= selected_order
+    }
+    unique[scan_key(scan)] = scan
+    return sorted(unique.values(), key=scan_order)
+
+
+def find_scan_history(scan: dict, results_dir: str | Path = "results") -> list[dict]:
+    """Load compatible saved history, stopping at the selected snapshot."""
+    entries = find_domain_scans(_target(scan), results_dir)
+    return scan_history(scan, [entry["scan"] for entry in entries])
+
+
+def domain_scans(scan: dict, scans: list[dict] | None = None) -> list[dict]:
+    """All distinct snapshots for a domain, including later scans for its home page."""
+    _require_scan(scan, "Selected")
+    unique = {scan_key(item): item for item in (scans or [])
+              if isinstance(item, dict) and _target(item) == _target(scan)}
+    unique[scan_key(scan)] = scan
+    return sorted(unique.values(), key=scan_order)
 
 
 def _apply_confirmed_removals(changes: list[dict], before_old: dict, old: dict,
@@ -88,6 +154,10 @@ def build_diff(old_scan: dict, new_scan: dict, before_old: dict | None = None,
         changes = _apply_confirmed_removals(changes, before_old, old_scan, new_scan)
 
     ignore_rules = noise.load_ignore_rules() if rules is None else rules
+    return _diff_document(result, changes, ignore_rules)
+
+
+def _diff_document(result: dict, changes: list[dict], ignore_rules: list[dict]) -> dict:
     kept, ignored = noise.apply_ignore_rules(changes, ignore_rules)
 
     notes = []
@@ -112,6 +182,52 @@ def build_diff(old_scan: dict, new_scan: dict, before_old: dict | None = None,
     return diff
 
 
+def build_history_diff(scan: dict, history: list[dict] | None = None, *,
+                       baseline: dict | None = None,
+                       rules: list[dict] | None = None) -> dict | None:
+    """Baseline-to-selected change plus every adjacent scan comparison.
+
+    Overall counts describe the net change, not the sum of repeated events.
+    ``history`` preserves regressions that appeared and were later fixed. A net
+    removal is confirmed only when absent in the final two included snapshots.
+    An explicit ``baseline`` limits the comparison window to that older scan.
+    """
+    ordered = scan_history(scan, history)
+    if baseline is not None:
+        _require_scan(baseline, "Baseline")
+        _same_target(baseline, scan)
+        if history_group(baseline) != history_group(scan):
+            raise ValueError("Demo and real scans, or unrelated demos, cannot be compared.")
+        if scan_order(baseline) >= scan_order(scan):
+            raise ValueError("The comparison baseline must be an earlier scan.")
+        ordered = scan_history(scan, [*ordered, baseline])
+        ordered = [item for item in ordered if scan_order(item) >= scan_order(baseline)]
+        # Keep the explicit file's evidence if another copy shares its identity.
+        ordered[0] = baseline
+    if len(ordered) < 2:
+        return None
+
+    ignore_rules = noise.load_ignore_rules() if rules is None else rules
+    net = compare_scans(ordered[0], scan)
+    changes = net["changes"]
+    if len(ordered) >= 3:
+        previous = compare_scans(ordered[0], ordered[-2])
+        missing_keys = {change_key(change) for change in previous["changes"]
+                        if change.get("kind") in noise.REMOVAL_KINDS}
+        changes = [{**change, "status": "confirmed"}
+                   if change.get("kind") in noise.REMOVAL_KINDS
+                   and change_key(change) in missing_keys else change
+                   for change in changes]
+    diff = _diff_document(net, changes, ignore_rules)
+    diff["history"] = [
+        build_diff(ordered[index - 1], ordered[index],
+                   before_old=ordered[index - 2] if index >= 2 else None,
+                   rules=ignore_rules)
+        for index in range(1, len(ordered))
+    ]
+    return diff
+
+
 def find_domain_scans(domain: str, results_dir: str | Path = "results") -> list[dict]:
     """Return saved scans for ``domain``, oldest first, with their paths.
 
@@ -123,7 +239,7 @@ def find_domain_scans(domain: str, results_dir: str | Path = "results") -> list[
     wanted = normalize_domain(domain)
     found = []
     try:
-        paths = sorted(Path(results_dir).glob("*.json"))
+        paths = saved_json_paths(results_dir, wanted)
     except OSError:
         return []
 
@@ -136,28 +252,23 @@ def find_domain_scans(domain: str, results_dir: str | Path = "results") -> list[
             continue
         found.append({"path": str(path), "scan": scan})
 
-    found.sort(key=lambda entry: (
-        str(entry["scan"].get("started_at") or ""),
-        str(entry["scan"].get("scan_id") or ""),
-        entry["path"],
-    ))
+    found.sort(key=lambda entry: (*scan_order(entry["scan"]), entry["path"]))
     return found
 
 
 def diff_domain(domain: str, results_dir: str | Path = "results") -> dict:
-    """Compare the two newest saved scans for ``domain``.
+    """Compare the earliest compatible scan through the newest for ``domain``.
 
-    When a third older scan exists it is used to confirm removals. Raises
-    ``ValueError`` if fewer than two readable scans exist for the domain.
+    Include every intermediate comparison. Raises ``ValueError`` if fewer than
+    two distinct, compatible snapshots exist (demo data stays separate).
     """
     from exposureiq.discovery.subdomains import normalize_domain
 
     wanted = normalize_domain(domain)
     scans = find_domain_scans(wanted, results_dir)
-    if len(scans) < 2:
+    diff = build_history_diff(scans[-1]["scan"], [entry["scan"] for entry in scans]) if scans else None
+    if diff is None:
         raise ValueError(
             f"Need at least two saved scans for {wanted} in {results_dir}."
         )
-
-    before_old = scans[-3]["scan"] if len(scans) >= 3 else None
-    return build_diff(scans[-2]["scan"], scans[-1]["scan"], before_old=before_old)
+    return diff

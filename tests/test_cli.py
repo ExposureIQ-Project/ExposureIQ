@@ -109,7 +109,7 @@ def test_json_structure_matches_the_findings_format(stages, tmp_path):
 def test_default_file_goes_to_results_folder(stages, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     run("example.com")
-    assert stages.path.replace("\\", "/").startswith("results/example.com_")
+    assert stages.path.replace("\\", "/").startswith("results/example.com/example.com_")
     assert stages.path.endswith(".json")
 
 
@@ -573,7 +573,7 @@ def test_demo_uses_no_network_tools_and_saves_valid_labeled_json(monkeypatch, tm
     monkeypatch.setattr(cli, "build_scan", storage.build_scan)
     monkeypatch.setattr(cli, "save_scan", storage.save_scan)
     assert run("example.com", "--demo", "--plain") == 0
-    paths = list((tmp_path / "results").glob("demo_*.json"))
+    paths = list((tmp_path / "results" / "example.com").glob("demo_*.json"))
     assert len(paths) == 1
     scan = storage.load_scan(str(paths[0]))
     assert scan["schema_version"] == "0.2" and scan["scan_id"].startswith("DEMO-")
