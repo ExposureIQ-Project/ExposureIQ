@@ -117,6 +117,27 @@ same target/scan-ID name as the default PDF. Saved-scan previews can export too.
 Exports only read saved JSON; they never run another scan or change existing PDFs.
 The button is disabled when saving was skipped or failed.
 
+To copy from the terminal UI, **drag-select text and release the mouse**. The
+highlighted text is copied automatically, including table and input-box text.
+A small **Text copied** notification appears at the top right, below the header.
+No shortcut is needed; **Ctrl+Shift+C** and **Ctrl+Insert** remain available for
+manual copying.
+**Ctrl+C** still quits/cancels, and Escape clears a text selection.
+
+**Double-click a scan-results row** to copy just its hostname, not the whole
+table or its other columns. The grouped Hosts table copies the first listed hostname;
+rows with only an IP address copy that IP. Headers and empty rows copy nothing.
+
+**View saved results** is a file browser: single-click chooses a scan;
+double-click (or Enter) opens it without selecting or copying text.
+
+Desktop copying uses `wl-copy` on Wayland, `xclip`/`xsel` on X11, `pbcopy` on macOS,
+or PowerShell on Windows. Wayland and X11 are Linux display systems. No new
+Python dependency is required. Without a local clipboard tool (or over SSH), the
+app sends a terminal clipboard message (OSC 52); support depends on your terminal.
+If copying still fails, hold **Shift** while
+dragging to select with the terminal itself, then press **Ctrl+Shift+C**.
+
 HTML opens offline as a responsive dashboard matching the app's dark/teal
 styling. Hover a chart to see a snapping dashed cursor, scan number and UTC date;
 click a point to jump to its history changes. Charts grow when first scrolled
