@@ -1,0 +1,45 @@
+{
+  "python": {
+    "version": "3.14.10",
+    "directory": "Python314",
+    "hash_source": "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/p/Python/Python/3/14/3.14.10/Python.Python.3.14.installer.yaml",
+    "architectures": {
+      "amd64": {
+        "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-amd64.exe",
+        "sha256": "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965"
+      },
+      "arm64": {
+        "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-arm64.exe",
+        "sha256": "5b9547e4edae2f6fb2fbfec5e26cf91b4ea191e3b07f7727d5a2c5c2cca93ed3"
+      },
+      "386": {
+        "url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10.exe",
+        "sha256": "c8f1a16db9afd76ca74b5f8e28eeaad408bca10894c9d080443bde83def3ed09"
+      }
+    }
+  },
+  "subfinder": {
+    "version": "2.17.0",
+    "hash_source": "https://github.com/projectdiscovery/subfinder/releases/download/v2.17.0/subfinder_2.17.0_checksums.txt",
+    "architectures": {
+      "amd64": {
+        "url": "https://github.com/projectdiscovery/subfinder/releases/download/v2.17.0/subfinder_2.17.0_windows_amd64.zip",
+        "sha256": "a3fd612928d591fb31c1e59a2e06055e364421ba32251e553073f5673a2d3103"
+      },
+      "arm64": {
+        "url": "https://github.com/projectdiscovery/subfinder/releases/download/v2.17.0/subfinder_2.17.0_windows_arm64.zip",
+        "sha256": "579f8dc7b5bb3da01672fb8b48ba1c232002fe20d1f22d3ddf4b952790f65fe9"
+      },
+      "386": {
+        "url": "https://github.com/projectdiscovery/subfinder/releases/download/v2.17.0/subfinder_2.17.0_windows_386.zip",
+        "sha256": "ee46e9177013b45ccef3f848ac55209e0c5a6c669b5c0735b0dbb4c671fbcc5a"
+      }
+    }
+  },
+  "nmap": {
+    "version": "7.993",
+    "url": "https://nmap.org/dist/nmap-7.993-setup.exe",
+    "sha256": "22e5928d1738a1b94ffd3643014f52cb87d467dbec4cff9e5f721fe0b3782f1b",
+    "hash_source": "https://nmap.org/dist/sigs/nmap-7.993-setup.exe.digest.txt"
+  }
+}
