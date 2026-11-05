@@ -3,7 +3,8 @@
 The project does not require WeasyPrint, ReportLab, or a headless browser. This
 module writes a normal PDF 1.4 file with the built-in Helvetica fonts, vector
 charts, coloured tables, and page numbers. It is intentionally small: it only
-implements the operators this report needs.
+implements the operators this report needs. Text stays selectable, and wrapped
+table cells retain their original values for copying.
 """
 
 from __future__ import annotations
@@ -88,6 +89,28 @@ def wrap(text, width: float, size: float, bold: bool = False) -> list[str]:
     return lines or [""]
 
 
+def _unicode_cmap() -> str:
+    """Map the built-in fonts' WinAnsi bytes to Unicode for PDF text readers."""
+    entries = []
+    for code in range(32, 256):
+        try:
+            character = bytes([code]).decode("cp1252")
+        except UnicodeDecodeError:
+            continue  # WinAnsi has five undefined byte values.
+        entries.append(f"<{code:02X}> <{ord(character):04X}>")
+    lines = [
+        "/CIDInit /ProcSet findresource begin", "12 dict begin", "begincmap",
+        "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def",
+        "/CMapName /ExposureIQWinAnsi def", "/CMapType 2 def",
+        "1 begincodespacerange", "<00> <FF>", "endcodespacerange",
+    ]
+    for start in range(0, len(entries), 100):
+        chunk = entries[start:start + 100]
+        lines.extend([f"{len(chunk)} beginbfchar", *chunk, "endbfchar"])
+    lines.extend(["endcmap", "CMapName currentdict /CMap defineresource pop", "end", "end"])
+    return "\n".join(lines)
+
+
 class PdfDocument:
     """Collect page content streams and serialise them as PDF 1.4."""
 
@@ -108,18 +131,22 @@ class PdfDocument:
             objects.append(value)
             return len(objects) - 1
 
+        def add_stream(value: str) -> int:
+            stream = value.encode("cp1252", "replace")
+            return add(f"<< /Length {len(stream)} >>\nstream\n"
+                       f"{stream.decode('cp1252')}\nendstream")
+
         catalog = add("<< /Type /Catalog /Pages 2 0 R >>")
         pages_id = add("")  # filled after the page objects exist
+        unicode_map = add_stream(_unicode_cmap())
         font_regular = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
-                           "/Encoding /WinAnsiEncoding >>")
+                           f"/Encoding /WinAnsiEncoding /ToUnicode {unicode_map} 0 R >>")
         font_bold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold "
-                        "/Encoding /WinAnsiEncoding >>")
+                        f"/Encoding /WinAnsiEncoding /ToUnicode {unicode_map} 0 R >>")
 
         page_ids = []
         for content in self.pages:
-            stream = "\n".join(content).encode("cp1252", "replace")
-            content_id = add(f"<< /Length {len(stream)} >>\nstream\n"
-                             f"{stream.decode('cp1252')}\nendstream")
+            content_id = add_stream("\n".join(content))
             page_id = add(
                 f"<< /Type /Page /Parent {pages_id} 0 R "
                 f"/MediaBox [0 0 {PAGE_WIDTH:.3f} {PAGE_HEIGHT:.3f}] "
@@ -178,6 +205,18 @@ class ReportPdf:
             f"{red:.3f} {green:.3f} {blue:.3f} rg "
             f"{x:.2f} {PAGE_HEIGHT - top:.2f} Td ({_escape(value)}) Tj ET"
         )
+
+    def text_lines(self, x: float, top: float, lines: list[str], size: float = 10,
+                   bold: bool = False, color: str = branding.DARK, leading: float = 13,
+                   actual_text: str | None = None) -> None:
+        """Draw wrapped lines; ActualText keeps a cell's copyable value intact."""
+        if actual_text is not None:
+            encoded = ("\ufeff" + str(actual_text)).encode("utf-16-be", "replace").hex().upper()
+            self._op(f"/Span << /ActualText <{encoded}> >> BDC")
+        for index, line in enumerate(lines):
+            self.text(x, top + index * leading, line, size, bold, color)
+        if actual_text is not None:
+            self._op("EMC")
 
     def wrapped(self, value, x: float = MARGIN, width: float = CONTENT_WIDTH,
                 size: float = 9.5, leading: float = 13, color: str = branding.PRINT_SECONDARY,
@@ -370,6 +409,12 @@ class ReportPdf:
         x_sev, x_asset, x_find, x_rec = (
             MARGIN, MARGIN + widths[0], MARGIN + widths[0] + widths[1],
             MARGIN + sum(widths[:3]))
+        host = finding.get("host") or ""
+        host_lines = wrap(host, widths[1] - 8, 8.5, True)
+        endpoint = ""
+        if finding.get("ip"):
+            endpoint = finding["ip"] + (f":{finding['port']}" if finding.get("port") else "")
+        endpoint_lines = wrap(endpoint, widths[1] - 8, 7) if endpoint else []
         title_lines = wrap(finding.get("title") or "", widths[2] - 10, 8.5, True)
         detail_lines = wrap(finding.get("detail") or "", widths[2] - 10, 8)
         rec_lines = wrap(finding.get("recommendation") or "", widths[3] - 10, 8)
@@ -383,7 +428,9 @@ class ReportPdf:
             rec_lines = rec_lines[:9] + ["... (truncated)"]
         title_h = len(title_lines) * 9.5
         detail_h = len(detail_lines) * 9.5
-        row_height = max(11 + title_h + detail_h + 12, 11 + len(rec_lines) * 9.5 + 8, 36)
+        asset_h = len(host_lines) * 10 + len(endpoint_lines) * 9.5
+        row_height = max(11 + title_h + detail_h + 12, 11 + len(rec_lines) * 9.5 + 8,
+                         15 + asset_h + 4, 36)
 
         if self.y + row_height > BOTTOM:
             self.new_page()
@@ -401,13 +448,11 @@ class ReportPdf:
         self.text(x_sev + 4, self.y + 31, finding.get("id") or "", 6.5, False,
                   branding.PRINT_MUTED)
 
-        self.text(x_asset + 4, self.y + 15, finding.get("host") or "", 8.5, True,
-                  branding.DARK)
-        endpoint = ""
-        if finding.get("ip"):
-            endpoint = finding["ip"] + (f":{finding['port']}" if finding.get("port") else "")
+        self.text_lines(x_asset + 4, self.y + 15, host_lines, 8.5, True, branding.DARK,
+                        leading=10, actual_text=host)
         if endpoint:
-            self.text(x_asset + 4, self.y + 26, endpoint, 7, False, branding.PRINT_MUTED)
+            self.text_lines(x_asset + 4, self.y + 16 + len(host_lines) * 10, endpoint_lines,
+                            7, False, branding.PRINT_MUTED, leading=9.5, actual_text=endpoint)
 
         cursor = self.y + 12
         for line in title_lines:
@@ -668,7 +713,8 @@ class ReportPdf:
                 "\n".join(asset.get("technologies") or []) or "none detected",
                 finding_label.strip(),
             )
-            wrapped = [wrap(value, width - 8, 7.5) for value, width in zip(values, widths)]
+            wrapped = [wrap(value, width - 8, 7.5, column == 0)
+                       for column, (value, width) in enumerate(zip(values, widths))]
             row_height = max(len(lines) for lines in wrapped) * 9.5 + 12
             if self.y + row_height > BOTTOM:
                 self.new_page()
@@ -678,9 +724,9 @@ class ReportPdf:
                 self.rect(MARGIN, self.y, CONTENT_WIDTH, row_height, branding.PRINT_SURFACE)
             x = MARGIN
             for column, (lines, width) in enumerate(zip(wrapped, widths)):
-                for line_index, line in enumerate(lines):
-                    self.text(x + 4, self.y + 13 + line_index * 9.5, line, 7.5,
-                              column == 0, branding.DARK if column == 0 else branding.PRINT_SECONDARY)
+                self.text_lines(x + 4, self.y + 13, lines, 7.5, column == 0,
+                                branding.DARK if column == 0 else branding.PRINT_SECONDARY,
+                                leading=9.5, actual_text=values[column])
                 x += width
             self.y += row_height
             self.line(MARGIN, self.y, PAGE_WIDTH - MARGIN, self.y, branding.LINE, 0.5)

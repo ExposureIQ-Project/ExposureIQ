@@ -1,13 +1,14 @@
 """Full-screen scan progress and results. All stages run off the UI thread."""
 
 import logging
+import threading
 import time
 from pathlib import Path
 
 from rich.cells import cell_len
 from rich.segment import Segment
 from rich.text import Text
-from textual import on, work
+from textual import events, on, work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
@@ -15,15 +16,18 @@ from textual.geometry import Size
 from textual.message import Message
 from textual.strip import Strip
 from textual.theme import Theme
+from textual.worker import get_current_worker
 from textual.widgets import Button, DataTable, Input, ProgressBar, Rule, Static, TabbedContent, TabPane, Tabs
 
 from exposureiq import output, storage
 from exposureiq.report import branding
+from exposureiq.tui.clipboard import copy_system_text
 from exposureiq.tui.control import ScanCancelled, ScanControl
 from exposureiq.tui.confirm_scope import ScopeConfirmation
 from exposureiq.tui.export import ExportDialog
 from exposureiq.tui.rerun import rerun_hosts
 from exposureiq.tui.saved import display_time, list_saved, result_from_snapshot
+from exposureiq.tui.selectable_table import SelectableDataTable
 from exposureiq.tui.scan import PHASES, ScanStages, run_scan
 from exposureiq.tui.user_scope import MAX_HOSTS, append_hosts, eligible_hosts
 from exposureiq.diffing import pipeline as diff_pipeline
@@ -91,7 +95,25 @@ def _diff_body(diff: dict) -> Text:
     return body
 
 
-class _PhaseTable(DataTable):
+class _SavedResultsTable(DataTable):
+    """Browse files: single-click chooses a row; double-click or Enter opens it."""
+
+    ALLOW_SELECT = False
+
+    def _on_click(self, event: events.Click) -> None:
+        # The normal table handler may open an already-highlighted row on its
+        # first click. Make opening explicit, and never select/copy browser text.
+        event.prevent_default()
+        event.stop()
+        row_index = event.style.meta.get("row")
+        if (event.button == 1 and isinstance(row_index, int)
+                and 0 <= row_index < self.row_count):
+            self.move_cursor(row=row_index, scroll=False)
+            if event.chain == 2:
+                self.action_select_cursor()  # Reuse the normal RowSelected/Enter path.
+
+
+class _PhaseTable(SelectableDataTable):
     """Draw separators in each row's spare line, not as extra data rows."""
     COMPONENT_CLASSES = DataTable.COMPONENT_CLASSES | {"datatable--separator"}
 
@@ -153,6 +175,7 @@ class ExposureIQApp(App[int]):
     BINDINGS = [
         Binding("q", "quit", "Quit / cancel", priority=True),
         Binding("ctrl+c", "cancel_scan", "Cancel", priority=True),
+        Binding("ctrl+shift+c,ctrl+insert", "copy_selection", "Copy", priority=True),
         Binding("a", "add_scope", "Add to scope"),
         Binding("d", "diff_view", "Diff"),
         Binding("e", "export_report", "Export"),
@@ -161,6 +184,12 @@ class ExposureIQApp(App[int]):
     ]
     CSS = """
     Screen { background: $background; color: $body-text; }
+    /* Start one row below the four-row header, clear of its title and buttons. */
+    ToastRack { dock: top; align: right top; margin: 5 0 0 0; padding: 0 1; overflow-y: auto; }
+    Toast { width: auto; max-width: 50%; margin: 0 0 1 0; padding: 0 1; background: $panel; }
+    Toast.-information { border: round $primary; }
+    Toast.-warning { border: round $warning; }
+    Toast.-error { border: round $error; }
     .panel, DataTable {
         background: $surface; border: round $panel-border; padding: 1 2;
         border-title-color: $primary; border-title-style: bold;
@@ -326,6 +355,10 @@ class ExposureIQApp(App[int]):
         self._rerunning = False
         self._exporting = False
         self.export_worker = None
+        self.clipboard_worker = None
+        self._clipboard_lock = threading.Lock()
+        self._selection_copy_pending = False
+        self._selection_input = None
         self.rerun_states = {}
         self.worker = None
         self._log_handler = None
@@ -382,8 +415,8 @@ class ExposureIQApp(App[int]):
                 "input-cursor-foreground": branding.BUTTON_TEXT,
                 "input-selection-background": branding.HIGHLIGHT,
                 "input-selection-foreground": branding.TEXT_PRIMARY,
-                "screen-selection-background": branding.HIGHLIGHT,
-                "screen-selection-foreground": branding.TEXT_PRIMARY,
+                "screen-selection-background": branding.TEAL,
+                "screen-selection-foreground": branding.DARK,
                 "scrollbar": branding.LINE, "scrollbar-hover": branding.BORDER_SOFT,
                 "scrollbar-active": branding.TEAL,
                 "scrollbar-background": branding.PANEL,
@@ -418,7 +451,7 @@ class ExposureIQApp(App[int]):
                 yield Static(id="home-message", markup=False)
         with VerticalScroll(id="browser"):
             yield Static("Saved scans", classes="home-heading")
-            yield DataTable(id="saved-table", cursor_type="row", zebra_stripes=True)
+            yield _SavedResultsTable(id="saved-table", cursor_type="row", zebra_stripes=True)
             with Horizontal(id="browser-actions"):
                 yield Button("Open selected file", id="saved-open", variant="primary")
                 yield Button("View selected scan history", id="saved-diff-domain", variant="default")
@@ -456,16 +489,16 @@ class ExposureIQApp(App[int]):
                         yield Static(id="summary-notes", markup=False)
                         yield Static(id="report-exports", markup=False)
             with TabPane("Subdomains", id="subdomains-tab"):
-                yield DataTable(id="subdomains-table", cursor_type="row", zebra_stripes=True)
+                yield SelectableDataTable(id="subdomains-table", cursor_type="row", zebra_stripes=True)
             with TabPane("Hosts", id="hosts-tab"):
-                yield DataTable(id="hosts-table", cursor_type="row", zebra_stripes=True)
+                yield SelectableDataTable(id="hosts-table", cursor_type="row", zebra_stripes=True)
             with TabPane("Technologies", id="technologies-tab"):
-                yield DataTable(id="technologies-table", cursor_type="row", zebra_stripes=True)
+                yield SelectableDataTable(id="technologies-table", cursor_type="row", zebra_stripes=True)
             with TabPane("Findings", id="findings-tab"):
                 with Horizontal(id="finding-layout"):
-                    yield DataTable(id="findings-table", cursor_type="row", zebra_stripes=True,
-                                    cursor_foreground_priority="renderable",
-                                    cursor_background_priority="renderable")
+                    yield SelectableDataTable(id="findings-table", cursor_type="row", zebra_stripes=True,
+                                              cursor_foreground_priority="renderable",
+                                              cursor_background_priority="renderable")
                     with VerticalScroll(id="finding-side", classes="panel detail-panel empty-findings"):
                         yield Rule(line_style="solid", classes="details-divider finding-extra")
                         yield Static(id="finding-title", classes="finding-extra", markup=False)
@@ -475,7 +508,7 @@ class ExposureIQApp(App[int]):
                         yield Static(id="finding-recommendation", classes="finding-extra", markup=False)
             with TabPane("Ports", id="ports-tab"):
                 yield Static(id="ports-skip-notes", markup=False)
-                yield DataTable(id="ports-table", cursor_type="row", zebra_stripes=True)
+                yield SelectableDataTable(id="ports-table", cursor_type="row", zebra_stripes=True)
             with TabPane("Diff", id="scan-diff-tab"):
                 yield Static("Compare with previous saved scan", id="scan-diff-title", markup=False)
                 yield Static(id="scan-diff-meta", markup=False)
@@ -485,7 +518,7 @@ class ExposureIQApp(App[int]):
                 yield Static(id="scan-diff-message", markup=False)
         with Vertical(id="rerun-panel", classes="panel"):
             yield Static("Web-only re-run (no port scans)", markup=False)
-            yield DataTable(id="rerun-hosts", cursor_type="row")
+            yield SelectableDataTable(id="rerun-hosts", cursor_type="row")
         yield Static(id="user-scope-saved", markup=False)
         yield Static(id="result-log", markup=False)
         with Horizontal(id="footer"):
@@ -589,6 +622,7 @@ class ExposureIQApp(App[int]):
         message.update(Text(text, style=style or output.AMBER))
 
     def _hide_all_views(self):
+        self.clear_selection()
         for selector in ("#home", "#browser", "#scanning", "#results", "#scan-status", "#result-log",
                          "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report"):
             try:
@@ -632,7 +666,7 @@ class ExposureIQApp(App[int]):
         self.query_one("#browser").display = True
         self._set_back(True)
         self._set_title(suffix="saved results", demo=False)
-        self._keys("Enter open   d Diff   ← back   Tab move   q quit", "NO PROBES SENT")
+        self._keys("Double-click/Enter open   d Diff   ← back   Tab move   q quit", "NO PROBES SENT")
         self._populate_saved()
         try:
             self.query_one("#diff-view").display = False
@@ -1124,6 +1158,69 @@ class ExposureIQApp(App[int]):
 
     def action_cancel_scan(self) -> None:
         self.action_quit()
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        # Input owns its selection separately from the screen. Remember the
+        # actual drag source, rather than copying an unrelated focused input.
+        field = self.focused
+        self._selection_input = (field if event.button == 1 and isinstance(field, Input)
+                                 and event.screen_offset in field.region else None)
+
+    def on_text_selected(self) -> None:
+        self._queue_selection_copy()
+
+    def on_click(self, event: events.Click) -> None:
+        # Static widgets select text on double-click, after the mouse-up event.
+        # Tables intercept this themselves to copy only the row's host value.
+        if event.button == 1 and event.chain == 2:
+            self._queue_selection_copy()
+
+    def _queue_selection_copy(self) -> None:
+        if not self._selection_copy_pending:
+            self._selection_copy_pending = True
+            self.call_after_refresh(self._auto_copy_selection, self.screen, self._selection_input)
+
+    def _auto_copy_selection(self, screen, field: Input | None) -> None:
+        self._selection_copy_pending = False
+        self._selection_input = None
+        if screen is not self.screen:
+            return  # Never copy text from a new view or a dismissed dialog.
+        selected = screen.get_selected_text()
+        if not selected and field is not None and field.is_attached and field.screen is screen:
+            if not field.password:
+                selected = field.selected_text
+        if selected and selected.strip():
+            self.copy_to_clipboard(selected)
+
+    def action_copy_selection(self) -> None:
+        selected = self.focused.selected_text if isinstance(self.focused, Input) else ""
+        selected = selected or self.screen.get_selected_text()
+        if selected:
+            self.copy_to_clipboard(selected)
+        else:
+            self.notify("Drag-select text to copy it automatically.", title="Copy", timeout=2)
+
+    def copy_to_clipboard(self, text: str) -> None:
+        if not text:
+            return
+        super().copy_to_clipboard(text)  # Preserve local paste and the terminal's OSC 52 fallback.
+        if self.is_running:
+            self.clipboard_worker = self._copy_system_clipboard(text)
+
+    @work(thread=True, exclusive=True, group="clipboard", exit_on_error=False)
+    def _copy_system_clipboard(self, text: str) -> None:
+        worker = get_current_worker()
+        # Serialize clipboard writes so an older, slower copy cannot win a race.
+        with self._clipboard_lock:
+            if worker.is_cancelled:
+                return
+            copied = copy_system_text(text)
+        if not worker.is_cancelled:
+            message = ("Text copied" if copied else
+                       "Selection sent to the terminal clipboard. If paste fails, use "
+                       "Shift+drag then Ctrl+Shift+C for your terminal's native copy.")
+            self.call_from_thread(self.notify, message, timeout=2 if copied else 4, markup=False,
+                                  severity="information" if copied else "warning")
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if action in ("quit", "add_scope", "export_report") and isinstance(self.focused, Input):
