@@ -11,6 +11,7 @@ results/
 /report/
 /reports/
 .venv/
+/.tools/
 .DS_Store
 .idea/
 .vscode/

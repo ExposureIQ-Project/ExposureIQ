@@ -6,3 +6,8 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# These helpers follow the project's Unix-line-ending convention.
+/run.bat text eol=lf
+/run.ps1 text eol=lf
+/scripts/windows-install.ps1 text eol=lf

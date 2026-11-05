@@ -72,11 +72,15 @@ ExposureIQ is built around three ideas:
 
 ## Quick start
 
+**Windows:** after cloning, run `.\run.bat install`. See the
+[Windows helper](#windows-helper) for Nmap's confirmation prompts and setup checks.
+The manual setup below is for Linux/macOS.
+
 ```bash
 git clone https://github.com/ExposureIQ-Project/ExposureIQ.git
 cd ExposureIQ
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Linux/macOS; see the Windows helper below
 pip install -e ".[dev]"
 
 # 1. Scan a domain you own or are authorised to test.
@@ -138,6 +142,67 @@ or diff for scan 3 only uses scans 1–3, even if scans 4–10 are already saved
 The HTML home lists all saved scans, with real and demo trends kept separate.
 Explicit `--compare` or
 `diff OLD.json NEW.json` still selects your chosen baseline.
+
+### Windows helper
+
+On Windows 10/11, open PowerShell or Command Prompt in the cloned folder
+containing `pyproject.toml`, then run:
+
+```powershell
+.\run.bat install
+.\run.bat doctor
+.\run.bat
+.\run.bat demo
+.\run.bat scan example.com --passive
+.\run.bat test
+.\run.bat help
+```
+
+`install` sets up everything needed by ExposureIQ:
+
+- Reuses a working Python 3.10+, or installs Python for the current user if missing.
+- Creates/reuses `.venv` and installs ExposureIQ and its test dependencies.
+- Installs the correct Subfinder binary for x64, ARM64, or x86.
+- Opens the official Nmap installer if no working Nmap is found. **Complete its
+  license/Windows administrator prompts and keep the default install location.**
+  Nmap's installer supplies its required Visual C++ runtime. The free Nmap
+  installer is not silently installable; these confirmation prompts are expected.
+- Checks that Python packages, Subfinder, and Nmap are ready before saying setup
+  is complete. Setup never scans a target or changes scope files.
+
+Downloads come from the official publishers, with pinned versions and SHA-256
+checksums (file-integrity checks) recorded in `scripts/windows-tools.json`.
+Downloaded installers and Subfinder stay in git-ignored `.tools/`. Installed
+Python lives under `%LOCALAPPDATA%\Programs\ExposureIQ\`. No Git, Go, WinGet,
+virtual-environment activation, or manual `PATH` editing is required to run the
+helper. Each launch makes installed tools visible to ExposureIQ for that process
+only. Nmap may need administrator approval; the entire helper is not elevated.
+
+For demos/passive discovery without Nmap installation, use
+`.\run.bat install --python-only`. With Python available, run commands also set
+up the Python environment automatically. `demo` uses fake example.com data;
+`test` runs offline tests. Neither requires Nmap or Subfinder. Existing
+incompatible environments or corrupt cached files are not silently overwritten.
+
+`doctor` only checks local dependencies: it does not install anything, contact a
+target, or verify network access. A complete installation cannot prevent crt.sh
+timeouts/502 responses or a target refusing its front-page request. Subfinder
+reduces reliance on crt.sh, but its own sources can also fail or require API keys.
+Missing results must never be treated as proof of safety.
+
+Helper `scan` commands are passive by default. Add `--active` only for domains
+you own or have written permission to test; the existing `scope.txt` checks still
+apply. The helper never changes scope files. `diff`, `report`, `scope`, `--open`,
+and `--version` also pass their arguments to ExposureIQ. Quoted paths and options
+such as `demo --plain` work too.
+
+`run.bat` calls `run.ps1` using Windows PowerShell 5.1+ with an execution policy
+for that process only; it does not change your saved security settings. You can
+also run `.\run.ps1 demo` directly from PowerShell if your policy permits it.
+Npcap (a packet-capture driver), Zenmap, and other Nmap companion tools are not
+installed by this helper: ExposureIQ's existing `-sT -Pn` TCP connect scans do
+not need them. Windows loopback scans without Npcap have platform limitations;
+this setup check does not test those or run any scan.
 
 ### Ten-scan demo story (no network)
 
@@ -238,10 +303,13 @@ ExposureIQ/
 │   └── storage.py       # JSON build/save/load and validation
 ├── assets/branding/     # logo and banner assets
 ├── docs/                # format specifications and examples
+├── scripts/             # verified Windows dependency installation
 ├── tests/               # pytest suite (no internet, no Nmap/Subfinder needed)
 ├── scope.txt            # targets that may be actively probed
 ├── ignore.txt           # optional diff noise rules
-├── run.sh               # install / test / scan helper
+├── run.sh               # Linux/macOS install / test / scan helper
+├── run.ps1              # Windows setup / launch helper
+├── run.bat              # Windows PowerShell wrapper
 └── pyproject.toml
 ```
 
