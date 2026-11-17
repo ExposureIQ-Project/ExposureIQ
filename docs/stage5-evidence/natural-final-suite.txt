@@ -1,0 +1,63 @@
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 19%]
+........................................................................ [ 23%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+........................................................................ [ 35%]
+........................................................................ [ 39%]
+........................................................................ [ 43%]
+........................................................................ [ 47%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+........................................................................ [ 59%]
+........................................................................ [ 62%]
+............................................................................................................................................ [ 70%]
+........................................................................ [ 74%]
+........................................................................ [ 78%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 94%]
+......................................ssssssssssssssssssssssssssssssssss [ 98%]
+sss.sssssssssssssssssssssssssssss                                        [100%]
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_windows_helper.py:254: Native batch execution requires Windows
+SKIPPED [2] tests/test_windows_helper.py:264: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [6] tests/test_windows_helper.py:277: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [3] tests/test_windows_helper.py:288: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:303: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:312: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [4] tests/test_windows_helper.py:321: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:332: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:345: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:357: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:367: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:381: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:392: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:412: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:422: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:438: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:450: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:461: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:470: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:482: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [3] tests/test_windows_helper.py:492: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [5] tests/test_windows_installer.py:156: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:166: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:174: PowerShell is not installed
+SKIPPED [5] tests/test_windows_installer.py:184: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:200: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:212: PowerShell is not installed
+SKIPPED [3] tests/test_windows_installer.py:222: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:237: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:246: PowerShell is not installed
+SKIPPED [3] tests/test_windows_installer.py:259: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:277: PowerShell is not installed
+SKIPPED [2] tests/test_windows_installer.py:288: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:299: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:306: PowerShell is not installed
+SKIPPED [2] tests/test_windows_installer.py:313: PowerShell is not installed
+1763 passed, 66 skipped, 4 subtests passed in 239.06s (0:03:59)

@@ -1,0 +1,72 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "attempt": 1,
+      "passed": true,
+      "checks": [
+        "one-command native token-protected report handoff",
+        "same-origin health",
+        "settings automatically enable icon",
+        "open/close/Escape/focus",
+        "mobile bounds",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "literal HTML text",
+        "scan selection clears context",
+        "safe provider fallback",
+        "Off hides icon and clears chat",
+        "initial Off report has no chat",
+        "backend-down does not substitute prepared text"
+      ]
+    },
+    {
+      "attempt": 2,
+      "passed": true,
+      "checks": [
+        "one-command native token-protected report handoff",
+        "same-origin health",
+        "settings automatically enable icon",
+        "open/close/Escape/focus",
+        "mobile bounds",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "literal HTML text",
+        "scan selection clears context",
+        "safe provider fallback",
+        "Off hides icon and clears chat",
+        "initial Off report has no chat",
+        "backend-down does not substitute prepared text"
+      ]
+    },
+    {
+      "attempt": 3,
+      "passed": true,
+      "checks": [
+        "one-command native token-protected report handoff",
+        "same-origin health",
+        "settings automatically enable icon",
+        "open/close/Escape/focus",
+        "mobile bounds",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "literal HTML text",
+        "scan selection clears context",
+        "safe provider fallback",
+        "Off hides icon and clears chat",
+        "initial Off report has no chat",
+        "backend-down does not substitute prepared text"
+      ]
+    }
+  ],
+  "limitation": "Fresh browser profiles and local servers; same-origin loopback HTTP and offline fakes only. No real key/provider/target traffic."
+}

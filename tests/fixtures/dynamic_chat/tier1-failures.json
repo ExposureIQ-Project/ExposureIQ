@@ -1,0 +1,349 @@
+{
+  "network": "loopback fakes only; external sockets and DNS blocked",
+  "real_model_tested": false,
+  "note": "Provider failures may use labelled saved-facts answers. Browser-server/auth/connection failures are separate and must never use prepared answers.",
+  "rows": [
+    {
+      "case": "tagged",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "prose",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "reply_format",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The model's reply was not in a usable format, so I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 2
+    },
+    {
+      "case": "fences",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "surrounding",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "trailing_comma",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "single_quotes",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "truncated",
+      "source": "local",
+      "badge": "Live AI · synthetic-small-model",
+      "fallback_kind": "",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "",
+      "offline_notice": "",
+      "retry_available": false,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 1
+    },
+    {
+      "case": "unfinished_text",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "reply_format",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The model's reply was not in a usable format, so I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 2
+    },
+    {
+      "case": "empty",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "empty",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI endpoint returned no reply text or read-only tool call. Check the model's chat compatibility. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 2
+    },
+    {
+      "case": "injection",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "evidence",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 2
+    },
+    {
+      "case": "provider_connection",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "connection",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "Cannot reach the configured AI endpoint. Check the URL and connection. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "provider_timeout",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "timeout",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI request timed out, including after one retry. Try again later. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "provider_auth",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "auth",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI key was rejected (401/403). Check your provider and key in AI settings. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "provider_not_found",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "not_found",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI endpoint or model was not found (404). Check the base URL and model name. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "provider_bad_request",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "bad_request",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI endpoint rejected the request format or model options (400/422). Check the endpoint, model and API compatibility. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "provider_unavailable",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "unavailable",
+      "attempts": 1,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The AI provider is unavailable (5xx), including after one retry. I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "invented_number",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "evidence",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    },
+    {
+      "case": "unknown_reference",
+      "source": "template",
+      "badge": "Built-in answer",
+      "fallback_kind": "evidence",
+      "attempts": 2,
+      "facts_note": "Facts checked against your saved scan",
+      "reason": "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.",
+      "offline_notice": "",
+      "retry_available": true,
+      "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "wording_verified": false,
+      "loopback_requests": 0
+    }
+  ]
+}

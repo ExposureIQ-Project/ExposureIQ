@@ -1,0 +1,347 @@
+Diagnostic capture saved outside the repository; visible synthetic screen text follows:
+ExposureIQ · Natural damage follow-up; conditional saved-finding consequences
+╭
+───
+╮
+╭
+───
+╮
+ExposureIQ
+ | 
+example.com
+ / saved scan / ai
+╭
+────────────
+╮
+
+
+│
+ ⚙ 
+│
+│
+ ← 
+│
+2026-10-10 10:00 UTC
+│
+ Export 
+│
+
+
+╰
+───
+╯
+╰
+───
+╯
+╰
+────────────
+╯
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+Saved scan · read-only preview — no probes sent
+
+
+Summary
+Subdomains
+Hosts
+Technologies
+Findings
+Ports
+Diff
+AI
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+╸
+━━
+╺
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+╭
+────────
+╮
+╭
+──────────
+╮
+╭
+───────
+╮
+
+
+Findings
+│
+HIGH 0
+│
+│
+MEDIUM 0
+│
+│
+LOW 1
+│
+
+
+╰
+────────
+╯
+╰
+──────────
+╯
+╰
+───────
+╯
+
+
+
+
+╭
+───────────────────────────────────────
+╮
+╭
+───────────────────────────────────────
+╮
+╭
+───────────────────────────────────────
+╮
+
+
+│
+ Explain this scan 
+│
+│
+ Fix first 
+│
+│
+ Most exposed host 
+│
+
+
+╰
+───────────────────────────────────────
+╯
+╰
+───────────────────────────────────────
+╯
+╰
+───────────────────────────────────────
+╯
+
+
+
+
+▊
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+▎
+
+
+▊
+More common questions
+▼
+▎
+
+
+▊
+▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+▎
+
+
+
+
+Fake demonstration data — no real probes were sent.
+
+
+╭
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╮
+
+
+│
+│
+
+
+│
+│
+│
+
+
+│
+│
+You · sent
+│
+
+
+│
+│
+│
+
+
+│
+│
+then what posible damage it can make?
+│
+
+
+│
+│
+│
+
+
+│
+│
+│
+
+
+│
+│
+ExposureIQ · AI draft
+│
+
+
+│
+│
+│
+
+
+│
+│
+Here's what could go wrong with the issues in this scan. These are possible consequences, not evidence that
+│
+
+
+│
+│
+someone broke in or that data was lost.
+▃▃
+│
+
+
+│
+│
+│
+
+
+│
+│
+What could go wrong:
+│
+
+
+│
+│
+1. Missing referrer privacy policy
+│
+
+
+│
+│
+When visitors follow links, browsers may share more of the page address than intended. That could reveal
+│
+
+
+│
+│
+private information if it is included in the address.
+│
+
+
+│
+│
+Saved finding: F-0001
+│
+
+
+│
+│
+│
+
+
+│
+│
+The scan doesn't tell us what data is stored, how well accounts are protected or whether anyone used these
+│
+
+
+│
+│
+exposures.
+│
+
+
+│
+│
+│
+
+
+│
+│
+
+
+╰
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+╯
+
+
+
+
+╭
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+╮
+╭
+──────────────
+╮
+
+
+│
+Ask about these saved findings…
+│
+│
+ Send 
+│
+
+
+╰
+───────────────────────────────────────────────────────────────────────────────────────────────────────────
+╯
+╰
+──────────────
+╯
+
+
+Reply ready · 0.0s. Review this draft with your team.
+
+
+verified 4 of 4 claims · ExposureIQ offline test fake · 2026-11-16T10:26:52+00:00
+
+
+
+
+
+
+← saved results   e Export   Tab panels   ↑↓←→ move   Enter detail   q quit
+NO PROBES SENT
+Traceback (most recent call last):
+  File "<stdin>", line 23, in <module>
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 251, in main
+    images = asyncio.run(screenshots(output, root))
+  File "/usr/lib/python3.14/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 167, in screenshots
+    impact_image = capture(app, output, "12-impact-follow-up.svg", "ExposureIQ · Natural damage follow-up; conditional saved-finding consequences", ["then what posible damage it can make?", "AI draft", "What could go wrong:", "not evidence that someone broke in", "read, change or delete stored data", "verified"])
+                   ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<stdin>", line 9, in diagnostic_capture
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 90, in capture
+    assert word in words, f"Expected visible text missing from {filename}: {word}"
+           ^^^^^^^^^^^^^
+AssertionError: Expected visible text missing from 12-impact-follow-up.svg: not evidence that someone broke in

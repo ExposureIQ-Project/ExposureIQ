@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "browser": "installed Firefox, real headless browser",
+  "source": "synthetic exported file",
+  "checks": [
+    "three-turn host context",
+    "collapsed/opened Evidence",
+    "technical mode",
+    "literal HTML text",
+    "scan selection",
+    "clear chat"
+  ],
+  "transcript": [
+    {
+      "question": "Which host is the most exposed?",
+      "text": "You \u00b7 sentWhich host is the most exposed?ExposureIQ \u00b7 built-in explanationdb.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.Offline mode: answers come from built-in explanations, not a live model.EvidenceH:db.example.comF-0021"
+    },
+    {
+      "question": "then why would i fix it first?",
+      "text": "You \u00b7 sentthen why would i fix it first?ExposureIQ \u00b7 built-in explanationdb.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.EvidenceH:db.example.comF-0021"
+    },
+    {
+      "question": "what would that do or cause if didn't fixed?",
+      "text": "You \u00b7 sentwhat would that do or cause if didn't fixed?ExposureIQ \u00b7 built-in explanationFor db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nI can turn that into a short fix list for your team.\n\nThese are possible consequences, not proof that anyone broke in.EvidenceH:db.example.comF-0021"
+    }
+  ],
+  "screenshot": "export-browser-l1.png",
+  "network": "file page has connect-src none; non-loopback browser HTTP is directed to a refusing localhost proxy"
+}

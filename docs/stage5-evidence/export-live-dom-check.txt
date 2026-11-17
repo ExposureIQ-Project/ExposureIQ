@@ -1,0 +1,1 @@
+PASS: actual live-report scripts use only token-protected relative requests; file/remote/missing-token pages stay offline, greetings/refusals make no calls, both modes and redaction work, Evidence stays literal, clear isolates conversations, host-named consent remains visible, Off drops pending replies, stale replies are suppressed and backend failures fall back safely.

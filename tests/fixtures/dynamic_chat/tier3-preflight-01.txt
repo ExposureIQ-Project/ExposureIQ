@@ -1,0 +1,166 @@
+...................FF................................................... [ 45%]
+........................................................................ [ 90%]
+...............                                                          [100%]
+=================================== FAILURES ===================================
+_____ test_tui_report_button_and_h_share_viewer_from_results_ai_and_domain _____
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-10/test_tui_report_button_and_h_s0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7f6acddbc1a0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6acdce77d0>
+
+    def test_tui_report_button_and_h_share_viewer_from_results_ai_and_domain(tmp_path, ai_scan_factory, monkeypatch):
+        root = tmp_path / "results"
+        paths = []
+        for index in range(2):
+            path = root / "example.com" / f"scan-{index}.json"
+            storage.save_scan(ai_scan_factory(index), str(path))
+            paths.append(path)
+        opened, notices = [], []
+        monkeypatch.setattr(tui, "open_browser", lambda url: opened.append(url) or True)
+        monkeypatch.setattr(cli, "_execute_scan", lambda *a, **k: pytest.fail("Report opening must not scan"))
+        before = {path: path.read_bytes() for path in paths}
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(paths[0]), results_dir=root)
+            app.ai_service = AIService(AIConfig(mode="demo"), provider=FakeProvider(), use_cache=False)
+            app.notify = lambda message, **kwargs: notices.append((message, kwargs))
+            async with app.run_test(size=(125, 46)) as pilot:
+                assert app.viewer.server is None and not app.query_one("#open-html-report", Button).disabled
+                assert "h Open HTML report" in plain(app.query_one("#keys", Static))
+                await pilot.click("#open-html-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                server, thread = app.viewer.server, app.viewer.thread
+                assert len(opened) == 1 and "view=scan" in opened[0]
+                assert parse_qs(urlsplit(opened[0]).query)["report"] == [server.state.report_identifier(str(paths[0]))]
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                app.query_one("#open-html-report", Button).focus()
+                await pilot.press("h")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert len(opened) == 2 and app.viewer.server is server and app.viewer.thread is thread
+                field = app.query_one("#ai-chat-input", Input)
+                field.value = ""
+                field.focus()
+                await pilot.press("h")
+                assert field.value == "h" and len(opened) == 2
+                await pilot.click("#back")
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                assert isinstance(app.screen, DomainScreen)
+                table = app.screen.query_one("#domain-scans", DataTable)
+                table.move_cursor(row=1)
+                table.focus()
+                await pilot.press("h")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert len(opened) == 3 and app.viewer.server is server
+                assert parse_qs(urlsplit(opened[-1]).query)["report"] == [server.state.report_identifier(str(paths[0]))]
+                app.screen.query_one("#domain-tabs", TabbedContent).active = "domain-ai-tab"
+                await pilot.pause()
+                await pilot.click("#domain-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert len(opened) == 4 and app.viewer.server is server and not app.ai_service.audit
+                app.screen.query_one("#domain-report", Button).focus()
+                await pilot.press("q")
+            assert not thread.is_alive() and app.return_value == 0
+>       asyncio.run(exercise())
+
+tests/test_report_open.py:232: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(paths[0]), results_dir=root)
+        app.ai_service = AIService(AIConfig(mode="demo"), provider=FakeProvider(), use_cache=False)
+        app.notify = lambda message, **kwargs: notices.append((message, kwargs))
+        async with app.run_test(size=(125, 46)) as pilot:
+            assert app.viewer.server is None and not app.query_one("#open-html-report", Button).disabled
+            assert "h Open HTML report" in plain(app.query_one("#keys", Static))
+            await pilot.click("#open-html-report")
+            await app.report_open_worker.wait()
+            await pilot.pause()
+            server, thread = app.viewer.server, app.viewer.thread
+            assert len(opened) == 1 and "view=scan" in opened[0]
+            assert parse_qs(urlsplit(opened[0]).query)["report"] == [server.state.report_identifier(str(paths[0]))]
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            app.query_one("#open-html-report", Button).focus()
+            await pilot.press("h")
+            await app.report_open_worker.wait()
+            await pilot.pause()
+>           assert len(opened) == 2 and app.viewer.server is server and app.viewer.thread is thread
+E           AssertionError: assert (1 == 2)
+E            +  where 1 = len(['http://127.0.0.1:39705/?report=f67ae3817eea730909edd720&view=scan#[session-redacted]'])
+
+tests/test_report_open.py:204: AssertionError
+_____________ test_tui_missing_scan_and_failed_launcher_are_honest _____________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-10/test_tui_missing_scan_and_fail0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7f6abffd9bc0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7f6acdce7650>
+
+    def test_tui_missing_scan_and_failed_launcher_are_honest(tmp_path, ai_scan_factory, monkeypatch):
+        path = tmp_path / "saved.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+        notices = []
+        monkeypatch.setattr(tui, "open_browser", lambda url: False)
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=tmp_path)
+            app.ai_service = AIService(AIConfig(), use_cache=False)
+            app.notify = lambda text, **kwargs: notices.append(text)
+            async with app.run_test(size=(110, 38)) as pilot:
+                await pilot.click("#open-html-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert "Browser launch unavailable" in notices[-1] and "http://127.0.0.1:" in notices[-1]
+                path.unlink()  # Remove only this test's synthetic fixture.
+                await pilot.click("#open-html-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert "could not be opened safely" in notices[-1] and "http://" not in notices[-1]
+>       asyncio.run(exercise())
+
+tests/test_report_open.py:258: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=tmp_path)
+        app.ai_service = AIService(AIConfig(), use_cache=False)
+        app.notify = lambda text, **kwargs: notices.append(text)
+        async with app.run_test(size=(110, 38)) as pilot:
+            await pilot.click("#open-html-report")
+            await app.report_open_worker.wait()
+            await pilot.pause()
+>           assert "Browser launch unavailable" in notices[-1] and "http://127.0.0.1:" in notices[-1]
+                                                   ^^^^^^^^^^^
+E           IndexError: list index out of range
+
+tests/test_report_open.py:252: IndexError
+=========================== short test summary info ============================
+FAILED tests/test_report_open.py::test_tui_report_button_and_h_share_viewer_from_results_ai_and_domain
+FAILED tests/test_report_open.py::test_tui_missing_scan_and_failed_launcher_are_honest
+2 failed, 157 passed in 62.72s (0:01:02)

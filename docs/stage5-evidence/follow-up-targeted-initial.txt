@@ -1,0 +1,24 @@
+..........................................F............................. [ 19%]
+........................................................................ [ 38%]
+........................................................................ [ 57%]
+........................................................................ [ 76%]
+........................................................................ [ 95%]
+.................                                                        [100%]
+=================================== FAILURES ===================================
+_ test_referenced_consequence_outside_top_five_uses_exact_tool_evidence_and_keeps_highs _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fabc72873d0>
+
+    def test_referenced_consequence_outside_top_five_uses_exact_tool_evidence_and_keeps_highs(ai_scan_factory):
+        rules = [(rule, "high") for rule in ("ports.database_exposed", "ports.remote_desktop_exposed",
+                                            "https.cert_expired", "ports.smb_exposed", "ports.telnet_exposed")]
+        rules.append(("tech.server_version_disclosed", "low"))
+        chat = build_chat(ai_scan_factory(rules=rules), provider=FakeProvider())
+>       assert len(chat.digest["findings"]) == 5
+E       AssertionError: assert 6 == 5
+E        +  where 6 = len([{'ref': 'R:https.cert_expired', 'rule': 'https.cert_expired', 'severity': 'high', 'title': 'HTTPS certificate expired...sion_disclosed', 'rule': 'tech.server_version_disclosed', 'severity': 'low', 'title': 'Server version disclosed', ...}])
+
+tests/test_ai_chat.py:322: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ai_chat.py::test_referenced_consequence_outside_top_five_uses_exact_tool_evidence_and_keeps_highs
+1 failed, 376 passed in 62.78s (0:01:02)

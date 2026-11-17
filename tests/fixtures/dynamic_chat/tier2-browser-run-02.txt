@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 218, in <module>
+    run()
+    ~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 84, in run
+    browser.wait("document.body.classList.contains('chat-open') && !document.getElementById('export-chat-input').disabled")
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 120, in wait
+    raise RuntimeError("The browser's expected saved-data state did not appear.")
+RuntimeError: The browser's expected saved-data state did not appear.

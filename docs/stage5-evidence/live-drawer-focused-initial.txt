@@ -1,0 +1,51 @@
+........................................................................ [ 34%]
+.............F.......................................................... [ 68%]
+...................................................................      [100%]
+=================================== FAILURES ===================================
+_________ test_disk_renderer_refuses_to_attach_even_live_chat_metadata _________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-26/test_disk_renderer_refuses_to_0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7f8d18e01e80>
+
+    def test_disk_renderer_refuses_to_attach_even_live_chat_metadata(tmp_path, ai_scan_factory):
+        from exposureiq.report.domain import build_domain_report
+        from exposureiq.report.html import render_domain_html
+        from exposureiq.report.model import build_report
+    
+        scan = ai_scan_factory()
+>       domain = build_domain_report(scan, [scan], build_report(scan))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:250: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+scan = {'schema_version': '0.2', 'scan_id': 'scan-0000', 'target': 'example.com', 'started_at': '2026-01-01T00:00:00Z', ...}
+scans = [{'schema_version': '0.2', 'scan_id': 'scan-0000', 'target': 'example.com', 'started_at': '2026-01-01T00:00:00Z', ...}]
+selected_report = {'title': 'Security Assessment Report', 'target': 'example.com', 'demo': False, 'scan_id': 'scan-0000', ...}
+include_diff = True
+
+    def build_domain_report(scan: dict, scans: list[dict], selected_report: dict, *,
+                            include_diff: bool = True) -> dict:
+        """Home includes every scan; each detail view uses only its own predecessors.
+    
+        Explicit comparison options apply to the selected detail view. Home charts
+        and timelines retain the complete, separately grouped domain history.
+        """
+        ordered = pipeline.domain_scans(scan, scans)
+        rules = pipeline.noise.load_ignore_rules() if include_diff else []
+        reports, groups = [], {}
+        for item in ordered:
+            history = pipeline.scan_history(item, ordered)
+            diff = pipeline.build_history_diff(item, history, rules=rules) if include_diff else None
+            report = build_report(item, diff=diff, history=history,
+                                  title=selected_report["title"],
+                                  generated_at=selected_report["generated_at"],
+                                  comparison_enabled=include_diff)
+>           report["tool_version"] = selected_report["tool_version"]
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           KeyError: 'tool_version'
+
+exposureiq/report/domain.py:30: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_export_chat.py::test_disk_renderer_refuses_to_attach_even_live_chat_metadata
+1 failed, 210 passed in 43.38s

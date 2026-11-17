@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "cases": 20,
+  "turns": 84,
+  "files": [
+    {
+      "file": "natural-chat.json",
+      "sha256": "dd00fdd44b29ce0ff126d6bfea56462484e3a30b2e096152046e8331eb24acdd"
+    },
+    {
+      "file": "natural-chat-transcripts.md",
+      "sha256": "06c0b123f1a86393f7da2af8c038a239dcf0cda73b09f7941b1cd2c3296adca5"
+    }
+  ]
+}

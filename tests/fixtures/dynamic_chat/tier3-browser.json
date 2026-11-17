@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "browser": "installed headless Firefox; not a native phone or OS-default-browser test",
+  "checks": [
+    "authenticated TUI URL opens the exact older scan",
+    "token removed from the address after native handoff",
+    "AI-Off report has no chat or chat metadata",
+    "repeated opening keeps one daemon server and port",
+    "TUI settings update the existing viewer service",
+    "live scan selection matches the authenticated deep link",
+    "opening/health make no model call",
+    "session shutdown stops the real listener and disables the browser chat",
+    "saved scan bytes unchanged; no disk report generated"
+  ],
+  "network": "loopback only; isolated browser profile refuses non-loopback HTTP",
+  "model_calls": 0,
+  "files": [
+    {
+      "file": "report-open-off.png",
+      "bytes": 156156,
+      "sha256": "f18a84bd16a456472f1dc8800b8f3c46f7eb0b35225eb044b19a0c4118c664a5"
+    },
+    {
+      "file": "report-open-live.png",
+      "bytes": 166503,
+      "sha256": "06a0347c0bbf38ad3e29cf5cac23148b4facd18c1594af6eb100700b5f87937f"
+    }
+  ],
+  "sources": {
+    "exposureiq/cli.py": "a51002cd325f2ece69837e87d463561f027317c400eb8bbee1000f7d14e9db3b",
+    "exposureiq/tui/app.py": "b92d0482ab761b6d87bd9bc28da9e41079a6bb04d81e0f37619339dfbb460975",
+    "exposureiq/tui/domain_browser.py": "cd3516de48ae655fc93e1c5c4938aa2ec9bc238ce3589275f93576791e99fb3a",
+    "exposureiq/viewer/browser.py": "06457183d152e45c8c3710309978b74ef31a684b8c07f469db6bebb568998921",
+    "exposureiq/viewer/session.py": "2ceb695ea2b0dafa14e3e0abde9438fbed9f5144190cb5d707db5f2cab0c9071",
+    "exposureiq/viewer/server.py": "c96cbe62ab801f50e0a1ba7c736617590ad0e50bb70c588f309b4e42bf29f5bd",
+    "exposureiq/viewer/export.py": "2a1d603078d4705e3aa61c8f83b8e1215e5d75681742863610a59a8ad812249c",
+    "exposureiq/viewer/static/app.js": "9582eba76853cdcb842fc6c67a6dfaba22e0effb339bbbc07166225d5ff9f030",
+    "exposureiq/viewer/static/live-chat.js": "2de38bf8b87435b2d03483c09d8bfbd88d892727d861a06aa7558f68517a6e03",
+    "exposureiq/viewer/static/report-session.js": "e18fb19a464382ae411aacaee6fe46dabcb2c96bf2ed43922770f41e1fd6c23e",
+    "exposureiq/report/html.py": "615675aaf326a30d0fb0472f66217271028cfdfa1f0dd1fbab007c50f3a2f695"
+  }
+}

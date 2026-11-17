@@ -1,0 +1,12 @@
+Before handoff layout storage: {'ratio': '30', 'saved': '30'}
+After handoff layout storage: {'ratio': '50', 'saved': '30'}
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 244, in <module>
+    run()
+    ~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 178, in run
+    browser.wait("!document.getElementById('export-chat-send').disabled && document.querySelectorAll('.export-chat-turn').length === 1")
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 120, in wait
+    raise RuntimeError("The browser's expected saved-data state did not appear.")
+RuntimeError: The browser's expected saved-data state did not appear.

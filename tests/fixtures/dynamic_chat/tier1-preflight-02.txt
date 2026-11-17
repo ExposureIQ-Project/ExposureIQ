@@ -1,0 +1,778 @@
+...................................................FFFFFF....FF......FFF [ 28%]
+FFF..FF........F........F................FF............................. [ 56%]
+.................FF................................FFFFFFFFFFFF......... [ 84%]
+.......................................                                  [100%]
+=================================== FAILURES ===================================
+_ test_fake_model_can_request_only_read_only_tools[Explain F-0001-get_finding] _
+
+question = 'Explain F-0001', tool = 'get_finding'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6e1f0>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_fake_model_can_request_only_read_only_tools(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask(question)
+        assert result["verified"] == result["total"] and result["source"] == "demo"
+>       assert result["tool_calls"][0]["name"] == tool and provider.calls == 2
+E       AssertionError: assert ('get_finding' == 'get_finding'
+E         
+E           get_finding and 1 == 2)
+E        +  where 1 = <exposureiq.ai.provider.FakeProvider object at 0x7fb0022bf230>.calls
+
+tests/test_ai_chat.py:31: AssertionError
+_ test_fake_model_can_request_only_read_only_tools[What should I fix first?-list_findings] _
+
+question = 'What should I fix first?', tool = 'list_findings'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6d4e0>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_fake_model_can_request_only_read_only_tools(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask(question)
+        assert result["verified"] == result["total"] and result["source"] == "demo"
+>       assert result["tool_calls"][0]["name"] == tool and provider.calls == 2
+E       AssertionError: assert ('list_findings' == 'list_findings'
+E         
+E           list_findings and 1 == 2)
+E        +  where 1 = <exposureiq.ai.provider.FakeProvider object at 0x7fb0022db250>.calls
+
+tests/test_ai_chat.py:31: AssertionError
+_ test_fake_model_can_request_only_read_only_tools[Which host is the most exposed?-get_host] _
+
+question = 'Which host is the most exposed?', tool = 'get_host'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6d0c0>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_fake_model_can_request_only_read_only_tools(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask(question)
+        assert result["verified"] == result["total"] and result["source"] == "demo"
+>       assert result["tool_calls"][0]["name"] == tool and provider.calls == 2
+E       AssertionError: assert ('get_host' == 'get_host'
+E         
+E           get_host and 1 == 2)
+E        +  where 1 = <exposureiq.ai.provider.FakeProvider object at 0x7fb0022dafd0>.calls
+
+tests/test_ai_chat.py:31: AssertionError
+_ test_fake_model_can_request_only_read_only_tools[Show scan history-get_history] _
+
+question = 'Show scan history', tool = 'get_history'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6dc70>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_fake_model_can_request_only_read_only_tools(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask(question)
+        assert result["verified"] == result["total"] and result["source"] == "demo"
+>       assert result["tool_calls"][0]["name"] == tool and provider.calls == 2
+E       AssertionError: assert ('get_history' == 'get_history'
+E         
+E           get_history and 1 == 2)
+E        +  where 1 = <exposureiq.ai.provider.FakeProvider object at 0x7fb001c28b00>.calls
+
+tests/test_ai_chat.py:31: AssertionError
+_ test_fake_model_can_request_only_read_only_tools[Which findings are still unfixed?-list_unfixed] _
+
+question = 'Which findings are still unfixed?', tool = 'list_unfixed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6e980>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_fake_model_can_request_only_read_only_tools(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask(question)
+        assert result["verified"] == result["total"] and result["source"] == "demo"
+>       assert result["tool_calls"][0]["name"] == tool and provider.calls == 2
+E       AssertionError: assert ('list_unfixed' == 'list_unfixed'
+E         
+E           list_unfixed and 1 == 2)
+E        +  where 1 = <exposureiq.ai.provider.FakeProvider object at 0x7fb001c29480>.calls
+
+tests/test_ai_chat.py:31: AssertionError
+_ test_tool_loops_over_budget_or_invalid_batches_fall_back_without_extra_reads[calls0-4-5] _
+
+calls = [{'id': 'one', 'type': 'function', 'function': {'name': 'get_finding', 'arguments': '{"id": "F-0001"}'}}]
+expected_tools = 4, expected_model_calls = 5
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6ceb0>
+
+    @pytest.mark.parametrize("calls,expected_tools,expected_model_calls", [
+        ([tool_call()], 4, 5), ([tool_call(identifier=str(i)) for i in range(5)], 0, 1),
+        ([tool_call("list_findings", {}), tool_call(arguments={"id": "F-9999"})], 0, 1),
+        ([tool_call("run_command", {"command": "do-not-run"})], 0, 1),
+    ])
+    def test_tool_loops_over_budget_or_invalid_batches_fall_back_without_extra_reads(calls, expected_tools, expected_model_calls, ai_scan_factory):
+        class Loop:
+            model = "looping fake"
+            calls = 0
+    
+            def complete(self, messages, **kwargs):
+                self.calls += 1
+                return ProviderResponse(tool_calls=copy.deepcopy(calls))
+    
+        provider = Loop()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        result = chat.ask("Explain this finding")
+        assert result["source"] == "template" and result["verified"] == result["total"]
+>       assert len(chat.tools.calls) == expected_tools and provider.calls == expected_model_calls
+E       assert (0 == 4)
+E        +  where 0 = len([])
+E        +    where [] = <exposureiq.ai.tools.ReadOnlyTools object at 0x7fb001c6a210>.calls
+E        +      where <exposureiq.ai.tools.ReadOnlyTools object at 0x7fb001c6a210> = <exposureiq.ai.chat.Chat object at 0x7fb001c6a8f0>.tools
+
+tests/test_ai_chat.py:59: AssertionError
+_____________ test_chat_repairs_json_only_once_and_logs_both_calls _____________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc87d0>
+
+    def test_chat_repairs_json_only_once_and_logs_both_calls(ai_scan_factory):
+        class Malformed(FakeProvider):
+            def complete(self, messages, **kwargs):
+                if self.calls == 0:
+                    self.calls += 1
+                    return ProviderResponse("not JSON")
+                return super().complete(messages, **kwargs)
+    
+        provider = Malformed()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+        assert chat.ask("Explain scan risk")["source"] == "demo"
+        assert provider.calls == 2 and len(chat.service.audit) == 2
+>       assert chat.service.audit[0]["dropped"][0]["claim"] == "JSON shape"
+E       AssertionError: assert 'reply format' == 'JSON shape'
+E         
+E         - JSON shape
+E         + reply format
+
+tests/test_ai_chat.py:95: AssertionError
+___________ test_rejected_claim_never_enters_chat_memory_or_display ____________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6f5e0>
+
+    def test_rejected_claim_never_enters_chat_memory_or_display(ai_scan_factory):
+        class Liar(FakeProvider):
+            def complete(self, messages, **kwargs):
+                response = super().complete(messages, **kwargs)
+                candidate = json.loads(response.content)
+                candidate["headline"] = {"text": "Exploit using CVE-2099-9999", "refs": ["F-9999"]}
+                return ProviderResponse(json.dumps(candidate))
+    
+        chat = build_chat(ai_scan_factory(), provider=Liar())
+        result = chat.ask("Explain scan risk")
+>       assert result["source"] == "template" and result["dropped"]
+E       AssertionError: assert ('demo' == 'template'
+E         
+E         - template
+E         + demo)
+
+tests/test_ai_chat.py:109: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[What do severity levels mean in this scan?-what to fix first] _
+
+question = 'What do severity levels mean in this scan?'
+expected = 'what to fix first'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc9a60>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+        assert expected in result["headline"]["text"]
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert not result["priorities"]  # Definitions must not repeat unrelated urgent findings.
+        text = chat_text(result)
+        assert "FIX FIRST" not in text and "NEXT STEPS" not in text and "Recorded priority" not in text
+        assert "Saved finding:" not in text and result["evidence_refs"]
+>       assert "wording needs review" in verified_footer(result)
+E       AssertionError: assert 'wording needs review' in 'Facts checked against your saved scan'
+E        +  where 'Facts checked against your saved scan' = verified_footer({'draft': 'AI draft', 'headline': {'text': 'Severity tells your team what to fix first. Urgent means direct exposure o...onnection; important and minor mean smaller protection gaps.', 'refs': ['S:scan']}, 'next_steps': [], 'notes': [], ...})
+
+tests/test_ai_chat.py:187: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[What does the risk score mean in this scan?-not the chance of a break-in] _
+
+question = 'What does the risk score mean in this scan?'
+expected = 'not the chance of a break-in'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc8bf0>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+        assert expected in result["headline"]["text"]
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert not result["priorities"]  # Definitions must not repeat unrelated urgent findings.
+        text = chat_text(result)
+        assert "FIX FIRST" not in text and "NEXT STEPS" not in text and "Recorded priority" not in text
+        assert "Saved finding:" not in text and result["evidence_refs"]
+>       assert "wording needs review" in verified_footer(result)
+E       AssertionError: assert 'wording needs review' in 'Facts checked against your saved scan'
+E        +  where 'Facts checked against your saved scan' = verified_footer({'draft': 'AI draft', 'headline': {'text': 'The exposure score is 18. It measures recorded exposure, not the chance of a break-in.', 'refs': ['S:scan']}, 'next_steps': [], 'notes': [], ...})
+
+tests/test_ai_chat.py:187: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[What are security headers in this scan?-instructions that help browsers protect visitors] _
+
+question = 'What are security headers in this scan?'
+expected = 'instructions that help browsers protect visitors'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc9bc0>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+        assert expected in result["headline"]["text"]
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert not result["priorities"]  # Definitions must not repeat unrelated urgent findings.
+        text = chat_text(result)
+        assert "FIX FIRST" not in text and "NEXT STEPS" not in text and "Recorded priority" not in text
+        assert "Saved finding:" not in text and result["evidence_refs"]
+>       assert "wording needs review" in verified_footer(result)
+E       AssertionError: assert 'wording needs review' in 'Facts checked against your saved scan'
+E        +  where 'Facts checked against your saved scan' = verified_footer({'draft': 'AI draft', 'headline': {'text': 'security headers are website instructions that help browsers protect visit...n flaw, a suitable policy may reduce what unwanted code can load.', 'refs': ['R:headers.missing_csp', 'F-0002']}], ...})
+
+tests/test_ai_chat.py:187: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[What wasn't checked in this scan?-missing or failed check] _
+
+question = "What wasn't checked in this scan?"
+expected = 'missing or failed check'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001c6eb90>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+        assert expected in result["headline"]["text"]
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert not result["priorities"]  # Definitions must not repeat unrelated urgent findings.
+        text = chat_text(result)
+        assert "FIX FIRST" not in text and "NEXT STEPS" not in text and "Recorded priority" not in text
+        assert "Saved finding:" not in text and result["evidence_refs"]
+>       assert "wording needs review" in verified_footer(result)
+E       AssertionError: assert 'wording needs review' in 'Facts checked against your saved scan'
+E        +  where 'Facts checked against your saved scan' = verified_footer({'draft': 'AI draft', 'headline': {'text': 'This scan can only tell us what was saved. A missing or failed check does not mean that part is safe.', 'refs': ['S:scan']}, 'next_steps': [], 'notes': [], ...})
+
+tests/test_ai_chat.py:187: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[How can I confirm fixes from this scan?-usual authorized checks] _
+
+question = 'How can I confirm fixes from this scan?'
+expected = 'usual authorized checks'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001dd9bc0>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+>       assert expected in result["headline"]["text"]
+E       AssertionError: assert 'usual authorized checks' in 'Confirm that approved applications still connect and that the saved public-port finding is absent after the authorized recheck.'
+
+tests/test_ai_chat.py:181: AssertionError
+_ test_common_questions_get_focused_plain_english_checked_answers[What does ExposureIQ do?-I don't scan or take action] _
+
+question = 'What does ExposureIQ do?', expected = "I don't scan or take action"
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc8eb0>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+        assert expected in result["headline"]["text"]
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert not result["priorities"]  # Definitions must not repeat unrelated urgent findings.
+        text = chat_text(result)
+        assert "FIX FIRST" not in text and "NEXT STEPS" not in text and "Recorded priority" not in text
+        assert "Saved finding:" not in text and result["evidence_refs"]
+>       assert "wording needs review" in verified_footer(result)
+E       assert 'wording needs review' in 'Facts checked against your saved scan'
+E        +  where 'Facts checked against your saved scan' = verified_footer({'draft': 'AI draft', 'headline': {'text': "ExposureIQ helps you see what your organization exposes online and what ch...ans. I only explain saved data; I don't scan or take action.", 'refs': ['S:scan']}, 'next_steps': [], 'notes': [], ...})
+
+tests/test_ai_chat.py:187: AssertionError
+_ test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal[FakeProvider] _
+
+provider_type = <class 'exposureiq.ai.provider.FakeProvider'>
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cc99b0>
+
+    @pytest.mark.parametrize("provider_type", [FakeProvider, UnavailableProvider])
+    def test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal(provider_type, ai_scan_factory):
+        rules = [(rule, "high") for rule in ("ports.database_exposed", "ports.remote_desktop_exposed",
+                                            "https.cert_expired", "ports.smb_exposed", "ports.telnet_exposed")]
+        provider = provider_type()
+        chat = build_chat(ai_scan_factory(rules=rules), provider=provider)
+        overview = chat.ask("Explain this scan in simple words.")
+        result = chat.ask("then what posible damage it can make?")
+        text = chat_text(result)
+        assert not result.get("policy_refusal") and result["answer_kind"] == "impact"
+        assert "possible consequences, not proof" in text
+        assert "read, change or delete stored data" in text
+        assert "security warnings or be unable to connect" in text
+        assert "delete shared files" not in text and "read login details or commands" not in text
+        assert len(text.split()) <= 180
+        assert "public access" in chat_text(overview) and not result["priorities"]
+        assert "Move database access" not in text
+        assert "Here's where I'd start:" not in text and "off-topic request" not in text
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert {ref for ref in result["evidence_refs"] if ref.startswith("F-")} == {
+            "F-0001", "F-0003",
+        }
+        assert provider.calls == 2 and len(chat.memory) == 4
+        assert result["source"] == ("demo" if provider_type is FakeProvider else "template")
+        detailed = chat.ask("Show a technical list of all possible consequences")
+        detail = chat_text(detailed)
+>       assert detailed["answer_kind"] == "impact" and len(detailed["priorities"]) == 5
+E       AssertionError: assert ('impact' == 'impact'
+E         
+E           impact and 3 == 5)
+E        +  where 3 = len([{'action': 'Have IT block public connections at the firewall and allow only those approved application systems.', 'ra...04'], 'why': 'If file permissions are weak, public SMB access could let someone read, change or delete shared files.'}])
+
+tests/test_ai_chat.py:244: AssertionError
+_ test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal[UnavailableProvider] _
+
+provider_type = <class 'test_ai_chat.UnavailableProvider'>
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cca2a0>
+
+    @pytest.mark.parametrize("provider_type", [FakeProvider, UnavailableProvider])
+    def test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal(provider_type, ai_scan_factory):
+        rules = [(rule, "high") for rule in ("ports.database_exposed", "ports.remote_desktop_exposed",
+                                            "https.cert_expired", "ports.smb_exposed", "ports.telnet_exposed")]
+        provider = provider_type()
+        chat = build_chat(ai_scan_factory(rules=rules), provider=provider)
+        overview = chat.ask("Explain this scan in simple words.")
+        result = chat.ask("then what posible damage it can make?")
+        text = chat_text(result)
+        assert not result.get("policy_refusal") and result["answer_kind"] == "impact"
+        assert "possible consequences, not proof" in text
+        assert "read, change or delete stored data" in text
+        assert "security warnings or be unable to connect" in text
+        assert "delete shared files" not in text and "read login details or commands" not in text
+        assert len(text.split()) <= 180
+        assert "public access" in chat_text(overview) and not result["priorities"]
+        assert "Move database access" not in text
+        assert "Here's where I'd start:" not in text and "off-topic request" not in text
+        assert result["verified"] == result["total"] and not result["dropped"]
+        assert {ref for ref in result["evidence_refs"] if ref.startswith("F-")} == {
+            "F-0001", "F-0003",
+        }
+        assert provider.calls == 2 and len(chat.memory) == 4
+        assert result["source"] == ("demo" if provider_type is FakeProvider else "template")
+        detailed = chat.ask("Show a technical list of all possible consequences")
+        detail = chat_text(detailed)
+>       assert detailed["answer_kind"] == "impact" and len(detailed["priorities"]) == 5
+E       AssertionError: assert ('impact' == 'impact'
+E         
+E           impact and 3 == 5)
+E        +  where 3 = len([{'rank': 1, 'action': 'Have IT block public connections at the firewall and allow only those approved application sys... public SMB access could let someone read, change or delete shared files.', 'refs': ['R:ports.smb_exposed', 'F-0004']}])
+
+tests/test_ai_chat.py:244: AssertionError
+_ test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cf4040>
+
+    def test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it(ai_scan_factory):
+        rules = [("ports.database_exposed", "high"), ("https.cert_expired", "high"),
+                 ("headers.missing_csp", "medium")]
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(rules=rules), provider=provider)
+        chat.ask("Explain f-0003")
+        result = chat.ask("What possible damage could it cause?")
+        assert result["tool_calls"] == [{"name": "get_finding", "arguments": {"id": "F-0003"}}]
+        assert chat.answer_context["kind"] == "impact" and chat.answer_context["finding_id"] == "F-0003"
+        assert chat.answer_context["host"] == "db.example.com"
+>       assert "unwanted code run in visitors' browsers" in chat_text(result)
+E       assert "unwanted code run in visitors' browsers" in 'For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nI...ssary public access and the protections around it.\n\nThese are possible consequences, not proof that anyone broke in.'
+E        +  where 'For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nI...ssary public access and the protections around it.\n\nThese are possible consequences, not proof that anyone broke in.' = chat_text({'draft': 'AI draft', 'headline': {'text': 'For db.example.com, the possible harm depends on the services recorded the...': 'Have the service owner review unnecessary public access and the protections around it.', 'refs': ['F-0003']}], ...})
+
+tests/test_ai_chat.py:293: AssertionError
+_ test_natural_words_survive_and_exact_three_turn_example_keeps_code_selected_host _
+
+    def test_natural_words_survive_and_exact_three_turn_example_keeps_code_selected_host():
+        scan = build_demo_scans()[3]
+        provider = NaturalProvider()
+        chat = chat_for(scan, provider, mode="local")
+        questions = ("Which host is the most exposed?", "then why would i fix it first?",
+                     "what would that do or cause if didn't fixed?")
+        results = [chat.ask(question) for question in questions]
+        assert [result["answer_kind"] for result in results] == ["host", "why", "impact"]
+        assert len(provider.requests) == 3 and len(chat.memory) == MEMORY_TURNS
+        for result in results:
+>           assert result["source"] == "local" and result["failure_kind"] == ""
+E           AssertionError: assert ('template' == 'local'
+E             
+E             - local
+E             + template)
+
+tests/test_ai_conversation.py:70: AssertionError
+______ test_invalid_reply_json_is_distinct_from_transport_or_tool_failure ______
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cf4880>
+
+    def test_invalid_reply_json_is_distinct_from_transport_or_tool_failure(ai_scan_factory):
+        class Invalid:
+            calls = 0
+            model = "invalid JSON offline fake"
+    
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                return ProviderResponse("not structured JSON")
+    
+        provider = Invalid()
+        chat = chat_for(ai_scan_factory(), provider)
+        result = chat.ask("Explain this scan")
+>       assert provider.calls == 2 and result["failure_kind"] == "structured_json"
+E       AssertionError: assert (2 == 2 and 'reply_format' == 'structured_json'
+E        +  where 2 = <test_ai_conversation.test_invalid_reply_json_is_distinct_from_transport_or_tool_failure.<locals>.Invalid object at 0x7fb0022bfb60>.calls
+E         
+E         - structured_json
+E         + reply_format)
+
+tests/test_ai_conversation.py:130: AssertionError
+______ test_json_repair_keeps_model_wording_and_does_not_copy_a_template _______
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cf5640>
+
+    def test_json_repair_keeps_model_wording_and_does_not_copy_a_template(ai_scan_factory):
+        class Repair(NaturalProvider):
+            def complete(self, messages, **kwargs):
+                if not self.requests:
+                    self.requests.append(copy.deepcopy(messages))
+                    return ProviderResponse("invalid JSON")
+                self.requests.append(copy.deepcopy(messages))
+                assert "Keep your own wording" in messages[-1]["content"]
+                data = json.loads(messages[-2]["content"])
+                return ProviderResponse(json.dumps({"headline": {"text": "{host} deserves a closer look at its saved exposure.", "refs": ["H:" + data["answer_context"]["host"]]},
+                    "priorities": [], "notes": [], "next_steps": []}))
+    
+        provider = Repair()
+        result = chat_for(ai_scan_factory(), provider, mode="local").ask("Which host is the most exposed?")
+>       assert result["source"] == "local" and "deserves a closer look" in chat_text(result)
+E       AssertionError: assert ('template' == 'local'
+E         
+E         - local
+E         + template)
+
+tests/test_ai_conversation.py:151: AssertionError
+________ test_model_repeated_disclaimer_is_not_repeated_in_the_display _________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cf49e0>
+
+    def test_model_repeated_disclaimer_is_not_repeated_in_the_display(ai_scan_factory):
+        class Repeating(NaturalProvider):
+            def complete(self, *args, **kwargs):
+                reply = super().complete(*args, **kwargs)
+                output = json.loads(reply.content)
+                output["notes"].append({"text": PROOF_NOTE, "refs": ["S:scan"]})
+                return ProviderResponse(json.dumps(output))
+    
+        chat = chat_for(ai_scan_factory(), Repeating())
+        chat.ask("Which host is the most exposed?")
+        replies = [chat.ask(question) for question in ("What could happen?", "What could happen if not fixed?", "why?")]
+>       assert all(result["source"] == "demo" and not result["dropped"] for result in replies)
+E       assert False
+E        +  where False = all(<generator object test_model_repeated_disclaimer_is_not_repeated_in_the_display.<locals>.<genexpr> at 0x7fb001cf2400>)
+
+tests/test_ai_conversation.py:303: AssertionError
+_______ test_simple_definitions_are_added_to_fresh_model_words_only_once _______
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cca2a0>
+
+    def test_simple_definitions_are_added_to_fresh_model_words_only_once(ai_scan_factory):
+        chat = chat_for(ai_scan_factory(), NaturalProvider(), mode="local")
+        first = chat.ask("Which host is the most exposed?")
+        second = chat.ask("Why?")
+        definition = "database (" + GLOSSARY["database"]["explanation"] + ")"
+        assert definition in chat_text(first) and definition not in chat_text(second)
+>       assert first["source"] == second["source"] == "local" and not first["dropped"]
+E       AssertionError: assert ('template' == 'local'
+E         
+E         - local
+E         + template)
+
+tests/test_ai_conversation.py:313: AssertionError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[CSP] ______
+
+term = 'CSP'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af5f30>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[FTP] ______
+
+term = 'FTP'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af68d0>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[HSTS] _____
+
+term = 'HSTS'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af5380>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+____ test_glossary_definitions_are_available_to_models_and_builtins[HTTPS] _____
+
+term = 'HTTPS'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af4300>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[SMB] ______
+
+term = 'SMB'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af41a0>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[SSH] ______
+
+term = 'SSH'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af6e50>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+____ test_glossary_definitions_are_available_to_models_and_builtins[Telnet] ____
+
+term = 'Telnet'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af7950>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_____ test_glossary_definitions_are_available_to_models_and_builtins[VPN] ______
+
+term = 'VPN'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af41a0>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_ test_glossary_definitions_are_available_to_models_and_builtins[certificate] __
+
+term = 'certificate'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af5590>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+___ test_glossary_definitions_are_available_to_models_and_builtins[database] ___
+
+term = 'database'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af77f0>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_ test_glossary_definitions_are_available_to_models_and_builtins[remote desktop] _
+
+term = 'remote desktop'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb000af5dd0>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+_ test_glossary_definitions_are_available_to_models_and_builtins[security headers] _
+
+term = 'security headers'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb001cf7320>
+
+    @pytest.mark.parametrize("term", sorted(GLOSSARY))
+    def test_glossary_definitions_are_available_to_models_and_builtins(term, ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+        result = chat.ask(f"What does {term} mean in this scan?")
+        assert GLOSSARY[term]["explanation"] in chat_text(result)
+        data = json.loads(chat.service.audit[-1]["sent"][-1]["content"])
+>       assert data["glossary"] == GLOSSARY
+               ^^^^^^^^^^^^^^^^
+E       KeyError: 'glossary'
+
+tests/test_ai_conversation.py:408: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_ai_chat.py::test_fake_model_can_request_only_read_only_tools[Explain F-0001-get_finding]
+FAILED tests/test_ai_chat.py::test_fake_model_can_request_only_read_only_tools[What should I fix first?-list_findings]
+FAILED tests/test_ai_chat.py::test_fake_model_can_request_only_read_only_tools[Which host is the most exposed?-get_host]
+FAILED tests/test_ai_chat.py::test_fake_model_can_request_only_read_only_tools[Show scan history-get_history]
+FAILED tests/test_ai_chat.py::test_fake_model_can_request_only_read_only_tools[Which findings are still unfixed?-list_unfixed]
+FAILED tests/test_ai_chat.py::test_tool_loops_over_budget_or_invalid_batches_fall_back_without_extra_reads[calls0-4-5]
+FAILED tests/test_ai_chat.py::test_chat_repairs_json_only_once_and_logs_both_calls
+FAILED tests/test_ai_chat.py::test_rejected_claim_never_enters_chat_memory_or_display
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[What do severity levels mean in this scan?-what to fix first]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[What does the risk score mean in this scan?-not the chance of a break-in]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[What are security headers in this scan?-instructions that help browsers protect visitors]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[What wasn't checked in this scan?-missing or failed check]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[How can I confirm fixes from this scan?-usual authorized checks]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[What does ExposureIQ do?-I don't scan or take action]
+FAILED tests/test_ai_chat.py::test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal[FakeProvider]
+FAILED tests/test_ai_chat.py::test_exact_damage_followup_explains_possible_consequences_not_an_off_topic_refusal[UnavailableProvider]
+FAILED tests/test_ai_chat.py::test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it
+FAILED tests/test_ai_conversation.py::test_natural_words_survive_and_exact_three_turn_example_keeps_code_selected_host
+FAILED tests/test_ai_conversation.py::test_invalid_reply_json_is_distinct_from_transport_or_tool_failure
+FAILED tests/test_ai_conversation.py::test_json_repair_keeps_model_wording_and_does_not_copy_a_template
+FAILED tests/test_ai_conversation.py::test_model_repeated_disclaimer_is_not_repeated_in_the_display
+FAILED tests/test_ai_conversation.py::test_simple_definitions_are_added_to_fresh_model_words_only_once
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[CSP]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[FTP]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[HSTS]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[HTTPS]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[SMB]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[SSH]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[Telnet]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[VPN]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[certificate]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[database]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[remote desktop]
+FAILED tests/test_ai_conversation.py::test_glossary_definitions_are_available_to_models_and_builtins[security headers]
+34 failed, 221 passed in 8.27s

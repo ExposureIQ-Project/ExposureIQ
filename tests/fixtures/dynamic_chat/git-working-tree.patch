@@ -1,0 +1,1163 @@
+diff --git a/.gitignore b/.gitignore
+index 245d704..6bed105 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -15,3 +15,5 @@ results/
+ .DS_Store
+ .idea/
+ .vscode/
++ai.json
++**/ai.json
+diff --git a/README.md b/README.md
+index 015f07f..b7583c2 100644
+--- a/README.md
++++ b/README.md
+@@ -66,7 +66,12 @@ ExposureIQ is built around three ideas:
+ | | `exposureiq report` command | Done |
+ | | TUI Export picker for animated HTML and editable DOCX | Done |
+ | | Custom report templates | Planned |
+-| **AI (optional)** | Risk prioritisation and plain-language drafting | Planned |
++| **AI (optional)** | Checked saved-scan summaries; code-owned severity and priorities | Done |
++| | Domain history, risk trends, fixed/unfixed and regression explanations | Done |
++| | Natural saved-data chat; Simple/Technical wording, contextual follow-ups and collapsed Evidence | Done |
++| | Private Settings; Off/local/remote modes, OpenAI/Anthropic presets and checked fallback | Done |
++| **Local web viewer** | Saved domains, findings and chat on `127.0.0.1` only | Done; [platform limits](docs/ai-safety.md#local-web-viewer) |
++| **HTML AI drawer** | Floating open/close chat using TUI AI settings through the local server; Off hides it | Done; [export boundaries](docs/ai-safety.md#portable-html-chat) |
+ 
+ ---
+ 
+@@ -128,8 +133,10 @@ manual copying.
+ table or its other columns. The grouped Hosts table copies the first listed hostname;
+ rows with only an IP address copy that IP. Headers and empty rows copy nothing.
+ 
+-**View saved results** is a file browser: single-click chooses a scan;
+-double-click (or Enter) opens it without selecting or copying text.
++**View results** starts with domain folders: Enter opens a domain, then Enter
++opens a saved scan. **All files** retains the original flat file browser;
++single-click chooses a scan, and double-click (or Enter) opens it without
++selecting or copying text. Browsing never sends target probes.
+ 
+ Desktop copying uses `wl-copy` on Wayland, `xclip`/`xsel` on X11, `pbcopy` on macOS,
+ or PowerShell on Windows. Wayland and X11 are Linux display systems. No new
+@@ -164,6 +171,71 @@ The HTML home lists all saved scans, with real and demo trends kept separate.
+ Explicit `--compare` or
+ `diff OLD.json NEW.json` still selects your chosen baseline.
+ 
++### Optional AI quick start and local web viewer
++
++These first three commands need no saved scan, key, model service or network:
++
++```bash
++exposureiq ai summary --demo   # synthetic scan, deterministic offline fake
++exposureiq ai history --demo   # synthetic ten-scan history; code verdict: mixed
++exposureiq ai eval             # normal and deliberately wrong offline fakes
++```
++
++For saved demo data and the local viewer:
++
++```bash
++exposureiq scan example.com --demos --no-report --plain # creates fake JSON only
++exposureiq ai ask example.com "What should I fix first?" --demo
++exposureiq ai ask example.com "Explain the saved findings" --demo --mode technical
++exposureiq web --demo --port 0 # prints a private per-launch loopback URL
++```
++
++Open the **full URL**, including its `#` fragment, in your browser. The viewer
++reads saved JSON; it cannot scan, change scope, run commands or receive an API
++key. Ctrl+C stops it. Secure file reads are unavailable on some platforms,
++including typical Windows installations; use the TUI or offline reports there.
++
++In the TUI, click **⚙ Settings → AI settings**. **Off (no AI)** is the default
++and hides AI tabs/buttons. **Local URL** accepts a loopback-only OpenAI-compatible
++endpoint (default `http://127.0.0.1:11434/v1`) and sends no key. **Remote API**
++includes OpenAI, Anthropic and other presets, or **Custom** for another compatible
++service. Enter a model available there and the key privately in the masked field;
++confirm the named host before saving or testing. Anthropic uses its native
++Messages API. Never put a key in a command, scan file or chat.
++
++The AI tab is one chat view: common questions, a message bar, distinct user/AI
++messages and ASCII thinking feedback. **Settings → Developer mode** reveals AI
++logs and the fake-data badge; normal users still see a plain warning on synthetic
++scans. There is no Demo setting; the explicit `--demo` CLI examples above remain
++offline test fixtures.
++
++Export a self-contained, scan-only HTML report:
++
++```bash
++exposureiq report example.com --format html --results-dir results -o reports
++```
++
++Open the generated `index.html` directly to view saved scans. For real AI chat,
++configure Local or Remote AI in the TUI, then open the same report in one command:
++
++```bash
++exposureiq web example.com --open
++```
++
++The floating chat icon opens/closes a side drawer and uses the TUI's AI settings.
++**Off** means no icon or chat. A saved JSON path under `--results-dir` can replace
++the domain. Provider keys stay on the server; keep the command running while
++chatting. There are no prepared answers in the HTML. A double-clicked file cannot
++access private AI settings and stays scan-only. Sharing it shares saved host
++names and findings, so keep it private. `--demo` is only an explicit offline fake.
++
++`ai summary` and `ai history` also accept a saved JSON filename or domain.
++`--json` gives structured output; `--no-fallback` exits nonzero on missing AI
++configuration, provider/tool failure or unverified claims. The default uses the
++verified template instead. See [safety and local/remote setup](docs/ai-safety.md),
++the [eight-step offline presentation](docs/stage5-presentation.md) and
++[twelve headless screenshots and evaluation](docs/stage5-evidence/README.md).
++
+ ### Windows helper
+ 
+ On Windows 10/11, open PowerShell or Command Prompt in the cloned folder
+@@ -350,10 +422,36 @@ ExposureIQ **actively probes systems** when you run a normal scan.
+ 
+ The authors accept no responsibility for misuse.
+ 
+-### About the AI layer
+-
+-AI output can be wrong. It is meant to save writing time, not replace judgement.
+-Any AI-generated text will be labelled as a draft for review before it is shared.
++### Responsible AI
++
++AI is optional, read-only and labelled **AI draft**. Code, not the model, decides
++severity, counts, risk, history verdicts and priority order. Chat may explain the
++selected evidence in its own words; bounded checks validate references, factual
++placeholders and known safety violations. Its footer says **saved evidence
++checked; wording needs review**. This does not fully verify arbitrary model prose.
++Summaries/reports retain stricter code-approved sentence checks. Neither kind of
++checking proves that a host is safe, a breach happened or a fix worked.
++
++Simple is the default; Technical is available in chat and with `ai ask --mode
++technical`. Built-in replies handle greetings and thanks without a model call.
++HTML AI chat requires the authenticated local server and enabled TUI settings;
++no provider key is embedded or sent to the browser. Disk reports remain scan-only.
++Server failure shows an unavailable message, not a saved answer. A provider failure
++can still give the same clearly labelled, checked built-in fallback as the TUI.
++
++The assistant only discusses saved scans, ExposureIQ and defensive fixes. Its
++six tools read saved data; none scan, execute commands, change scope or act on a
++target. Saved strings are treated as data, never terminal markup or browser HTML.
++Local mode sends no key. Remote sharing requires consent naming the configured
++host; normalized host names and findings may leave your machine only then.
++
++Keys and disposable caches stay in private user files outside the source tree;
++keys are not encrypted at rest. `EXPOSUREIQ_AI_KEY` may override a remote key,
++but is never saved. Chat and the last thirty redacted AI calls stay in memory.
++Saving **Off** hides AI controls and forgets the stored key. Logs are visible
++only in Developer mode. Review every draft before sharing it.
++The [offline evaluation](docs/stage5-evidence/evaluation.md) tests safety
++regressions with fakes, not any real model's accuracy.
+ 
+ ---
+ 
+diff --git a/exposureiq/cli.py b/exposureiq/cli.py
+index d307e24..b0f5c15 100644
+--- a/exposureiq/cli.py
++++ b/exposureiq/cli.py
+@@ -159,6 +159,15 @@ def build_parser() -> argparse.ArgumentParser:
+     report.add_argument("--title", default=None, help="report title")
+     report.add_argument("--open", dest="open_report", action="store_true",
+                         help="open the HTML report in the default browser")
++    from exposureiq.ai.commands import register_commands
++
++    register_commands(commands)
++    web = commands.add_parser("web", help="loopback-only saved-scan/AI viewer; no scanning controls")
++    web.add_argument("source", nargs="?", help="domain or saved JSON under the results root; open its HTML report directly")
++    web.add_argument("--results-dir", default="results", help="saved-results root")
++    web.add_argument("--port", type=int, default=8765, help="local port (default: %(default)s; 0 chooses a free port)")
++    web.add_argument("--demo", action="store_true", help="use offline fake AI, ignoring remote/local preferences")
++    web.add_argument("--open", dest="open_browser", action="store_true", help="open the per-launch local URL in a browser")
+     return parser
+ 
+ 
+@@ -410,6 +419,8 @@ def run_report(args) -> int:
+             output.info(f"{label}  {path}")
+     if result.get("domain"):
+         output.info(f"Domain dashboard: {len(result['domain']['reports'])} saved scan(s), newest first.")
++    for warning in result.get("warnings", []):
++        output.warn(warning)
+     if result["diff"]:
+         headline = (report.get("diff_summary") or {}).get("headline")
+         output.info(f"What changed: {headline or 'see the report'}")
+@@ -461,7 +472,38 @@ def run_open(args) -> int:
+         output.warn("Textual is not installed; showing the compact preview.")
+         return 0
+     return ExposureIQApp(args, stages=_stages(), control=ScanControl(),
+-                         version=_version(), open_file=str(path)).run()
++                          version=_version(), open_file=str(path)).run()
++
++
++def run_web(args) -> int:
++    """Serve saved data on loopback only; never run the scanner."""
++    from exposureiq.viewer import make_server
++
++    try:
++        server = make_server(args.results_dir, port=args.port, demo=args.demo)
++    except (OSError, ValueError):
++        print("Cannot start the local viewer. Check the results folder and choose an unused port (0–65535).", file=sys.stderr)
++        return 2
++    try:
++        url = server.report_url(args.source) if args.source else server.url
++    except (OSError, ValueError):
++        server.server_close()
++        print("Cannot open this saved report. Choose a domain or a safe saved JSON file under --results-dir.", file=sys.stderr)
++        return 2
++    print(("Local HTML report: " if args.source else "Local read-only viewer: ") + url, flush=True)
++    print("Keep this per-launch URL private. Ctrl+C stops the viewer. No target probes or browser credentials.", flush=True)
++    try:
++        if args.open_browser:
++            from exposureiq.viewer.browser import open_browser
++
++            if not open_browser(url):
++                print("Browser launch was unavailable. Open the local URL above manually.", file=sys.stderr)
++        server.serve_forever()
++    except KeyboardInterrupt:
++        return 130
++    finally:
++        server.server_close()
++    return 0
+ 
+ 
+ def main(argv=None) -> int:
+@@ -483,6 +525,12 @@ def main(argv=None) -> int:
+             parser.print_help()
+             return 2
+         return run_home(args)
++    if args.command == "ai":
++        from exposureiq.ai.commands import run_ai
++
++        return run_ai(args)
++    if args.command == "web":
++        return run_web(args)
+     if args.command not in ("scan", "scope", "diff", "report"):
+         parser.print_help()
+         return 2
+diff --git a/exposureiq/report/html.py b/exposureiq/report/html.py
+index 8a6c03d..5562f90 100644
+--- a/exposureiq/report/html.py
++++ b/exposureiq/report/html.py
+@@ -1,6 +1,7 @@
+ """Render a report model as one self-contained HTML document.
+ 
+-No web fonts, remote images, or requests: the interactive dashboard works offline.
++No web fonts or remote images: disk dashboards work offline. Only authenticated
++local-server reports can attach the live saved-data chat drawer.
+ A fixed embedded script handles scan selection, chart cursors and first-reveal
+ animations. All scan text is escaped and never inserted into JavaScript.
+ """
+@@ -31,7 +32,8 @@ def _severity_badge(name: str) -> str:
+     return f'<span class="badge badge-{key}">{_e(label)}</span>'
+ 
+ 
+-def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = None) -> str:
++def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = None,
++                server_report: bool = False) -> str:
+     links = "".join(
+         f'<a href="#{prefix}{anchor}"'
+         + (f' data-report-section="{anchor}"' if home_prefix else "")
+@@ -52,7 +54,7 @@ def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = Non
+     <div class="topbar-logo">{branding.LOGO_SVG}</div>
+     <div class="topbar-copy"><strong>ExposureIQ</strong>
+       <span class="topbar-target">{_e(report['target'])}</span></div>
+-    <span class="offline-badge">Offline report</span>
++    <span class="offline-badge">{'Local report' if server_report else 'Offline report'}</span>
+     <nav class="report-nav" aria-label="Report sections">{links}</nav>
+   </div>
+ </header>
+@@ -683,6 +685,10 @@ _PORTAL_CSS = """
+   border-radius: 8px; padding: 8px 12px; }
+ .history-step:target { border-left-color: var(--indigo); box-shadow: 0 0 0 1px var(--teal); }
+ .group-title { color: var(--indigo); margin-top: 0; }
++.portal-notices { max-width: 1180px; width: calc(100% - 48px); margin: 24px auto;
++  color: var(--muted); font-size: 12px; }
++#export-sharing-warning, #export-size-warning { border-left: 3px solid var(--indigo); padding-left: 12px; }
++[hidden] { display: none !important; }
+ @media screen and (max-width: 760px) {
+   .scan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+   .scan-card { padding: 16px; }
+@@ -699,24 +705,54 @@ def _report_body(report: dict, prefix: str = "", fallbacks: dict | None = None)
+             + _inventory(report, prefix) + _methodology(report, prefix))
+ 
+ 
+-def _document(report: dict, body: str, navigation: str) -> str:
++def _document(report: dict, body: str, navigation: str, *, chat_bundle: dict | None = None,
++              server_report: bool = False, start_view: str = "") -> str:
++    from exposureiq.viewer.export import SHARING_WARNING
++
+     digest = base64.b64encode(hashlib.sha256(interactive.SCRIPT.encode("utf-8")).digest()).decode("ascii")
++    hashes, extra_css, extra_scripts, markup, connection_policy = [digest], "", "", "", "'none'"
++    if chat_bundle is not None:
++        if not server_report:
++            raise ValueError("AI chat requires the authenticated local report server.")
++        from exposureiq.viewer.export import chat_assets
++
++        markup, extra_css, script, data = chat_assets(chat_bundle)
++        for value in (script, data):
++            hashes.append(base64.b64encode(hashlib.sha256(value.encode("utf-8")).digest()).decode("ascii"))
++        extra_scripts = (f'<script id="exposureiq-chat-data" type="application/json">{data}</script>\n'
++                         f'<script id="exposureiq-live-chat">{script}</script>')
++        connection_policy = "'self'"
++    elif server_report:
++        from importlib.resources import files
++
++        script = files("exposureiq.viewer").joinpath("static/report-session.js").read_text(encoding="utf-8")
++        hashes.append(base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
++        extra_scripts = f'<script id="exposureiq-report-session">{script}</script>'
++    script_policy = " ".join("'sha256-" + value + "'" for value in hashes)
++    report_start = '<div id="report-pane" class="report-pane" role="region" aria-label="Saved HTML report" tabindex="-1">' if chat_bundle is not None else ""
++    report_end = "</div>" if chat_bundle is not None else ""
++    start_attribute = f' data-start-view="{_e(start_view)}"' if start_view else ""
+     return f"""<!DOCTYPE html>
+ <html lang="en">
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="generator" content="ExposureIQ">
+-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
++<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {script_policy}; style-src 'unsafe-inline'; img-src data:; connect-src {connection_policy}; base-uri 'none'; form-action 'none'">
+ <title>{_e(report.get('title') or 'Security Assessment Report')} — {_e(report.get('target'))}</title>
+-<style>{_CSS}{interactive.CSS}{_PORTAL_CSS}</style>
++<style>{_CSS}{interactive.CSS}{_PORTAL_CSS}{extra_css}</style>
+ </head>
+ <body>
++{report_start}
+ {navigation}
+-<main id="report-main" tabindex="-1">
++<main id="report-main" tabindex="-1"{start_attribute}>
+ {body}
+ </main>
++<div class="portal-notices"><p id="export-sharing-warning">{_e(SHARING_WARNING)}</p><p id="export-size-warning" hidden></p></div>
++{report_end}
++{markup}
+ <script id="exposureiq-interactions">{interactive.SCRIPT}</script>
++{extra_scripts}
+ </body>
+ </html>
+ """
+@@ -729,13 +765,15 @@ def render_html(report: dict) -> str:
+     return _document(report, _report_body(report), _navigation(report))
+ 
+ 
+-def render_domain_html(domain: dict) -> str:
++def render_domain_html(domain: dict, *, chat_bundle: dict | None = None, server_report: bool = False, start_view: str = "") -> str:
+     """One portable HTML home page and separately bounded saved-scan views."""
+     if not isinstance(domain, dict) or not domain.get("reports") or not domain.get("groups"):
+         raise ValueError("domain report must contain saved reports and history groups")
+     reports = domain["reports"]
+     latest = reports[-1]
+     view_ids = {_scan_key(report): "scan-" + _scan_token(report) for report in reports}
++    if not isinstance(start_view, str) or (start_view and (not server_report or start_view not in view_ids.values())):
++        raise ValueError("A server report can start only at one of its saved scan views.")
+     fallbacks = {_scan_key(report): _history_id(report, view_ids[_scan_key(report)] + "-")
+                  for report in reports}
+     cards = []
+@@ -761,7 +799,7 @@ def render_domain_html(domain: dict) -> str:
+   <section class="page cover" id="domain-overview" tabindex="-1">
+     <div class="cover-mark">{branding.LOGO_SVG}</div>
+     <div class="brandline"><strong>Exposure<span>IQ</span></strong><span>Saved scan workspace</span></div>
+-    <p class="kicker">Domain dashboard &middot; offline</p>
++    <p class="kicker">Domain dashboard &middot; {'local saved data' if server_report else 'offline'}</p>
+     <h1>{_e(domain['target'])}</h1>
+     <p class="meta">{len(reports)} saved scan(s) &middot; Latest scan {_e(latest['started_label'])}</p>
+     <div class="exec"><p>Choose a scan below to inspect its findings, assets and changes.
+@@ -793,5 +831,5 @@ def render_domain_html(domain: dict) -> str:
+             f'<span class="muted">{_e(report["started_label"])}</span></div>'
+             + _report_body(report, view_id + "-", fallbacks) + '</article>')
+     first_group = "domain-" + domain["groups"][0]["key"] + "-"
+-    navigation = _navigation(latest, prefix=view_ids[_scan_key(latest)] + "-", home_prefix=first_group)
+-    return _document(latest, home + "".join(views), navigation)
++    navigation = _navigation(latest, prefix=view_ids[_scan_key(latest)] + "-", home_prefix=first_group, server_report=server_report)
++    return _document(latest, home + "".join(views), navigation, chat_bundle=chat_bundle, server_report=server_report, start_view=start_view)
+diff --git a/exposureiq/report/render.py b/exposureiq/report/render.py
+index 07060dc..9985e70 100644
+--- a/exposureiq/report/render.py
++++ b/exposureiq/report/render.py
+@@ -135,10 +135,13 @@ def generate_report(source: str, *, output: str | None = None, format: str | Non
+     paths = _output_paths(output, fmt, report["target"], report["scan_id"])
+     html_path, pdf_path, docx_path = (paths.get(name) for name in ("html", "pdf", "docx"))
+ 
+-    domain = None
++    domain, warnings, html_bytes = None, [], None
+     if html_path is not None:
++        from exposureiq.viewer.export import check_export_size
++
+         domain = build_domain_report(scan, available, report, include_diff=include_diff)
+-        page = render_domain_html(domain)
++        page, warnings = check_export_size(render_domain_html(domain))
++        html_bytes = len(page.encode("utf-8"))
+         html_path.parent.mkdir(parents=True, exist_ok=True)
+         html_path.write_text(page, encoding="utf-8")
+     if pdf_path is not None:
+@@ -165,4 +168,6 @@ def generate_report(source: str, *, output: str | None = None, format: str | Non
+         "source": str(source_path) if source_path is not None else None,
+         "diff": diff,
+         "domain": domain,
++        "warnings": warnings,
++        "html_bytes": html_bytes,
+     }
+diff --git a/exposureiq/tui/app.py b/exposureiq/tui/app.py
+index 2ae1ca7..190cfb6 100644
+--- a/exposureiq/tui/app.py
++++ b/exposureiq/tui/app.py
+@@ -14,6 +14,7 @@ from textual.binding import Binding
+ from textual.containers import Horizontal, Vertical, VerticalScroll
+ from textual.geometry import Size
+ from textual.message import Message
++from textual.screen import ModalScreen
+ from textual.strip import Strip
+ from textual.theme import Theme
+ from textual.worker import get_current_worker
+@@ -32,6 +33,14 @@ from exposureiq.tui.scan import PHASES, ScanStages, run_scan
+ from exposureiq.tui.user_scope import MAX_HOSTS, append_hosts, eligible_hosts
+ from exposureiq.diffing import pipeline as diff_pipeline
+ from exposureiq.diffing import summary as diff_summary
++from exposureiq.ai.config import AIConfig, ConfigError, load_config
++from exposureiq.ai.service import AIService
++from exposureiq.history import list_domains
++from exposureiq.tui.ai_panel import AIPanel
++from exposureiq.tui.ai_settings import AISettings, DeveloperModeChanged, SettingsDrawer
++from exposureiq.tui.domain_browser import DomainScreen, OpenDomainScan
++from exposureiq.viewer.browser import open_browser
++from exposureiq.viewer.session import ViewerSession
+ 
+ _SEVERITY = {"high": f"bold {branding.TUI_HIGH} on {branding.HIGH_BACKGROUND}",
+              "medium": branding.AMBER, "low": branding.LOW}
+@@ -152,9 +161,16 @@ class ScanEvent(Message):
+ 
+ 
+ class ReportExported(Message):
+-    def __init__(self, result: dict, fmt: str, *, path: str | None = None, error: str | None = None):
++    def __init__(self, result: dict, fmt: str, *, path: str | None = None, error: str | None = None, warnings: list[str] | None = None):
+         super().__init__()
+         self.result, self.fmt, self.path, self.error = result, fmt, path, error
++        self.warnings = warnings or []
++
++
++class HTMLReportOpened(Message):
++    def __init__(self, *, url="", launch_requested=False, failed=False):
++        super().__init__()
++        self.url, self.launch_requested, self.failed = url, launch_requested, failed
+ 
+ 
+ class _ScanLogHandler(logging.Handler):
+@@ -179,6 +195,7 @@ class ExposureIQApp(App[int]):
+         Binding("a", "add_scope", "Add to scope"),
+         Binding("d", "diff_view", "Diff"),
+         Binding("e", "export_report", "Export"),
++        Binding("h", "open_html_report", "Open HTML report"),
+         Binding("tab", "focus_next", "Next panel"),
+         Binding("shift+tab", "focus_previous", "Previous", show=False),
+     ]
+@@ -228,8 +245,10 @@ class ExposureIQApp(App[int]):
+     }
+     #mode-badge.demo { color: $warning; border: round $demo-border; }
+     #export-report { display: none; width: auto; min-width: 12; height: 3; margin-left: 1; }
++    #open-html-report { display: none; width: auto; min-width: 20; height: 3; margin-left: 1; }
+     #back { width: 5; min-width: 5; height: 3; padding: 0; border: round $panel-border;
+             color: $primary; text-style: bold; }
++    #settings { width: 5; min-width: 5; height: 3; padding: 0; margin-right: 1; }
+     #home { height: 1fr; align: center middle; }
+     #home-center { width: 100%; max-width: 120; height: auto; align: center middle; content-align: center middle; }
+     #ascii-logo { height: auto; color: $primary; text-style: bold; text-align: center; }
+@@ -248,6 +267,8 @@ class ExposureIQApp(App[int]):
+     #home-message.has-message { display: block; }
+     #browser { height: 1fr; padding: 1 2; }
+     #saved-table { height: 1fr; }
++    #domain-table { height: 1fr; }
++    #browser-files { margin-top: 1; margin-right: 1; }
+     #browser-note { height: auto; margin-top: 1; color: $footnote; }
+     #scan-status { height: 1; margin: 0 2; color: $secondary; text-style: bold; }
+     #scanning { height: 1fr; padding: 0 2; }
+@@ -342,6 +363,12 @@ class ExposureIQApp(App[int]):
+         self.results_dir = results_dir
+         self.mode = "browser" if browser else ("home" if home or open_file else "scanning")
+         self.saved_paths = {}
++        self.file_browser = False
++        self._selected_domain = None
++        self.ai_service = AIService()
++        self.viewer = ViewerSession()
++        self._opening_report = False
++        self.report_open_worker = None
+         self.result = None
+         self.exit_code = 0
+         self.phase_states = dict.fromkeys(PHASES, "waiting")
+@@ -430,29 +457,33 @@ class ExposureIQApp(App[int]):
+ 
+     def compose(self) -> ComposeResult:
+         with Horizontal(id="topbar"):
++            yield Button("⚙", id="settings", tooltip="Settings")
+             yield Button("←", id="back")
+             yield Static(Text.assemble(("ExposureIQ", f"bold {output.TEAL}"),
+                                        (f" · v{self.version}", branding.TUI_BREADCRUMB)), id="brand")
+             with Horizontal(id="header-actions"):
+                 yield Static(id="mode-badge", markup=False)
+                 yield Button("Export", id="export-report", variant="primary", disabled=True)
++                yield Button("Open HTML report", id="open-html-report", disabled=True)
+         yield Static("Scanning", id="scan-status", markup=False)
+         with VerticalScroll(id="home"):
+             with Vertical(id="home-center"):
+                 yield Static("ExposureIQ", id="ascii-logo", markup=False)
+                 with Horizontal(id="home-bar"):
+                     yield Input(placeholder="example.com", id="home-domain")
+-                    yield Button("Scan", id="home-scan", variant="primary")
++                    yield Button("New scan", id="home-scan", variant="primary")
+                 with Horizontal(id="home-actions"):
+-                    yield Button("View saved results", id="home-results")
++                    yield Button("View results", id="home-results")
+                     yield Button("Add domain to my scope", id="home-scope")
+                 yield Static("Listed in scope: web checks + ports. Unlisted: passive discovery only.", id="home-scan-note", markup=False)
+                 yield Static("Only test domains you own or have permission to test.", id="home-note", markup=False)
+                 yield Static(id="home-message", markup=False)
+         with VerticalScroll(id="browser"):
+-            yield Static("Saved scans", classes="home-heading")
++            yield Static("Domains", id="browser-heading", classes="home-heading", markup=False)
++            yield _SavedResultsTable(id="domain-table", cursor_type="row", zebra_stripes=True)
+             yield _SavedResultsTable(id="saved-table", cursor_type="row", zebra_stripes=True)
+             with Horizontal(id="browser-actions"):
++                yield Button("All files", id="browser-files")
+                 yield Button("Open selected file", id="saved-open", variant="primary")
+                 yield Button("View selected scan history", id="saved-diff-domain", variant="default")
+             yield Static("Select a file, then Enter or Open selected. Diff available if domain has 2+ scans.",
+@@ -516,6 +547,8 @@ class ExposureIQApp(App[int]):
+                 with VerticalScroll(id="scan-diff-scroll", classes="panel detail-panel"):
+                     yield Static(id="scan-diff-body", markup=False)
+                 yield Static(id="scan-diff-message", markup=False)
++            with TabPane("AI", id="ai-tab"):
++                yield AIPanel()
+         with Vertical(id="rerun-panel", classes="panel"):
+             yield Static("Web-only re-run (no port scans)", markup=False)
+             yield SelectableDataTable(id="rerun-hosts", cursor_type="row")
+@@ -536,7 +569,7 @@ class ExposureIQApp(App[int]):
+         self.query_one("#home").display = False
+         self.query_one("#scan-status").display = False
+         try:
+-            self.query_one("#scan-diff-tab").display = False
++            self.query_one("#results", TabbedContent).hide_tab("scan-diff-tab")
+         except Exception:
+             pass
+         self.query_one("#phase-list").border_title = "Phases"
+@@ -544,6 +577,7 @@ class ExposureIQApp(App[int]):
+         self.query_one("#phase-counts").border_title = "PHASES"
+         self.query_one("#summary-info").border_title = "SCAN SUMMARY"
+         self.query_one("#finding-side").border_title = "SELECTED FINDING"
++        self._sync_ai_preferences()
+         self.set_interval(0.1, self._tick)
+         self._log_handler = _ScanLogHandler(self)
+         self._previous_handlers = logging.getLogger().handlers[:]
+@@ -562,6 +596,7 @@ class ExposureIQApp(App[int]):
+             self.worker = self._run_scan()
+ 
+     def on_unmount(self) -> None:
++        self.viewer.stop()
+         if self._rerunning or (self.mode == "scanning" and not self._finished):
+             self.control.cancel()
+         root = logging.getLogger()
+@@ -593,6 +628,7 @@ class ExposureIQApp(App[int]):
+             demo = bool(getattr(self.args, "demo", False) or getattr(self.args, "demos", False))
+         badge = self.query_one("#mode-badge", Static)
+         badge.set_class(demo, "demo")
++        badge.display = not demo or self.ai_service._configuration().developer_mode
+         if demo:
+             badge.update("DEMO · FAKE DATA")
+         elif self.mode == "results" and self.result and self.result.get("mode") == "preview":
+@@ -624,7 +660,7 @@ class ExposureIQApp(App[int]):
+     def _hide_all_views(self):
+         self.clear_selection()
+         for selector in ("#home", "#browser", "#scanning", "#results", "#scan-status", "#result-log",
+-                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report"):
++                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report", "#open-html-report"):
+             try:
+                 self.query_one(selector).display = False
+             except Exception:
+@@ -636,6 +672,7 @@ class ExposureIQApp(App[int]):
+ 
+     def _show_home(self):
+         self.mode = "home"
++        self._selected_domain = None
+         self._finished, self.exit_code = True, 0
+         self._hide_all_views()
+         self.query_one("#home").display = True
+@@ -668,11 +705,99 @@ class ExposureIQApp(App[int]):
+         self._set_title(suffix="saved results", demo=False)
+         self._keys("Double-click/Enter open   d Diff   ← back   Tab move   q quit", "NO PROBES SENT")
+         self._populate_saved()
++        self.file_browser = False
++        self._populate_domains()
++        self._browser_view()
+         try:
+             self.query_one("#diff-view").display = False
+         except Exception:
+             pass
+-        self.call_after_refresh(self.query_one("#saved-table", DataTable).focus)
++        self.call_after_refresh(self.query_one("#domain-table", DataTable).focus)
++
++    def _populate_domains(self):
++        table = self.query_one("#domain-table", DataTable)
++        table.clear(columns=True)
++        table.add_columns(*(Text(v) for v in ("Domain", "Scans", "Last scan", "H / M / L", "Trend")))
++        for entry in list_domains(self.results_dir):
++            latest = entry["latest"]
++            table.add_row(Text(entry["domain"]), Text(str(entry["scans"])), Text(display_time(entry["last_date"])),
++                          Text(f"{latest['high']} / {latest['medium']} / {latest['low']}"),
++                          Text(entry["arrow"] + " " + entry["verdict"]), key=entry["domain"])
++
++    def _browser_view(self):
++        self.query_one("#saved-table").display = self.file_browser
++        self.query_one("#domain-table").display = not self.file_browser
++        self.query_one("#saved-diff-domain").display = self.file_browser
++        self.query_one("#browser-heading", Static).update("All saved files" if self.file_browser else "Domains")
++        self.query_one("#browser-files", Button).label = "Domains" if self.file_browser else "All files"
++        self.query_one("#saved-open", Button).label = "Open selected file" if self.file_browser else "Open selected domain"
++        if not self.file_browser:
++            self.query_one("#browser-note", Static).update(
++                "Domains are folders: Enter opens a domain, then Enter opens a scan. All files retains the original list, including unreadable files. No probes sent.")
++
++    @on(Button.Pressed, "#browser-files")
++    def toggle_browser_files(self):
++        self.file_browser = not self.file_browser
++        self._browser_view()
++        self.query_one("#saved-table" if self.file_browser else "#domain-table", DataTable).focus()
++
++    @on(DataTable.RowSelected, "#domain-table")
++    def domain_selected(self, event: DataTable.RowSelected):
++        self.push_screen(DomainScreen(event.row_key.value, self.results_dir))
++
++    def on_open_domain_scan(self, event: OpenDomainScan):
++        self._selected_domain = event.domain
++        self.pop_screen()
++        self.open_saved(event.path)
++
++    @on(Button.Pressed, "#settings")
++    def settings_button(self):
++        try:
++            config, readable = load_config(), True
++        except ConfigError:
++            config, readable = AIConfig(), False
++        self.push_screen(SettingsDrawer(config, readable=readable), self._drawer_chosen)
++
++    def _drawer_chosen(self, open_ai):
++        if open_ai:
++            self.push_screen(AISettings(), self._ai_settings_saved)
++
++    def _ai_settings_saved(self, saved):
++        if saved:
++            self._reload_ai_preferences(reset=True)
++
++    def on_developer_mode_changed(self, event: DeveloperModeChanged):
++        event.stop()
++        self._reload_ai_preferences(reset=False)
++
++    def _reload_ai_preferences(self, *, reset):
++        previous = self.ai_service
++        self.ai_service = AIService(provider=None if reset else previous.provider, use_cache=previous.use_cache)
++        self.ai_service.limiter = previous.limiter
++        self.ai_service.audit = previous.audit
++        self.ai_service._audit_lock = previous._audit_lock
++        self.viewer.set_service(self.ai_service)
++        self._sync_ai_preferences(reset=reset)
++
++    def _sync_ai_preferences(self, *, reset=False):
++        config = self.ai_service._configuration()
++        # Update mounted underlying screens too, not just the current modal.
++        # Tab buttons own availability; ContentSwitcher still owns pane display.
++        for screen in self.screen_stack:
++            if isinstance(screen, DomainScreen):
++                screen.apply_preferences(config, reset=reset)
++                continue
++            for panel in screen.query(AIPanel):
++                panel.apply_preferences(config, reset=reset)
++            for tabs in screen.query("#results"):
++                if config.mode == "off":
++                    if tabs.active == "ai-tab":
++                        tabs.active = "summary-tab"
++                    tabs.hide_tab("ai-tab")
++                else:
++                    tabs.show_tab("ai-tab")
++            for badge in screen.query("#mode-badge"):
++                badge.display = not badge.has_class("demo") or config.developer_mode
+ 
+     def _populate_saved(self):
+         entries = list_saved(self.results_dir)
+@@ -752,7 +877,12 @@ class ExposureIQApp(App[int]):
+         if self.mode == "browser":
+             self._show_home()
+         elif self.mode == "results":
+-            self._show_saved_list()
++            if self._selected_domain:
++                domain = self._selected_domain
++                self._show_saved_list()
++                self.push_screen(DomainScreen(domain, self.results_dir))
++            else:
++                self._show_saved_list()
+         elif self.mode == "diff":
+             self._show_saved_list()
+ 
+@@ -807,6 +937,9 @@ class ExposureIQApp(App[int]):
+ 
+     @on(Button.Pressed, "#saved-open")
+     def saved_open_button(self) -> None:
++        if not self.file_browser:
++            self.query_one("#domain-table", DataTable).action_select_cursor()
++            return
+         table = self.query_one("#saved-table", DataTable)
+         if table.row_count:
+             path = self.saved_paths.get(str(table.cursor_row))
+@@ -968,6 +1101,8 @@ class ExposureIQApp(App[int]):
+ 
+     def _show_results(self) -> None:
+         result, assets = self.result, self.result["assets"]
++        self.query_one("#scan-ai", AIPanel).set_data(result.get("snapshot") or {
++            "target": result["target"], "started_at": result.get("started_at", "unknown"), "assets": assets})
+         custom_output = getattr(self.args, "output", None)
+         if custom_output and result.get("saved_to") and result.get("mode") != "preview":
+             root = Path(custom_output)
+@@ -980,16 +1115,17 @@ class ExposureIQApp(App[int]):
+         self.query_one("#scan-status").display = True
+         self.query_one("#result-log").display = True
+         self._update_export_button()
++        self._update_open_report_button()
+         self._set_back(True)
+         self._set_title(result["target"], result.get("started_at"), demo=bool(result.get("demo")))
+         if preview:
+             self.query_one("#scan-status", Static).update("Saved scan · read-only preview — no probes sent")
+-            self._keys("← saved results   e Export   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
++            self._keys("← saved results   e Export   h Open HTML report   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
+         else:
+             status = "Scan finished" if not self.exit_code else "Scan finished — results could not be saved"
+             self.query_one("#scan-status", Static).update(
+                 status)
+-            self._keys("← saved results   e Export   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
++            self._keys("← saved results   e Export   h Open HTML report   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
+                        "q / Ctrl+C quit/cancel", "NO PROBES SENT" if result.get("demo") else status)
+         if result.get("user_scope_path"):
+             self.query_one("#user-scope-saved").display = True
+@@ -1193,6 +1329,8 @@ class ExposureIQApp(App[int]):
+             self.copy_to_clipboard(selected)
+ 
+     def action_copy_selection(self) -> None:
++        if isinstance(self.focused, Input) and self.focused.password:
++            return  # Never copy a masked key through the shared clipboard path.
+         selected = self.focused.selected_text if isinstance(self.focused, Input) else ""
+         selected = selected or self.screen.get_selected_text()
+         if selected:
+@@ -1223,10 +1361,14 @@ class ExposureIQApp(App[int]):
+                                   severity="information" if copied else "warning")
+ 
+     def check_action(self, action: str, parameters: tuple) -> bool | None:
+-        if action in ("quit", "add_scope", "export_report") and isinstance(self.focused, Input):
++        if action in ("add_scope", "export_report", "diff_view", "open_html_report") and isinstance(self.screen, ModalScreen):
++            return False  # AI settings must not expose the scan/action shortcuts.
++        if action in ("quit", "add_scope", "export_report", "open_html_report") and isinstance(self.focused, Input):
+             return False  # Let the user type q/a/e in a domain box.
+         if action == "export_report":
+             return self._can_export() and not isinstance(self.screen, (ScopeConfirmation, ExportDialog))
++        if action == "open_html_report":
++            return bool(self._report_source() and not self._opening_report and not self._rerunning and not self._exporting)
+         if action == "add_scope":
+             return bool(self._finished and not self._rerunning and not self._exporting and self.result
+                         and self.mode == "results" and self.result.get("mode") != "preview"
+@@ -1234,6 +1376,70 @@ class ExposureIQApp(App[int]):
+                         and eligible_hosts(self.result["target"], self.result.get("skipped_hosts", [])))
+         return True
+ 
++    # --------------------------------------------------------------- local HTML
++    def _report_source(self):
++        if isinstance(self.screen, DomainScreen):
++            return self.screen.report_source()
++        if self.mode == "results" and self._finished and self.result:
++            return self.result.get("saved_to")
++        return None
++
++    def _update_open_report_button(self):
++        for screen in self.screen_stack:
++            for button in screen.query("#open-html-report"):
++                button.display = self.mode == "results"
++                button.disabled = not self._report_source() or self._opening_report or self._rerunning or self._exporting
++            for button in screen.query("#domain-report"):
++                button.disabled = not screen.entries or self._opening_report
++
++    @on(Button.Pressed, "#open-html-report")
++    def open_html_report_button(self):
++        self.action_open_html_report()
++
++    def action_open_html_report(self):
++        if not self.check_action("open_html_report", ()):
++            return
++        source = str(self._report_source())
++        root = Path(self.results_dir).expanduser().absolute()
++        path = Path(source).expanduser().absolute()
++        try:
++            path.relative_to(root)
++        except ValueError:
++            # A file explicitly opened by the TUI may be in another folder.
++            # Only the TUI selects that root; browser/AI requests cannot do so.
++            root = path.parent
++        self._opening_report = True
++        self._update_open_report_button()
++        self.report_open_worker = self._open_html_report(source, root)
++
++    @work(thread=True, exclusive=True, group="report-open", exit_on_error=False)
++    def _open_html_report(self, source, root):
++        worker = get_current_worker()
++        try:
++            url = self.viewer.report_url(source, root, self.ai_service)
++            self.viewer.set_service(self.ai_service)
++            if worker.is_cancelled:
++                return
++            launched = open_browser(url)
++        except Exception:
++            if not worker.is_cancelled:
++                self.post_message(HTMLReportOpened(failed=True))
++        else:
++            if not worker.is_cancelled:
++                self.post_message(HTMLReportOpened(url=url, launch_requested=launched))
++
++    @on(HTMLReportOpened)
++    def on_html_report_opened(self, event: HTMLReportOpened):
++        self._opening_report = False
++        self._update_open_report_button()
++        if event.failed:
++            self.notify("The selected saved scan could not be opened safely. Check that it still exists.",
++                        severity="error", markup=False)
++            return
++        lead = "Browser launch requested." if event.launch_requested else "Browser launch unavailable; open this URL manually."
++        self.notify(lead + "\n" + event.url + "\nKeep this URL private. The local viewer stops when the TUI exits.",
++                    severity="information" if event.launch_requested else "warning", timeout=12, markup=False)
++
+     # ----------------------------------------------------------------- exports
+     def _can_export(self) -> bool:
+         return bool(self.mode == "results" and self._finished and self.result
+@@ -1286,7 +1492,7 @@ class ExposureIQApp(App[int]):
+         except Exception as error:
+             self.post_message(ReportExported(result, fmt, error=str(error)))
+         else:
+-            self.post_message(ReportExported(result, fmt, path=exported[fmt]))
++            self.post_message(ReportExported(result, fmt, path=exported[fmt], warnings=exported.get("warnings", [])))
+ 
+     def on_report_exported(self, message: ReportExported) -> None:
+         self._exporting = False
+@@ -1299,6 +1505,8 @@ class ExposureIQApp(App[int]):
+                 text = Text(f"Could not export {message.fmt.upper()} report: {message.error}", style=branding.HIGH)
+             else:
+                 text = Text(f"{message.fmt.upper()} report saved to {message.path}", style=output.TEAL)
++                if message.warnings:
++                    text.append("\n" + "\n".join(message.warnings), style=branding.HIGH)
+             self.query_one("#result-log", Static).update(text)
+         else:
+             self.notify("Report export failed." if message.error is not None else
+@@ -1434,7 +1642,7 @@ class ExposureIQApp(App[int]):
+     def _update_scan_diff_tab(self) -> None:
+         """Read history through the exact saved scan, including read-only previews."""
+         try:
+-            tab = self.query_one("#scan-diff-tab", TabPane)
++            tabs = self.query_one("#results", TabbedContent)
+         except Exception:
+             return
+         result = self.result
+@@ -1442,7 +1650,7 @@ class ExposureIQApp(App[int]):
+         for name in ("meta", "headline", "body", "message"):
+             self.query_one(f"#scan-diff-{name}", Static).update("")
+         if not saved_to:
+-            tab.display = False
++            tabs.hide_tab("scan-diff-tab")
+             return
+         try:
+             selected = storage.load_scan(saved_to)
+@@ -1450,12 +1658,15 @@ class ExposureIQApp(App[int]):
+             history = diff_pipeline.find_scan_history(selected, directory)
+             diff = diff_pipeline.build_history_diff(selected, history)
+         except (OSError, ValueError) as error:
+-            tab.display = True
++            tabs.show_tab("scan-diff-tab")
+             self.query_one("#scan-diff-message", Static).update(f"Could not load scan history: {error}")
+             return
+-        tab.display = diff is not None
+         if diff is None:
++            tabs.hide_tab("scan-diff-tab")
+             return
++        # Availability belongs to the tab button. ContentSwitcher alone controls
++        # which pane is displayed; forcing an inactive pane visible clips AI.
++        tabs.show_tab("scan-diff-tab")
+         old, new = diff.get("old") or {}, diff.get("new") or {}
+         self.query_one("#scan-diff-meta", Static).update(
+             f"baseline: {old.get('started_at', '?')} ({old.get('scan_id', '')})  |  "
+diff --git a/pyproject.toml b/pyproject.toml
+index 0a92ea6..02bbf10 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -25,6 +25,10 @@ exposureiq = "exposureiq.cli:main"
+ [tool.setuptools.packages.find]
+ include = ["exposureiq*"]
+ 
++[tool.setuptools.package-data]
++"exposureiq.viewer" = ["static/*.html", "static/*.css", "static/*.js"]
++"exposureiq.ai" = ["fixtures/*.json"]
++
+ [tool.pytest.ini_options]
+ testpaths = ["tests"]
+ pythonpath = ["."]
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 1ed17df..2ba7605 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -1,10 +1,100 @@
+ """Isolated user authorization and shared offline HTML inspection helpers."""
+ 
+ from html.parser import HTMLParser
++import ipaddress
++import socket
++import copy
++from datetime import datetime, timedelta, timezone
+ 
+ import pytest
+ 
+ 
++@pytest.fixture(autouse=True)
++def isolated_ai_and_offline_sockets(monkeypatch, tmp_path):
++    """Never read a student's key/cache or reach the internet in any test.
++
++    Loopback is permitted for fake provider and local-viewer HTTP tests.
++    socketpair (used by asyncio/Textual) does not connect to a target.
++    """
++    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "ai-config"))
++    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "ai-cache"))
++    monkeypatch.delenv("EXPOSUREIQ_AI_KEY", raising=False)
++    original_connect = socket.socket.connect
++    original_connect_ex = socket.socket.connect_ex
++    original_lookup = socket.getaddrinfo
++    original_sendto = socket.socket.sendto
++    original_by_name = socket.gethostbyname
++    original_by_name_ex = socket.gethostbyname_ex
++
++    def allowed(address):
++        if not isinstance(address, tuple):
++            return True  # Unix-domain sockets used by the event loop.
++        name = str(address[0])
++        try:
++            return ipaddress.ip_address(name).is_loopback
++        except ValueError:
++            return name.lower() == "localhost"
++
++    def connect(sock, address):
++        if not allowed(address):
++            raise AssertionError("Tests must not connect to the internet.")
++        return original_connect(sock, address)
++
++    def connect_ex(sock, address):
++        if not allowed(address):
++            raise AssertionError("Tests must not connect to the internet.")
++        return original_connect_ex(sock, address)
++
++    def lookup(host, *args, **kwargs):
++        if host is not None and not allowed((host, 0)):
++            raise AssertionError("Tests must not perform external DNS lookups.")
++        return original_lookup(host, *args, **kwargs)
++
++    def sendto(sock, *args):
++        if not allowed(args[-1]):
++            raise AssertionError("Tests must not send external UDP traffic.")
++        return original_sendto(sock, *args)
++
++    def by_name(host):
++        if not allowed((host, 0)):
++            raise AssertionError("Tests must not perform external DNS lookups.")
++        return original_by_name(host)
++
++    def by_name_ex(host):
++        if not allowed((host, 0)):
++            raise AssertionError("Tests must not perform external DNS lookups.")
++        return original_by_name_ex(host)
++
++    monkeypatch.setattr(socket.socket, "connect", connect)
++    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
++    monkeypatch.setattr(socket, "getaddrinfo", lookup)
++    monkeypatch.setattr(socket.socket, "sendto", sendto)
++    monkeypatch.setattr(socket, "gethostbyname", by_name)
++    monkeypatch.setattr(socket, "gethostbyname_ex", by_name_ex)
++
++
++@pytest.fixture
++def ai_scan_factory():
++    """Small schema-0.2 scans with known answers; no teammate/network fixtures."""
++    def build(number=0, *, rules=None, host="db.example.com", passive=False):
++        rules = rules if rules is not None else [("ports.database_exposed", "high"),
++                                                 ("headers.missing_csp", "medium")]
++        findings = [{"id": f"F-{i:04d}", "rule": rule,
++                     "check": {"ports": "risky_services", "headers": "security_headers",
++                               "https": "https", "tech": "technology"}[rule.split(".")[0]],
++                     "severity": severity, "title": "Saved normalized title",
++                     "detail": "Sample observation only.", "recommendation": "Apply a defensive fix."}
++                    for i, (rule, severity) in enumerate(rules, 1)]
++        asset = {"host": host, "ips": [{"ip": "192.0.2.10", "open_ports": [] if passive else
++                  [{"port": 443, "protocol": "tcp", "service": "https"}]}]}
++        if not passive:
++            asset.update(findings=findings, technologies=[{"name": "nginx", "version": "1.24.0", "source": "Server header"}])
++        date = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(days=number)
++        return {"schema_version": "0.2", "scan_id": f"scan-{number:04d}", "target": "example.com",
++                "started_at": date.isoformat().replace("+00:00", "Z"), "assets": [copy.deepcopy(asset)]}
++    return build
++
++
+ @pytest.fixture(autouse=True)
+ def isolated_user_scope(monkeypatch, tmp_path):
+     path = tmp_path / "user-config" / "scope.txt"
+diff --git a/tests/test_report_domain.py b/tests/test_report_domain.py
+index 93c7b0f..1de4eab 100644
+--- a/tests/test_report_domain.py
++++ b/tests/test_report_domain.py
+@@ -186,6 +186,10 @@ def test_only_the_fixed_hashed_script_can_run_and_untrusted_data_stays_text(tmp_
+     parsed = portal_html(page)
+     digest = base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode()
+     assert parsed.scripts == [SCRIPT]
++    assert 'id="exposureiq-chat-data"' not in page and 'id="export-chat-toggle"' not in page
++    for script in parsed.scripts:
++        script_digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
++        assert f"'sha256-{script_digest}'" in page
+     assert f"script-src 'sha256-{digest}'" in page and "connect-src 'none'" in page
+     assert "<img src=x" not in page and "<svg onload" not in page
+     assert "&lt;svg onload" in page and "&lt;/script&gt;" in page
+diff --git a/tests/test_saved_open.py b/tests/test_saved_open.py
+index 51ac896..bda6023 100644
+--- a/tests/test_saved_open.py
++++ b/tests/test_saved_open.py
+@@ -13,7 +13,7 @@ from pathlib import Path
+ 
+ import pytest
+ from rich.text import Text
+-from textual.widgets import Button, DataTable, Input, Static, TabPane
++from textual.widgets import Button, DataTable, Input, Static, TabbedContent
+ 
+ from exposureiq import cli, storage
+ from exposureiq.discovery import scope
+@@ -213,6 +213,7 @@ def test_browser_mode_starts_on_the_saved_file_list(tmp_path):
+             assert app.mode == "browser" and app.query_one("#browser").display
+             assert not app.query_one("#home").display
+             assert app.query_one("#saved-table", DataTable).row_count == 1
++            await pilot.click("#browser-files")  # The legacy file list is now an explicit choice.
+             await pilot.click("#saved-open")
+             await pilot.pause(0.2)
+             assert app.mode == "results"
+@@ -293,7 +294,7 @@ def test_results_diff_tab_shows_changes_since_the_previous_scan(tmp_path):
+             await app.worker.wait()
+             await pilot.pause()
+             assert app.mode == "results"
+-            assert app.query_one("#scan-diff-tab", TabPane).display
++            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
+             assert "1 thing got worse" in text(app.query_one("#scan-diff-headline", Static))
+             assert "example.com" in text(app.query_one("#scan-diff-body", Static))
+             await pilot.press("q")
+diff --git a/tests/test_tui.py b/tests/test_tui.py
+index b743111..f447c04 100644
+--- a/tests/test_tui.py
++++ b/tests/test_tui.py
+@@ -204,7 +204,7 @@ def test_saved_result_design_keeps_tabs_columns_and_rounded_count_chips(size, tm
+ 
+             assert {pane.id for pane in app.query(TabPane)} == {
+                 "summary-tab", "subdomains-tab", "hosts-tab", "technologies-tab",
+-                "findings-tab", "ports-tab", "scan-diff-tab",
++                "findings-tab", "ports-tab", "scan-diff-tab", "ai-tab",
+             }
+             assert app.query_one("#severity-counts").parent.id == "results"
+             for severity, count, foreground in (
+diff --git a/tests/test_tui_clipboard.py b/tests/test_tui_clipboard.py
+index 2fcb202..eb0b894 100644
+--- a/tests/test_tui_clipboard.py
++++ b/tests/test_tui_clipboard.py
+@@ -631,6 +631,7 @@ def test_saved_browser_double_click_opens_once_without_copying(tmp_path, monkeyp
+         monkeypatch.setattr(app, "open_saved", lambda path: opened.append(str(path)) or original_open(path))
+         async with app.run_test(size=(120, 40), notifications=True) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")  # Retained flat-file browser.
+             table = app.query_one("#saved-table", DataTable)
+             expected = Path(app.saved_paths[str(row_index)])
+             before = expected.read_bytes()
+@@ -652,6 +653,7 @@ def test_saved_browser_single_click_only_chooses_a_row(tmp_path, offline):
+         app = saved_browser_app(tmp_path)
+         async with app.run_test(size=(120, 40)) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")
+             table = app.query_one("#saved-table", DataTable)
+             for row_index in (0, 1, 0):
+                 value = table.get_row_at(row_index)[0].plain
+@@ -669,6 +671,7 @@ def test_saved_browser_enter_and_open_button_still_open_without_copying(tmp_path
+         app = saved_browser_app(tmp_path)
+         async with app.run_test(size=(120, 40)) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")
+             table = app.query_one("#saved-table", DataTable)
+             expected = app.saved_paths["1"]
+             value = table.get_row_at(1)[0].plain
+@@ -690,6 +693,7 @@ def test_saved_browser_headers_and_empty_rows_do_not_open_or_copy(tmp_path, offl
+         app = saved_browser_app(tmp_path)
+         async with app.run_test(size=(120, 40)) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")
+             table = app.query_one("#saved-table", DataTable)
+             gutter = table.content_region.offset - table.region.offset
+             for point in (text_point(table, "File"), (gutter.x + 1, gutter.y + 5)):
+@@ -706,6 +710,7 @@ def test_saved_browser_drag_does_not_select_or_copy_text(tmp_path, offline):
+         app = saved_browser_app(tmp_path)
+         async with app.run_test(size=(120, 40)) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")
+             table = app.query_one("#saved-table", DataTable)
+             value = table.get_row_at(0)[1].plain
+             await drag_text(pilot, table, value, table.header_height)
+@@ -721,6 +726,7 @@ def test_saved_browser_raw_double_click_opens_the_clicked_file_without_copying(t
+         app = saved_browser_app(tmp_path)
+         async with app.run_test(size=(120, 40)) as pilot:
+             await pilot.click("#home-results")
++            await pilot.click("#browser-files")
+             table = app.query_one("#saved-table", DataTable)
+             expected = app.saved_paths["1"]
+             value = table.get_row_at(1)[1].plain
+diff --git a/tests/test_tui_history.py b/tests/test_tui_history.py
+index eb0e80e..6f817f3 100644
+--- a/tests/test_tui_history.py
++++ b/tests/test_tui_history.py
+@@ -7,7 +7,7 @@ from pathlib import Path
+ 
+ import pytest
+ from rich.text import Text
+-from textual.widgets import Button, DataTable, Static, TabPane
++from textual.widgets import Button, DataTable, Static, TabbedContent
+ 
+ from exposureiq import cli, storage
+ from exposureiq.demo_data import build_demo_scans
+@@ -83,7 +83,7 @@ def test_demos_tui_finishes_on_scan_ten_with_complete_history(tmp_path):
+             assert app.mode == "results" and app.result["demo"]
+             assert app.result["scan_id"] == scans[-1]["scan_id"]
+             assert len(app.result["saved_scans"]) == 10
+-            assert app.query_one("#scan-diff-tab", TabPane).display
++            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
+             assert_history_window(app, scans, 10)
+             assert "HIGH 0" in text(app.query_one("#severity-high", Static))
+             assert "MEDIUM 0" in text(app.query_one("#severity-medium", Static))
+@@ -139,7 +139,7 @@ def test_preview_tab_and_diff_view_stop_at_the_selected_scan(tmp_path, number):
+             await pilot.pause()
+             assert app.result["mode"] == "preview" and app.worker is None
+             assert app.result["scan_id"] == scans[number - 1]["scan_id"]
+-            assert app.query_one("#scan-diff-tab", TabPane).display == (number > 1)
++            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display == (number > 1)
+             if number > 1:
+                 assert_history_window(app, scans, number)
+             app.action_diff_view()
+@@ -171,6 +171,7 @@ def test_browser_diff_uses_selected_row_not_latest_scan(tmp_path, real):
+         app = ExposureIQApp(args, home=True, browser=True)
+         async with app.run_test(size=(110, 34)) as pilot:
+             await pilot.pause()
++            await pilot.click("#browser-files")  # Selected-file diff still uses the original list.
+             table = app.query_one("#saved-table", DataTable)
+             row = next(int(key) for key, path in app.saved_paths.items()
+                        if Path(path).resolve() == paths[2].resolve())
+@@ -278,7 +279,7 @@ def test_opening_earlier_previews_clears_later_history(tmp_path):
+             assert_history_window(app, scans, 3)
+             assert app.open_saved(paths[0])
+             await pilot.pause()
+-            assert not app.query_one("#scan-diff-tab", TabPane).display
++            assert not app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
+             for name in ("meta", "headline", "body", "message"):
+                 assert not text(app.query_one(f"#scan-diff-{name}", Static))
+             await pilot.press("q")

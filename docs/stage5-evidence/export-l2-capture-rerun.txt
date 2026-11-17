@@ -1,0 +1,20 @@
+PASS: exported script agrees with Python on 40 phrase routes and 30 chat turns; modes, focus, literal text, collapsed evidence, common questions and clear-chat work without networking/storage.
+PASS: real Firefox offline export checks, screenshot: export-browser-l1.png
+PASS: actual live-report scripts use only token-protected relative requests; file/remote/missing-token pages stay offline, greetings/refusals make no calls, both modes and redaction work, Evidence stays literal, clear isolates conversations, host-named consent remains visible, Off drops pending replies, stale replies are suppressed and backend failures fall back safely.
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_export_evidence.py", line 115, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_export_evidence.py", line 99, in main
+    browser = check_live(server, args.out / "export-browser-l2.png", fake)
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 188, in check_live
+    browser.wait('window.ExposureIQLiveChat && document.getElementById("export-live-enabled") && !document.getElementById("export-live-enabled").disabled')
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 106, in wait
+    result = self.script('const done = arguments[arguments.length - 1], deadline = performance.now() + ' + str(timeout) + '; (function check() { let value = null; try { value = (' + expression + '); } catch (_) {} if (value) { done(value); return; } if (performance.now() > deadline) { done({wait_timed_out:true}); return; } setTimeout(check, 30); })();', asynchronous=True)
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 101, in script
+    result = self.command("WebDriver:ExecuteAsyncScript" if asynchronous else "WebDriver:ExecuteScript",
+                          {"script": code, "args": [], "newSandbox": False, "sandbox": "default", "scriptTimeout": 15000})
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 97, in command
+    raise RuntimeError("Firefox check failed: " + str(response[2].get("error")) + ": " + str(response[2].get("message", ""))[:500])
+RuntimeError: Firefox check failed: javascript error: Document was unloaded

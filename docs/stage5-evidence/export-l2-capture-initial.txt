@@ -1,0 +1,14 @@
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert.ok(log.textContent.includes("prepared offline explanations"))
+
+    at /home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_live_dom_check.cjs:97:53 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+PASS: exported script agrees with Python on 40 phrase routes and 30 chat turns; modes, focus, literal text, collapsed evidence, common questions and clear-chat work without networking/storage.
+PASS: real Firefox offline export checks, screenshot: export-browser-l1.png

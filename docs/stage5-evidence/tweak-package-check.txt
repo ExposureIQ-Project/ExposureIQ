@@ -1,0 +1,10 @@
+Wheel: exposureiq-0.1.0-py3-none-any.whl
+SHA-256: c1b7aaa4978bf5ef67f5a769db7448d1b2bb1a18bf01694babeaaa9249f52461
+PASS: CLI, AI, insight, TUI and viewer imports originate in the extracted wheel, not the editable source tree.
+PASS: packaged HTML, CSS, JavaScript and offline evaluation fixtures are present.
+PASS: 78 packaged Python files parse with Python 3.10 grammar (syntax check only).
+PASS: installed-wheel ai eval: 22/22 offline safety rows.
+PASS: installed-wheel synthetic summary/history commands produce verified offline drafts.
+PASS: installed-wheel read-only chat, offensive refusal and --no-fallback failure.
+PASS: all network sockets/DNS were blocked; no key, model service or target was used.
+Runtime: 3.14.8 (main, Oct  2 2026, 10:23:31) [GCC 16.2.1 20260810]

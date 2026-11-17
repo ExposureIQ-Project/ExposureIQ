@@ -1,0 +1,22 @@
+Synthetic failed TUI turn: {"text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data.\n\nIf a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.", "proof_notice": "These are possible consequences, not proof that anyone broke in."}
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 297, in <module>
+    main()
+    ~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 281, in main
+    images = asyncio.run(screenshots(output, root))
+  File "/usr/lib/python3.14/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 248, in screenshots
+    images.append(capture(app, output, "12-impact-follow-up.svg", "ExposureIQ · Fresh-wording damage follow-up; conditional harm and code-added disclaimer", ["then what posible damage it can make?", "AI draft", "not proof that anyone broke in", "read, change or delete stored data", "saved evidence checked"]))
+                  ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 99, in capture
+    raise AssertionError(f"Expected visible text missing from {filename}: {word}; failure retained in {failed}")
+AssertionError: Expected visible text missing from 12-impact-follow-up.svg: not proof that anyone broke in; failure retained in docs/stage5-evidence/failures/12-impact-follow-up.svg

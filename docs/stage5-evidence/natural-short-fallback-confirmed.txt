@@ -1,0 +1,106 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-simple] _
+
+mode = 'simple', question = 'Explain this scan'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        class TimeoutOnly(FakeProvider):
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise ProviderError(kind="timeout")
+    
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, provider=TimeoutOnly())
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+        assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+        assert len(text.split()) <= 180
+>       assert len({ref for ref in result["evidence_refs"] if ref.startswith("F-")}) <= 3
+E       AssertionError: assert 9 <= 3
+E        +  where 9 = len({'F-0003', 'F-0005', 'F-0007', 'F-0008', 'F-0009', 'F-0012', ...})
+
+tests/test_ai_conversation.py:396: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-technical] _
+
+mode = 'technical', question = 'Explain this scan'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        class TimeoutOnly(FakeProvider):
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise ProviderError(kind="timeout")
+    
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, provider=TimeoutOnly())
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+        assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+        assert len(text.split()) <= 180
+>       assert len({ref for ref in result["evidence_refs"] if ref.startswith("F-")}) <= 3
+E       AssertionError: assert 9 <= 3
+E        +  where 9 = len({'F-0003', 'F-0005', 'F-0007', 'F-0008', 'F-0009', 'F-0012', ...})
+
+tests/test_ai_conversation.py:396: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-simple] _
+
+mode = 'simple', question = 'What could happen if left like that?'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        class TimeoutOnly(FakeProvider):
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise ProviderError(kind="timeout")
+    
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, provider=TimeoutOnly())
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+        assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+>       assert len(text.split()) <= 180
+E       AssertionError: assert 344 <= 180
+E        +  where 344 = len(['The', 'possible', 'harm', 'depends', 'on', 'the', ...])
+E        +    where ['The', 'possible', 'harm', 'depends', 'on', 'the', ...] = <built-in method split of str object at 0x55d8d8f996a0>()
+E        +      where <built-in method split of str object at 0x55d8d8f996a0> = 'The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, ...nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.'.split
+
+tests/test_ai_conversation.py:395: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-technical] _
+
+mode = 'technical', question = 'What could happen if left like that?'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        class TimeoutOnly(FakeProvider):
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise ProviderError(kind="timeout")
+    
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, provider=TimeoutOnly())
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+        assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+>       assert len(text.split()) <= 180
+E       AssertionError: assert 324 <= 180
+E        +  where 324 = len(['The', 'possible', 'harm', 'depends', 'on', 'the', ...])
+E        +    where ['The', 'possible', 'harm', 'depends', 'on', 'the', ...] = <built-in method split of str object at 0x55d8d8fbd650>()
+E        +      where <built-in method split of str object at 0x55d8d8fbd650> = 'The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, ...nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.'.split
+
+tests/test_ai_conversation.py:395: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-simple]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-technical]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-simple]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-technical]
+4 failed, 107 deselected in 0.17s

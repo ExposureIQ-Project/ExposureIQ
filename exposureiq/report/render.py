@@ -135,10 +135,13 @@ def generate_report(source: str, *, output: str | None = None, format: str | Non
     paths = _output_paths(output, fmt, report["target"], report["scan_id"])
     html_path, pdf_path, docx_path = (paths.get(name) for name in ("html", "pdf", "docx"))
 
-    domain = None
+    domain, warnings, html_bytes = None, [], None
     if html_path is not None:
+        from exposureiq.viewer.export import check_export_size
+
         domain = build_domain_report(scan, available, report, include_diff=include_diff)
-        page = render_domain_html(domain)
+        page, warnings = check_export_size(render_domain_html(domain))
+        html_bytes = len(page.encode("utf-8"))
         html_path.parent.mkdir(parents=True, exist_ok=True)
         html_path.write_text(page, encoding="utf-8")
     if pdf_path is not None:
@@ -165,4 +168,6 @@ def generate_report(source: str, *, output: str | None = None, format: str | Non
         "source": str(source_path) if source_path is not None else None,
         "diff": diff,
         "domain": domain,
+        "warnings": warnings,
+        "html_bytes": html_bytes,
     }

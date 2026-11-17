@@ -1,0 +1,6 @@
+Baseline: 1775 passed; 4 subtests passed in 214.24s.
+Failures: zero.
+Skips: 66 — 65 need PowerShell; one needs native Windows batch execution.
+Branch: feature/s5-dynamic-chat; inherited Stage 5 work preserved.
+Safety: offline suite only; no real key, model provider or target used.
+Next: Tier 1; source snapshots: /tmp/opencode/s5-dynamic-before-zoio7mii/.

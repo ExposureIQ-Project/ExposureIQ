@@ -1,0 +1,118 @@
+{
+  "passed": true,
+  "network": "loopback and offline fakes only; no real key/model/target",
+  "files": [
+    {
+      "file": "live-drawer-structure.json",
+      "bytes": 793,
+      "sha256": "15c4c18b91b75aceca9bf4ac36c86b530f1374429948dc13a165f62284e95a25"
+    },
+    {
+      "file": "live-drawer-dom-check.txt",
+      "bytes": 437,
+      "sha256": "6bc4654bfa8475182bcb0038d3a0bdd2df94a0452688e04b7492821a7d34e7ed"
+    },
+    {
+      "file": "live-drawer-offline-browser.json",
+      "bytes": 390,
+      "sha256": "91692028d23470fdf94be768bc9dd1bb6f30d16279a0750e1392cd19e8977011"
+    },
+    {
+      "file": "live-drawer-offline-browser.png",
+      "bytes": 150559,
+      "sha256": "3432c8001df019e221ce4dc7e7a94d167f2ccc5562c520a5eb6c237138661404"
+    },
+    {
+      "file": "live-drawer-browser.json",
+      "bytes": 3728,
+      "sha256": "5328ec09f4705a720dd4574ad3815a511a6fa8b9df6a8a1546d2f06a4db6b135"
+    },
+    {
+      "file": "live-drawer-browser.png",
+      "bytes": 69212,
+      "sha256": "38fab4bd15d6461da7c4640b273cf392cc4877f4376c50e199ad93a555ccc206"
+    },
+    {
+      "file": "live-drawer-browser-closed.png",
+      "bytes": 156958,
+      "sha256": "0ea7e40b67c360008af4aa23db198caee4b257924f248fb56ed223ee154a673f"
+    },
+    {
+      "file": "live-drawer-browser-mobile.png",
+      "bytes": 88996,
+      "sha256": "4d89c400cf0b85d1bf26e9970b396fb760ada8fa249480f78e1a0a657fb68539"
+    },
+    {
+      "file": "live-drawer-repeatability.json",
+      "bytes": 2456,
+      "sha256": "56f35d37b4c2319e27e22a488316a2a81a20978581b039a2d09e089ef49af30f"
+    }
+  ],
+  "sources": [
+    {
+      "file": "exposureiq/cli.py",
+      "bytes": 25206,
+      "sha256": "147b487d5fbad554e70c9a6675e9b9b0e22a73e78f3e7e3c66db08ce609a7dd7"
+    },
+    {
+      "file": "exposureiq/report/html.py",
+      "bytes": 43246,
+      "sha256": "b12787e4c73ed94baeb9d72ea32dc2299f93df7c3c9c1af1c47349ff32f81ee5"
+    },
+    {
+      "file": "exposureiq/report/render.py",
+      "bytes": 7132,
+      "sha256": "8597a21e2ee1d8f3d8cf30cbe81399501d12324bad144f189483b2b61e094010"
+    },
+    {
+      "file": "exposureiq/viewer/export.py",
+      "bytes": 17192,
+      "sha256": "77acdbe891f7257e641ff41b0d77b6c2448ac686a52dccc3cae9d71ef6e066ea"
+    },
+    {
+      "file": "exposureiq/viewer/server.py",
+      "bytes": 27248,
+      "sha256": "eb630311639444fd9a10c5f68128d2e7b21c036d19dcc6140c3907e0b6d478db"
+    },
+    {
+      "file": "exposureiq/viewer/static/app.js",
+      "bytes": 12198,
+      "sha256": "a2760b5da868b33a0dd1d49eec06a1f6abc4691738123123fd43aa542617ad35"
+    },
+    {
+      "file": "exposureiq/viewer/static/index.html",
+      "bytes": 3344,
+      "sha256": "ec97ca841cecf9d96c784b2f204d7a007f7c65c5a7773896fbafeb6a7abf6688"
+    },
+    {
+      "file": "exposureiq/viewer/static/live-chat.js",
+      "bytes": 15411,
+      "sha256": "94b39bcead6344afaebe470659be13176fc8965b8b89eb4a32063dfa16a5ad7e"
+    },
+    {
+      "file": "exposureiq/viewer/static/live-chat.css",
+      "bytes": 4708,
+      "sha256": "ff434afbc99a23f28b5996fbdca784495a7f04accdb67e40a5f7765624adc597"
+    },
+    {
+      "file": "exposureiq/viewer/static/report-session.js",
+      "bytes": 694,
+      "sha256": "23d1ab4c64d5a741ebb74fb6e0a87b8cbefb81eea87c2d4032e5eb1f87d23f91"
+    },
+    {
+      "file": "scripts/stage5_export_evidence.py",
+      "bytes": 8185,
+      "sha256": "25fd210a4fc2bce40fc941e596d04997c6ea712abe61cb0e7556bc512794330c"
+    },
+    {
+      "file": "scripts/stage5_firefox_check.py",
+      "bytes": 21576,
+      "sha256": "69f623e0446f738fe0c7cb96e3b17a2319330597ca8997adef4bb560b18780d2"
+    },
+    {
+      "file": "scripts/stage5_live_dom_check.cjs",
+      "bytes": 12292,
+      "sha256": "3ba379ea3601bb2bc16270050ede22d20f00751f7c3dede304b73f02a15cb000"
+    }
+  ]
+}

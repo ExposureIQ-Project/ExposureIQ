@@ -1,0 +1,4 @@
+PASS: standalone report is scan-only, has one hashed interaction script, sharing/size safeguards and no chat metadata, answers or external assets.
+PASS: actual live drawer uses only token-protected relative requests, no prepared replies or browser intent matching; icon/close/Escape/focus work, settings enable chat automatically, both modes and redaction work, Evidence stays literal, scan/clear isolate conversations, host-named consent is visible, Off hides chat and drops pending replies, stale/malformed replies are suppressed and server failure never substitutes saved answers.
+Export: /tmp/opencode/s5-html-export-tegwo3p4/index.html
+Bytes: 408373

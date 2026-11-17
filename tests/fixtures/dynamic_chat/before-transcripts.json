@@ -1,0 +1,292 @@
+{
+  "stage": "before",
+  "scan": "synthetic reserved-data fixture",
+  "network": "loopback fake server only; non-loopback sockets and external DNS blocked",
+  "model_limit": "No Ollama or real-model accuracy trial. The fake after server phrases the code facts deterministically.",
+  "paths": {
+    "built-in": {
+      "turns": [
+        {
+          "question": "what is the most bad finding here in this scan?",
+          "answer": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "then how can i fix it?",
+          "answer": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "how long would that take?",
+          "answer": "I can't tell how long this will take from the scan. Your team needs to check who depends on the service and how access is managed.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what do you think?",
+          "answer": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001",
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what does SMB mean?",
+          "answer": "SMB means a file-sharing service. Think of it as a shared office folder.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "who should fix it?",
+          "answer": "The person who manages the affected service should own the fix. Your network or security team can help review who should be allowed to connect.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "AI is off or not configured. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "thanks",
+          "answer": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "badge": "Built-in reply",
+          "facts_note": "Built-in reply · no model call",
+          "reason": "",
+          "offline_notice": "",
+          "source": "built-in",
+          "focus": {},
+          "references": [],
+          "wording_verified": true
+        }
+      ],
+      "model_calls": 0,
+      "forced_json": false
+    },
+    "fake-small-model-server": {
+      "turns": [
+        {
+          "question": "what is the most bad finding here in this scan?",
+          "answer": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "then how can i fix it?",
+          "answer": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "how long would that take?",
+          "answer": "I can't tell how long this will take from the scan. Your team needs to check who depends on the service and how access is managed.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what do you think?",
+          "answer": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001",
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what does SMB mean?",
+          "answer": "SMB means a file-sharing service. Think of it as a shared office folder.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan",
+            "R:https.cert_expired",
+            "F-0005",
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "who should fix it?",
+          "answer": "The person who manages the affected service should own the fix. Your network or security team can help review who should be allowed to connect.\n\nI can turn that into a short fix list for your team.",
+          "badge": "Built-in fallback",
+          "facts_note": "Built-in fallback · saved evidence checked; wording needs review",
+          "reason": "The model did not return the required reply format after one repair. This reply uses built-in explanations.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "references": [
+            "S:scan"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "thanks",
+          "answer": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "badge": "Built-in reply",
+          "facts_note": "Built-in reply · no model call",
+          "reason": "",
+          "offline_notice": "",
+          "source": "built-in",
+          "focus": {},
+          "references": [],
+          "wording_verified": true
+        }
+      ],
+      "model_calls": 12,
+      "forced_json": true
+    }
+  }
+}

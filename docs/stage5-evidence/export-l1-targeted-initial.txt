@@ -1,0 +1,85 @@
+..................................................F..................... [ 30%]
+........F.F............................................................. [ 60%]
+........................................................................ [ 91%]
+.....................                                                    [100%]
+=================================== FAILURES ===================================
+_ test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7ff499537d70>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7ff49a386970>
+
+    def test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data(ai_scan_factory, monkeypatch):
+        from exposureiq.ai import config, provider
+    
+        monkeypatch.setattr(config, "load_config", lambda *a, **k: pytest.fail("Export must not load AI settings"))
+        monkeypatch.setattr(provider, "make_provider", lambda *a, **k: pytest.fail("Export must not create a provider"))
+        scan = ai_scan_factory()
+        scan["assets"][0]["findings"][0].update(title="UNTRUSTED-TITLE-ONLY", detail="UNTRUSTED-DETAIL-ONLY",
+                                                 recommendation="UNTRUSTED-RECOMMENDATION-ONLY")
+        scan["assets"][0]["technologies"][0].update(source="UNTRUSTED-BANNER-ONLY", version="UNTRUSTED-VERSION-ONLY")
+        before = copy.deepcopy(scan)
+        bundle = build_chat_bundle(scan)
+        encoded = embedded_json(bundle)
+        assert scan == before and len(INTENTS) == 12 and bundle["rules"] == matching_rules()
+        assert bundle["default_scan"] == "scan-" + _scan_token(scan)
+>       assert "UNTRUSTED-" not in encoded and "api_key" not in bundle["scans"]  # no preferences in data
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert ('UNTRUSTED-' not in '{"default_s...ine-chat-1"}'
+E         
+E         'UNTRUSTED-' is contained here:
+E         ?           -------------------------                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^...
+E         
+E         ...Full output truncated (3 lines hidden), use '-vv' to show)
+
+tests/test_export_chat.py:77: AssertionError
+___________ test_each_scan_uses_only_its_own_compatible_predecessors ___________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7ff4993ae090>
+
+    def test_each_scan_uses_only_its_own_compatible_predecessors(ai_scan_factory):
+        scans = [ai_scan_factory(i, rules=rules) for i, rules in enumerate(
+            [[("ports.database_exposed", "high")], [("headers.missing_csp", "medium")], [("ports.database_exposed", "high")]])]
+        bundle = build_chat_bundle(scans[1], scans)
+        for scan in scans:
+            row = bundle["scans"][view_id(scan)]
+            assert row["digest"]["date"] == scan["started_at"][:25]
+            assert row["digest"]["risk"]["score"] in (15, 3)
+        first = offline_answer(bundle, view_id(scans[0]), "Show history")
+>       assert "not enough saved data" in first["text"].lower()
+E       assert 'not enough saved data' in "there isn't enough comparable saved check data to judge a trend yet.\n\nfrom the saved comparisons: 0 changes reduced...ans absent in subsequent observed scans, not a live verification.\n\nwe can work through the first fix in plain words."
+E        +  where "there isn't enough comparable saved check data to judge a trend yet.\n\nfrom the saved comparisons: 0 changes reduced...ans absent in subsequent observed scans, not a live verification.\n\nwe can work through the first fix in plain words." = <built-in method lower of str object at 0x562621ee2b10>()
+E        +    where <built-in method lower of str object at 0x562621ee2b10> = "There isn't enough comparable saved check data to judge a trend yet.\n\nFrom the saved comparisons: 0 changes reduced...ans absent in subsequent observed scans, not a live verification.\n\nWe can work through the first fix in plain words.".lower
+
+tests/test_export_chat.py:170: AssertionError
+_ test_real_html_export_has_chat_hash_csp_no_external_assets_and_original_report _
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-7/test_real_html_export_has_chat0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7ff4993cab90>
+portal_html = <function portal_html.<locals>.inspect at 0x7ff4993ca4b0>
+
+    def test_real_html_export_has_chat_hash_csp_no_external_assets_and_original_report(tmp_path, ai_scan_factory, portal_html):
+        root, target = tmp_path / "results", tmp_path / "index.html"
+        scan = ai_scan_factory()
+        source = root / "scan.json"
+        storage.save_scan(scan, str(source))
+        result = generate_report(str(source), output=str(target), format="html", results_dir=root)
+        page = target.read_text(encoding="utf-8")
+        parsed = portal_html(page)
+        assert len(parsed.scripts) == 3 and parsed.scripts[0] == SCRIPT
+        assert json.loads(parsed.scripts[1])["default_scan"] == view_id(scan)
+        assert parsed.scripts[2] == files("exposureiq.viewer").joinpath("static/offline-chat.js").read_text(encoding="utf-8")
+        for script in parsed.scripts:
+            digest = base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii")
+            assert "'sha256-" + digest + "'" in page
+        assert "connect-src 'none'" in page and "default-src 'none'" in page
+        assert 'id="export-chat"' in page and 'id="export-chat-mode"' in page
+        assert 'type="application/json"' in page and "src=\"http" not in page and "href=\"http" not in page
+>       assert "Inventory" in page and "What changed" in page and view_id(scan) in parsed.ids
+E       assert ('Inventory' in '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,...xposureIQOfflineChat = Object.freeze({routeQuestion});\n  syncReportSelection();\n})();\n</script>\n</body>\n</html>\n')
+
+tests/test_export_chat.py:198: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_export_chat.py::test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data
+FAILED tests/test_export_chat.py::test_each_scan_uses_only_its_own_compatible_predecessors
+FAILED tests/test_export_chat.py::test_real_html_export_has_chat_hash_csp_no_external_assets_and_original_report
+3 failed, 234 passed in 23.70s

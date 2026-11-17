@@ -159,6 +159,15 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--title", default=None, help="report title")
     report.add_argument("--open", dest="open_report", action="store_true",
                         help="open the HTML report in the default browser")
+    from exposureiq.ai.commands import register_commands
+
+    register_commands(commands)
+    web = commands.add_parser("web", help="loopback-only saved-scan/AI viewer; no scanning controls")
+    web.add_argument("source", nargs="?", help="domain or saved JSON under the results root; open its HTML report directly")
+    web.add_argument("--results-dir", default="results", help="saved-results root")
+    web.add_argument("--port", type=int, default=8765, help="local port (default: %(default)s; 0 chooses a free port)")
+    web.add_argument("--demo", action="store_true", help="use offline fake AI, ignoring remote/local preferences")
+    web.add_argument("--open", dest="open_browser", action="store_true", help="open the per-launch local URL in a browser")
     return parser
 
 
@@ -410,6 +419,8 @@ def run_report(args) -> int:
             output.info(f"{label}  {path}")
     if result.get("domain"):
         output.info(f"Domain dashboard: {len(result['domain']['reports'])} saved scan(s), newest first.")
+    for warning in result.get("warnings", []):
+        output.warn(warning)
     if result["diff"]:
         headline = (report.get("diff_summary") or {}).get("headline")
         output.info(f"What changed: {headline or 'see the report'}")
@@ -461,7 +472,38 @@ def run_open(args) -> int:
         output.warn("Textual is not installed; showing the compact preview.")
         return 0
     return ExposureIQApp(args, stages=_stages(), control=ScanControl(),
-                         version=_version(), open_file=str(path)).run()
+                          version=_version(), open_file=str(path)).run()
+
+
+def run_web(args) -> int:
+    """Serve saved data on loopback only; never run the scanner."""
+    from exposureiq.viewer import make_server
+
+    try:
+        server = make_server(args.results_dir, port=args.port, demo=args.demo)
+    except (OSError, ValueError):
+        print("Cannot start the local viewer. Check the results folder and choose an unused port (0–65535).", file=sys.stderr)
+        return 2
+    try:
+        url = server.report_url(args.source) if args.source else server.url
+    except (OSError, ValueError):
+        server.server_close()
+        print("Cannot open this saved report. Choose a domain or a safe saved JSON file under --results-dir.", file=sys.stderr)
+        return 2
+    print(("Local HTML report: " if args.source else "Local read-only viewer: ") + url, flush=True)
+    print("Keep this per-launch URL private. Ctrl+C stops the viewer. No target probes or browser credentials.", flush=True)
+    try:
+        if args.open_browser:
+            from exposureiq.viewer.browser import open_browser
+
+            if not open_browser(url):
+                print("Browser launch was unavailable. Open the local URL above manually.", file=sys.stderr)
+        server.serve_forever()
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        server.server_close()
+    return 0
 
 
 def main(argv=None) -> int:
@@ -483,6 +525,12 @@ def main(argv=None) -> int:
             parser.print_help()
             return 2
         return run_home(args)
+    if args.command == "ai":
+        from exposureiq.ai.commands import run_ai
+
+        return run_ai(args)
+    if args.command == "web":
+        return run_web(args)
     if args.command not in ("scan", "scope", "diff", "report"):
         parser.print_help()
         return 2

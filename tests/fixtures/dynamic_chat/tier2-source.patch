@@ -1,0 +1,711 @@
+diff --git a/exposureiq/report/html.py b/exposureiq/report/html.py
+--- a/exposureiq/report/html.py
++++ b/exposureiq/report/html.py
+@@ -729,6 +729,8 @@
+         hashes.append(base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
+         extra_scripts = f'<script id="exposureiq-report-session">{script}</script>'
+     script_policy = " ".join("'sha256-" + value + "'" for value in hashes)
++    report_start = '<div id="report-pane" class="report-pane" role="region" aria-label="Saved HTML report" tabindex="-1">' if chat_bundle is not None else ""
++    report_end = "</div>" if chat_bundle is not None else ""
+     return f"""<!DOCTYPE html>
+ <html lang="en">
+ <head>
+@@ -740,11 +742,13 @@
+ <style>{_CSS}{interactive.CSS}{_PORTAL_CSS}{extra_css}</style>
+ </head>
+ <body>
++{report_start}
+ {navigation}
+ <main id="report-main" tabindex="-1">
+ {body}
+ </main>
+ <div class="portal-notices"><p id="export-sharing-warning">{_e(SHARING_WARNING)}</p><p id="export-size-warning" hidden></p></div>
++{report_end}
+ {markup}
+ <script id="exposureiq-interactions">{interactive.SCRIPT}</script>
+ {extra_scripts}
+diff --git a/exposureiq/viewer/export.py b/exposureiq/viewer/export.py
+--- a/exposureiq/viewer/export.py
++++ b/exposureiq/viewer/export.py
+@@ -195,13 +195,18 @@
+     <path d="M7 10h8M7 14h5"/>
+   </svg>
+ </button>
++<div id="export-chat-divider" class="export-chat-divider" role="separator" tabindex="0"
++  aria-label="Resize report and chat" aria-orientation="vertical" aria-valuemin="30" aria-valuemax="70" aria-valuenow="50" hidden></div>
+ <aside id="export-chat" class="export-chat-drawer" role="dialog" aria-modal="false"
+   aria-labelledby="export-chat-title" hidden>
+   <div class="export-chat-heading">
+     <div><p>Saved evidence, explained</p><h2 id="export-chat-title">ExposureIQ assistant</h2></div>
+-    <button id="export-chat-close" type="button" aria-label="Close AI chat" title="Close AI chat">&times;</button>
++    <div class="export-chat-heading-actions">
++      <button id="export-chat-options-toggle" type="button" aria-controls="export-chat-options" aria-expanded="false" aria-haspopup="dialog">Chat options</button>
++      <button id="export-chat-close" type="button" aria-label="Close AI chat" title="Close AI chat">&times;</button>
++    </div>
+   </div>
+-  <div class="export-chat-settings">
++  <div id="export-chat-options" class="export-chat-settings" role="dialog" aria-label="Chat options" hidden>
+     <div class="export-chat-header">
+     <label>Scan <select id="export-chat-scan"></select></label>
+     <label>Wording <select id="export-chat-mode"><option value="simple">Simple</option><option value="technical">Technical</option></select></label>
+@@ -210,14 +215,17 @@
+     <p id="export-chat-source">Checking AI settings…</p>
+     <p id="export-live-status" role="status">Settings and provider keys stay on the local server.</p>
+     <button id="export-live-refresh" type="button">Check settings</button>
++    <button id="export-chat-clear" type="button">Clear chat</button>
+   </div>
++  <p id="export-chat-stage" class="export-chat-stage" role="status" aria-live="polite" hidden></p>
+   <div id="export-chat-log" role="log" aria-live="polite" aria-label="Saved-data conversation">
+     <p class="export-chat-empty">Ask about this saved scan, or follow up on a reply. I explain evidence and defensive fixes; I never scan or take action.</p>
+   </div>
++  <div id="export-chat-ideas" class="export-chat-ideas" aria-label="Suggested questions"></div>
+   <div class="export-chat-compose">
+     <label for="export-chat-input">Your question</label>
+     <textarea id="export-chat-input" rows="2" maxlength="1000" placeholder="What matters most in this scan?" disabled></textarea>
+-    <div class="export-chat-actions"><button id="export-chat-clear" type="button">Clear chat</button><button id="export-chat-send" type="button" disabled>Send</button></div>
++    <div class="export-chat-actions"><span>Enter to send · Shift+Enter for a new line</span><button id="export-chat-send" type="button" disabled>Send</button></div>
+     <p id="export-chat-status" role="status">No model is called until you send a question.</p>
+   </div>
+ </aside>"""
+diff --git a/exposureiq/viewer/server.py b/exposureiq/viewer/server.py
+--- a/exposureiq/viewer/server.py
++++ b/exposureiq/viewer/server.py
+@@ -40,6 +40,8 @@
+ MAX_INDEX_BYTES = 32_000_000
+ MAX_FINDING_ROWS = 500
+ MAX_CHAT_CONTEXTS = 8
++MAX_PROGRESS_CONTEXTS = 32
++CHAT_STAGES = ("Reading your scan", "Phrasing your answer", "Checking the facts", "Reply ready", "Reply unavailable")
+ SESSION_HEADER = "X-ExposureIQ-Session"
+ STATIC = {"/": ("index.html", "text/html; charset=utf-8"),
+           "/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
+@@ -70,6 +72,8 @@
+         self.ai_lock = threading.Lock()
+         self.report_lock = threading.Lock()
+         self.chats = {}
++        self.chat_progress = {}
++        self.progress_lock = threading.Lock()
+         self.warning = ""
+         self.refresh()
+ 
+@@ -194,7 +198,7 @@
+         return self.service.summary(build_history_layers(scans)["L4"])
+ 
+     def ask(self, payload):
+-        required = set(payload) - {"mode", "host", "finding_id", "conversation", "retry_id"}
++        required = set(payload) - {"mode", "host", "finding_id", "conversation", "retry_id", "progress_id"}
+         if required not in ({"scan", "question"}, {"domain", "question"}):
+             raise ViewerError("Chat requires a question and one selected scan or domain.")
+         if "mode" in payload and payload["mode"] not in ("simple", "technical"):
+@@ -204,6 +208,20 @@
+         conversation = payload.get("conversation", "")
+         if not isinstance(conversation, str) or (conversation and not re.fullmatch(r"[a-f0-9]{32}", conversation)):
+             raise ViewerError("Use a bounded, session-only conversation identifier.")
++        progress_id = payload.get("progress_id", "")
++        if "progress_id" in payload and (not conversation or not isinstance(progress_id, str) or not re.fullmatch(r"[a-f0-9]{32}", progress_id)):
++            raise ViewerError("Live status requires a request identifier in this conversation.")
++
++        def progress(stage, *, done=False):
++            if not progress_id or stage not in CHAT_STAGES:
++                return
++            with self.progress_lock:
++                key = (conversation, progress_id)
++                if key not in self.chat_progress and len(self.chat_progress) >= MAX_PROGRESS_CONTEXTS:
++                    self.chat_progress.pop(next(iter(self.chat_progress)))
++                self.chat_progress[key] = {"stage": stage, "done": done}
++
++        progress("Reading your scan")
+         if "domain" in payload:
+             entries = self.domain_entries(payload["domain"])
+             scans = [self.selected(e["id"]) for e in entries]
+@@ -219,11 +237,25 @@
+             if len(self.chats) >= MAX_CHAT_CONTEXTS:
+                 self.chats.pop(next(iter(self.chats)))
+             self.chats[context] = Chat(digest, ReadOnlyTools(scan, self.root, scans=scans), self.service)
+-        result = self.chats[context].ask(payload["question"], mode=payload.get("mode"),
+-                                          host=payload.get("host", ""), finding_id=payload.get("finding_id", ""), retry_id=payload.get("retry_id", ""))
++        try:
++            result = self.chats[context].ask(payload["question"], mode=payload.get("mode"), progress=progress,
++                                              host=payload.get("host", ""), finding_id=payload.get("finding_id", ""), retry_id=payload.get("retry_id", ""))
++        except Exception:
++            progress("Reply unavailable", done=True)
++            raise
++        progress("Reply ready", done=True)
+         config = self.service._configuration()
+         result["user"] = redact(payload["question"], (config.key, config.api_key))
+         return result
++
++    def progress(self, conversation, request):
++        if any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{32}", value) for value in (conversation, request)):
++            raise ViewerError("Use a live-status identifier from this conversation.")
++        with self.progress_lock:
++            result = self.chat_progress.get((conversation, request))
++            if result is None:
++                raise ViewerError("No live status exists for this conversation request.")
++            return copy.deepcopy(result)
+ 
+     def health(self, signature=""):
+         from exposureiq.viewer.export import scan_signature
+@@ -234,6 +266,8 @@
+         if config.mode == "off" and self.ai_lock.acquire(blocking=False):
+             try:
+                 self.chats.clear()
++                with self.progress_lock:
++                    self.chat_progress.clear()
+             finally:
+                 self.ai_lock.release()
+         match = ""
+@@ -401,6 +435,11 @@
+                           "endpoint_host": config.host, "note": "Configure AI in the terminal Settings drawer. The browser never receives a key."}
+             elif path == "/api/health" and set(query) in (set(), {"signature"}):
+                 result = state.health(query.get("signature", ""))
++            elif path == "/api/ai/progress" and set(query) == {"conversation", "request"}:
++                if state.service._configuration().mode == "off":
++                    self._send(409, {"error": "AI is off; no live status is available."})
++                    return
++                result = state.progress(query["conversation"], query["request"])
+             else:
+                 self._send(404, {"error": "No such read-only viewer route."})
+                 return
+diff --git a/exposureiq/viewer/static/live-chat.css b/exposureiq/viewer/static/live-chat.css
+--- a/exposureiq/viewer/static/live-chat.css
++++ b/exposureiq/viewer/static/live-chat.css
+@@ -1,59 +1,107 @@
+ .export-chat-toggle { position: fixed; right: 24px; bottom: 24px; z-index: 90;
+   display: grid; place-items: center; width: 58px; height: 58px; padding: 0;
+-  border: 1px solid var(--teal); border-radius: 50%; background: var(--teal); color: var(--bg);
++  border: 1px solid var(--teal); border-radius: 50%; background: var(--teal); color: var(--background);
+   box-shadow: 0 8px 28px #0006; cursor: pointer; }
+ .export-chat-toggle:hover { filter: brightness(1.12); }
+-.export-chat-drawer { position: fixed; right: 24px; bottom: 94px; z-index: 100;
+-  display: flex; flex-direction: column; width: min(440px, calc(100vw - 48px));
+-  height: min(760px, calc(100vh - 118px)); height: min(760px, calc(100dvh - 118px));
+-  border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+-  background: var(--panel); color: var(--text); box-shadow: 0 16px 60px #0008;
+-  font: 14px/1.5 system-ui, sans-serif; text-align: left; }
+-.export-chat-heading { display: flex; align-items: center; justify-content: space-between;
++body.chat-open { display: grid; grid-template-columns: minmax(0, calc(var(--report-split, 50%) - 4px)) 8px minmax(0, 1fr);
++  height: 100vh; height: 100dvh; overflow: hidden; margin: 0; }
++.chat-open .report-pane { grid-column: 1; min-width: 0; height: 100vh; height: 100dvh;
++  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scroll-padding-top: 130px; }
++.chat-open .export-chat-toggle { display: none; }
++.chat-open .topbar-inner { flex-wrap: wrap; padding: 12px 16px; }
++.chat-open .report-nav { width: 100%; justify-content: flex-start; margin-left: 0; }
++.chat-open .offline-badge { margin-left: auto; }
++.chat-open .page { width: calc(100% - 32px); margin: 16px auto; padding: 24px; }
++.chat-open .cover h1 { font-size: clamp(26px, 3vw, 40px); }
++.chat-open .scorecards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++.chat-open .charts { grid-template-columns: minmax(0, 1fr); }
++.chat-open .scan-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
++.chat-open .portal-controls, .chat-open .portal-notices { width: calc(100% - 32px); }
++.export-chat-divider { grid-column: 2; position: relative; z-index: 30; cursor: col-resize;
++  touch-action: none; background: var(--background); }
++.export-chat-divider::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px;
++  background: var(--line); transition: background .15s ease; }
++.export-chat-divider:hover::after, .export-chat-divider:focus-visible::after { background: var(--teal); }
++.export-chat-drawer { grid-column: 3; position: relative; z-index: 40; display: flex; flex-direction: column;
++  min-width: 0; height: 100vh; height: 100dvh; overflow: hidden;
++  background: var(--panel); color: var(--text); font: 16px/1.5 system-ui, sans-serif; text-align: left; }
++.export-chat-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between;
+   gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
+ .export-chat-heading p { margin: 0; color: var(--muted); font-size: 11px; letter-spacing: .06em; }
+-.export-chat-heading h2 { margin: 3px 0 0; color: var(--teal); font-size: 17px; letter-spacing: 0; }
++.export-chat-heading h2 { margin: 3px 0 0; color: var(--teal); font-size: 18px; letter-spacing: 0; }
++.export-chat-heading-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+ .export-chat-drawer button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px;
+   color: var(--text); background: var(--surface); font: inherit; cursor: pointer; }
+ .export-chat-drawer button:hover { border-color: var(--teal); }
+ .export-chat-drawer button:disabled { opacity: .5; cursor: not-allowed; }
+-#export-chat-close { flex-shrink: 0; width: 34px; height: 34px; padding: 0; font-size: 24px; }
+-.export-chat-settings { padding: 12px 20px; border-bottom: 1px solid var(--line); }
+-.export-chat-header { display: flex; gap: 12px; margin-bottom: 8px; }
++#export-chat-options-toggle { font-size: 13px; }
++#export-chat-close { flex-shrink: 0; width: 36px; height: 36px; padding: 0; font-size: 24px; }
++.export-chat-settings { position: absolute; z-index: 50; right: 16px; top: 78px;
++  width: min(390px, calc(100% - 32px)); max-height: calc(100vh - 100px); max-height: calc(100dvh - 100px);
++  box-sizing: border-box; overflow-y: auto; padding: 16px; border: 1px solid var(--line); border-radius: 12px;
++  background: var(--surface); box-shadow: 0 12px 36px #0008; }
++.export-chat-header { display: flex; gap: 12px; margin-bottom: 12px; }
+ .export-chat-header label:first-child { flex: 1; min-width: 0; }
+-.export-chat-drawer label { display: block; color: var(--muted); font-size: 12px; }
++.export-chat-drawer label { display: block; color: var(--muted); font-size: 13px; }
+ .export-chat-drawer select, .export-chat-drawer textarea { display: block; width: 100%; min-width: 0;
+-  box-sizing: border-box; margin-top: 4px; padding: 7px 9px; border: 1px solid var(--line);
+-  border-radius: 8px; color: var(--text); background: var(--bg); font: inherit; }
+-.export-chat-drawer select { text-overflow: ellipsis; }
+-#export-chat-source, #export-live-status, #export-chat-status { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
++  box-sizing: border-box; margin-top: 4px; padding: 9px 11px; border: 1px solid var(--line);
++  border-radius: 8px; color: var(--text); background: var(--background); font: inherit; }
++.export-chat-drawer select { text-overflow: ellipsis; font-size: 14px; }
++#export-chat-source, #export-live-status, #export-chat-status { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+ #export-chat-source { color: var(--teal); }
+-#export-live-refresh { margin-top: 8px; padding: 4px 8px; font-size: 11px; }
+-#export-chat-log { flex: 1; min-height: 70px; overflow-y: auto; overscroll-behavior: contain;
+-  padding: 16px 20px; scrollbar-width: thin; scrollbar-color: var(--line) var(--panel); }
+-.export-chat-empty { color: var(--muted); font-size: 13px; }
+-.export-chat-turn { margin-bottom: 16px; overflow-wrap: anywhere; }
+-.export-chat-user, .export-chat-reply { padding: 10px 12px; border-radius: 10px; background: var(--surface); }
+-.export-chat-user { margin: 0 0 8px 28px; border: 1px solid var(--line); }
++#export-live-refresh, #export-chat-clear { margin-top: 12px; font-size: 13px; }
++.export-chat-stage { margin: 0; padding: 10px 20px; font-size: 13px; color: var(--teal); border-bottom: 1px solid var(--line); }
++.export-chat-stage::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px;
++  border-radius: 50%; background: var(--teal); animation: chat-pulse 1.2s ease-in-out infinite alternate; }
++@keyframes chat-pulse { to { opacity: .35; } }
++#export-chat-log { flex: 1; min-height: 60px; overflow-y: auto; overscroll-behavior: contain;
++  padding: 20px; scrollbar-width: thin; scrollbar-color: var(--line) var(--panel); }
++.export-chat-empty { color: var(--muted); font-size: 16px; }
++.export-chat-ideas { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: 8px; padding: 0 20px 20px; }
++.export-chat-ideas button { padding: 8px 10px; border-radius: 18px; font-size: 13px; }
++.export-chat-turn { margin-bottom: 20px; overflow-wrap: anywhere; }
++.export-chat-user, .export-chat-reply { padding: 12px 14px; border-radius: 10px; background: var(--surface); }
++.export-chat-user { margin: 0 0 10px 28px; border: 1px solid var(--line); }
+ .export-chat-reply { margin-right: 12px; border-left: 3px solid var(--teal); }
+-.export-chat-drawer strong { font-size: 11px; color: var(--teal); }
+-.export-chat-drawer pre { margin: 6px 0 0; white-space: pre-wrap; font: inherit; line-height: 1.6; }
+-.export-chat-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+-.export-chat-evidence { margin-top: 8px; color: var(--muted); font-size: 11px; }
++.export-chat-drawer strong { font-size: 13px; color: var(--teal); }
++.export-chat-drawer pre { margin: 8px 0 0; white-space: pre-wrap; font: inherit; line-height: 1.6; }
++.export-chat-note, .export-chat-checked { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
++.export-chat-evidence { margin-top: 10px; color: var(--muted); font-size: 12px; }
+ .export-chat-evidence summary { cursor: pointer; }
+ .export-chat-ref { display: inline-block; padding: 2px 5px; margin: 4px 4px 0 0;
+   border: 1px solid var(--line); border-radius: 4px; overflow-wrap: anywhere; }
+-.export-chat-compose { padding: 12px 20px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+-.export-chat-drawer textarea { max-height: 100px; resize: vertical; }
+-.export-chat-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+-#export-chat-send { background: var(--teal); color: var(--bg); border-color: var(--teal); font-weight: 600; }
+-.export-chat-toggle:focus-visible, .export-chat-drawer :focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+-.export-chat-drawer[hidden], .export-chat-toggle[hidden] { display: none !important; }
++.export-chat-reply-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
++.export-chat-reply-actions button { font-size: 13px; }
++.export-chat-compose { flex-shrink: 0; position: sticky; bottom: 0; padding: 14px 20px 16px;
++  border-top: 1px solid var(--line); background: var(--surface); }
++.export-chat-drawer textarea { min-height: 70px; max-height: 160px; resize: vertical; font-size: 16px; }
++.export-chat-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
++.export-chat-actions span { font-size: 11px; color: var(--muted); }
++#export-chat-send { background: var(--teal); color: var(--background); border-color: var(--teal); font-weight: 600; }
++.export-chat-toggle:focus-visible, .export-chat-drawer :focus-visible, .export-chat-divider:focus-visible {
++  outline: 2px solid var(--teal); outline-offset: 3px; }
++.export-chat-drawer[hidden], .export-chat-toggle[hidden], .export-chat-divider[hidden] { display: none !important; }
++@media screen and (max-width: 899px) {
++  body.chat-open { display: block; }
++  .chat-open .report-pane { visibility: hidden; }
++  .export-chat-drawer { position: fixed; inset: 0; width: 100%; }
++  .export-chat-divider { display: none; }
++}
+ @media screen and (max-width: 520px) {
+   .export-chat-toggle { right: 14px; bottom: 14px; width: 54px; height: 54px; }
+-  .export-chat-drawer { right: 10px; bottom: 80px; width: calc(100vw - 20px);
+-    height: calc(100vh - 96px); height: calc(100dvh - 96px); border-radius: 14px; }
+-  .export-chat-settings, .export-chat-compose { padding: 10px 14px; }
+-  #export-chat-log { padding: 12px 14px; }
++  .export-chat-heading { padding: 12px 14px; gap: 8px; }
++  .export-chat-heading h2 { font-size: 16px; }
++  .export-chat-heading-actions { gap: 6px; }
++  #export-chat-options-toggle { padding: 7px 9px; }
++  .export-chat-compose { padding: 12px 14px; }
++  #export-chat-log { padding: 16px 14px; }
++  .export-chat-ideas { padding: 0 14px 16px; }
+ }
+-@media print { .export-chat-toggle, .export-chat-drawer { display: none !important; } }
++@media (prefers-reduced-motion: reduce) {
++  .export-chat-drawer *, .export-chat-divider::after { animation: none !important; transition: none !important; }
++}
++@media print {
++  body.chat-open { display: block; height: auto; overflow: visible; }
++  .chat-open .report-pane { height: auto; overflow: visible; visibility: visible; }
++  .export-chat-toggle, .export-chat-drawer, .export-chat-divider { display: none !important; }
++}
+diff --git a/exposureiq/viewer/static/live-chat.js b/exposureiq/viewer/static/live-chat.js
+--- a/exposureiq/viewer/static/live-chat.js
++++ b/exposureiq/viewer/static/live-chat.js
+@@ -25,9 +25,25 @@
+     }
+     clearSessionFragment();
+     window.addEventListener("hashchange", clearSessionFragment);
+-    let selected = bundle.default_scan, health = null, connectionReady = false, busy = false, opened = false;
++    const pane = $("report-pane"), narrow = window.matchMedia("(max-width: 899px)");
++    if (!pane) return;
++    let selected = bundle.default_scan, health = null, connectionReady = false, busy = false, opened = false, optionsOpen = false;
+     let sessionReady = false, generation = 0, healthGeneration = 0, active = null, healthController = null, turns = 0;
+     let conversation = newConversation();
++    let stopProgress = null;
++    function setSplit(value, save = false) {
++      const ratio = Math.max(30, Math.min(70, Math.round(Number(value) * 1000) / 1000));
++      if (!Number.isFinite(ratio)) return;
++      document.body.style.setProperty("--report-split", ratio + "%");
++      $("export-chat-divider").setAttribute("aria-valuenow", String(Math.round(ratio)));
++      if (save) { try { window.sessionStorage.setItem("exposureiq-report-split", String(ratio)); } catch (_) {} }
++    }
++    // Only a bounded layout percentage is retained for this browser tab. No
++    // session token, question, answer, settings or provider data is stored.
++    try {
++      const saved = window.sessionStorage.getItem("exposureiq-report-split");
++      if (saved !== null && /^\d{2}(?:\.\d{1,6})?$/.test(saved)) setSplit(saved);
++    } catch (_) {}
+     function newConversation() {
+       const bytes = new Uint8Array(16); window.crypto.getRandomValues(bytes);
+       return Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+@@ -45,15 +61,40 @@
+       $("export-chat-toggle").setAttribute("aria-expanded", String(opened && available()));
+       $("export-chat-toggle").setAttribute("aria-label", opened ? "Close AI chat" : "Open AI chat");
+       $("export-chat-toggle").title = opened ? "Close AI chat" : "Open AI chat";
++      document.body.classList.toggle("chat-open", opened && available());
++      pane.inert = opened && narrow.matches;
++      pane.setAttribute("aria-hidden", String(opened && narrow.matches));
++      $("export-chat").setAttribute("aria-modal", String(opened && narrow.matches));
++      $("export-chat-divider").hidden = !opened || !available() || narrow.matches;
++      $("export-chat-ideas").hidden = turns > 0;
++      $("export-chat-stage").hidden = !busy;
+       for (const id of ["export-chat-send", "export-chat-input", "export-chat-common", "export-chat-mode"])
+         $(id).disabled = busy || !ready();
++      for (const button of $("export-chat-ideas").querySelectorAll("button")) button.disabled = busy || !ready();
++    }
++    function setOptions(wanted, focus = true) {
++      optionsOpen = Boolean(wanted && opened);
++      $("export-chat-options").hidden = !optionsOpen;
++      $("export-chat-options-toggle").setAttribute("aria-expanded", String(optionsOpen));
++      if (focus) (optionsOpen ? $("export-chat-scan") : $("export-chat-options-toggle")).focus({preventScroll: true});
+     }
+     function setOpen(wanted, focus = true) {
+-      opened = Boolean(wanted && available()); controls();
+-      if (focus && available()) (opened ? (ready() ? $("export-chat-input") : $("export-live-refresh")) : $("export-chat-toggle")).focus();
++      const previous = opened, reportScroll = opened ? pane.scrollTop : window.scrollY;
++      opened = Boolean(wanted && available());
++      if (!opened) setOptions(false, false);
++      controls();
++      if (previous !== opened) {
++        if (opened) pane.scrollTop = reportScroll;
++        else window.scrollTo({top: reportScroll, behavior: "instant"});
++      }
++      if (focus && available()) {
++        if (opened && !ready()) setOptions(true);
++        else (opened ? $("export-chat-input") : $("export-chat-toggle")).focus({preventScroll: true});
++      }
+     }
+     function resetContext(message = "Chat cleared. No conversation is saved.") {
+       generation += 1; if (active) active.abort(); active = null; busy = false;
++      if (stopProgress) stopProgress(); stopProgress = null;
+       conversation = newConversation(); turns = 0;
+       $("export-chat-log").replaceChildren(); $("export-chat-input").value = "";
+       $("export-chat-status").textContent = message; controls();
+@@ -103,13 +144,35 @@
+         $("export-live-status").textContent = "The local server could not be checked. Keep exposureiq web running, then check settings again. No answer is generated here.";
+       } finally { if (current === healthGeneration) healthController = null; }
+     }
++    function watchProgress(requestId, current, selection) {
++      const controller = new AbortController();
++      let pending = false;
++      async function poll() {
++        if (pending || controller.signal.aborted || !busy || current !== generation || selection !== selected) return;
++        pending = true;
++        try {
++          const result = await api("/api/ai/progress?conversation=" + conversation + "&request=" + requestId, undefined, controller, 5000);
++          if (controller.signal.aborted || current !== generation || selection !== selected) return;
++          if (result && typeof result.done === "boolean" && ["Reading your scan", "Phrasing your answer", "Checking the facts", "Reply ready", "Reply unavailable"].includes(result.stage))
++            $("export-chat-stage").textContent = result.stage;
++        } catch (_) { /* Status failure never substitutes an answer. */ }
++        finally { pending = false; }
++      }
++      const timer = setInterval(poll, 300);
++      poll();
++      return () => { clearInterval(timer); controller.abort(); };
++    }
+     function renderReply(userText, result, existing = null) {
++      const log = $("export-chat-log"), nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
++      let preserveTop = log.scrollTop;
+       const turn = existing || node("article", "", "export-chat-turn");
+       const user = node("div", "", "export-chat-user"), reply = node("div", "", "export-chat-reply");
+       user.append(node("strong", "You · sent"), node("pre", userText));
+-      reply.append(node("strong", "ExposureIQ · " + (result.pending ? "thinking" : result.label || "AI draft")), node("pre", result.text));
++      const answer = node("pre", result.text);
++      reply.append(node("strong", "ExposureIQ · " + (result.pending ? "thinking" : result.label || "AI draft")), answer);
+       if (result.offline_notice) reply.append(node("p", result.offline_notice, "export-chat-note"));
+       if (result.failure_kind && result.reason) reply.append(node("p", result.reason, "export-chat-note"));
++      if (result.footer) reply.append(node("p", result.footer, "export-chat-checked"));
+       const refs = result.evidence_refs || [];
+       if (refs.length) {
+         const evidence = node("details", "", "export-chat-evidence"); evidence.append(node("summary", "Evidence"));
+@@ -117,16 +180,35 @@
+         if (result.review_note) evidence.append(node("p", result.review_note, "export-chat-note"));
+         reply.append(evidence);
+       }
++      const actions = node("div", "", "export-chat-reply-actions");
++      if (!result.pending) {
++        const copy = node("button", "Copy answer"); copy.type = "button";
++        copy.addEventListener("click", async () => {
++          try {
++            await window.navigator.clipboard.writeText(result.text);
++            copy.textContent = "Copied";
++            setTimeout(() => { copy.textContent = "Copy answer"; }, 1500);
++          } catch (_) {
++            const range = document.createRange(); range.selectNodeContents(answer);
++            const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
++            $("export-chat-status").textContent = "Automatic copy is unavailable. The answer is selected for you to copy.";
++          }
++        });
++        actions.append(copy);
++      }
+       if (result.retryable && typeof result.retry_id === "string" && /^[a-f0-9]{32}$/.test(result.retry_id)) {
+         const retry = node("button", "Try again", "export-chat-retry"); retry.type = "button";
+-        retry.addEventListener("click", () => send(result.user, result.retry_id)); reply.append(retry);
+-      }
++        retry.addEventListener("click", () => send(result.user, result.retry_id)); actions.append(retry);
++      }
++      if (actions.children.length) reply.append(actions);
+       turn.replaceChildren(user, reply);
+-      const log = $("export-chat-log");
+       if (!existing) { if (!turns) log.replaceChildren(); turns += 1; log.append(turn); }
+-      while (log.children.length > 3) log.removeChild(log.children[0]);
+-      $("export-chat-status").textContent = result.pending ? "Thinking · reading saved evidence and checking the answer…" : result.footer || "Reply ready. Review it with your team.";
+-      log.scrollTop = log.scrollHeight;
++      // UI turns remain in this page only. Model memory is still the last three
++      // exchanges; viewing an older answer does not force the reader downward.
++      while (log.children.length > 30) { preserveTop -= log.children[0].getBoundingClientRect().height; log.removeChild(log.children[0]); }
++      $("export-chat-ideas").hidden = turns > 0;
++      $("export-chat-status").textContent = result.pending ? "Sending your question…" : result.footer || "Reply ready. Review it with your team.";
++      log.scrollTop = nearBottom ? log.scrollHeight : Math.max(0, preserveTop);
+       return turn;
+     }
+     function cleanQuestion(value) {
+@@ -138,6 +220,9 @@
+       const question = cleanQuestion(value);
+       if (!question || [...question].length > 1000) { $("export-chat-status").textContent = "Ask a nonempty question of at most 1000 characters."; return; }
+       const current = generation, selection = selected, mode = $("export-chat-mode").value, controller = new AbortController();
++      const requestId = newConversation();
++      let finishProgress = null;
++      $("export-chat-stage").textContent = "Sending your question…";
+       busy = true; active = controller; controls(); $("export-chat-input").value = "";
+       const turn = renderReply("Question sent. Your text will appear after private redaction.", {pending: true, text: "Thinking…"});
+       try {
+@@ -146,8 +231,9 @@
+         await checkHealth();
+         if (current !== generation || selection !== selected) return;
+         if (!ready()) throw new Error("Local AI not ready");
+-        const payload = {scan: health.scan_id, question, mode, conversation};
++        const payload = {scan: health.scan_id, question, mode, conversation, progress_id: requestId};
+         if (retryId) payload.retry_id = retryId;
++        finishProgress = watchProgress(requestId, current, selection); stopProgress = finishProgress;
+         const result = await api("/api/ai/ask", payload, controller, 125000);
+         if (current !== generation || selection !== selected) return;
+         if (!result || typeof result.text !== "string" || result.text.length > 32000 || typeof result.user !== "string" || result.user.length > 4000
+@@ -166,7 +252,11 @@
+             : "The local AI server did not answer. Keep exposureiq web running, check settings and try again. No reply was generated by this page.",
+           label: "Reply unavailable", footer: "No prepared answer was substituted. Your saved report is still available."
+         }, turn);
+-      } finally { if (current === generation) { busy = false; active = null; controls(); } }
++      } finally {
++        if (finishProgress) finishProgress();
++        if (stopProgress === finishProgress) stopProgress = null;
++        if (current === generation) { busy = false; active = null; controls(); }
++      }
+     }
+     function selectScan(identifier, navigate = false) {
+       if (!Object.hasOwn(bundle.scans, identifier) || identifier === selected) return;
+@@ -187,14 +277,47 @@
+     }
+     $("export-chat-scan").value = selected;
+     for (const question of bundle.questions) { const option = node("option", question); option.value = question; $("export-chat-common").append(option); }
++    for (const question of ["What is the worst finding?", "What should I fix first?", "Explain this scan in simple words."]) {
++      const chip = node("button", question); chip.type = "button"; chip.addEventListener("click", () => send(question)); $("export-chat-ideas").append(chip);
++    }
++    const divider = $("export-chat-divider");
++    divider.addEventListener("pointerdown", event => { if (event.button === 0) { divider.setPointerCapture(event.pointerId); event.preventDefault(); } });
++    divider.addEventListener("pointermove", event => { if (divider.hasPointerCapture(event.pointerId)) setSplit(event.clientX / window.innerWidth * 100, true); });
++    divider.addEventListener("pointerup", event => { if (divider.hasPointerCapture(event.pointerId)) divider.releasePointerCapture(event.pointerId); });
++    divider.addEventListener("dblclick", () => setSplit(50, true));
++    divider.addEventListener("keydown", event => {
++      const value = Number(divider.getAttribute("aria-valuenow"));
++      const next = {ArrowLeft: value - 2, ArrowRight: value + 2, Home: 30, End: 70}[event.key];
++      if (next !== undefined) { event.preventDefault(); setSplit(next, true); }
++    });
++    narrow.addEventListener("change", () => { controls(); if (opened && narrow.matches) (ready() && !busy ? $("export-chat-input") : $("export-chat-close")).focus({preventScroll: true}); });
+     $("export-chat-toggle").addEventListener("click", () => setOpen(!opened));
+     $("export-chat-close").addEventListener("click", () => setOpen(false));
+-    $("export-chat").addEventListener("keydown", event => { if (event.key === "Escape") { event.preventDefault(); setOpen(false); } });
++    $("export-chat-options-toggle").addEventListener("click", () => setOptions(!optionsOpen));
++    document.addEventListener("click", event => {
++      if (optionsOpen && !$("export-chat-options").contains(event.target) && !$("export-chat-options-toggle").contains(event.target)) setOptions(false, false);
++    });
++    $("export-chat").addEventListener("keydown", event => {
++      if (event.key === "Escape") { event.preventDefault(); if (optionsOpen) setOptions(false); else setOpen(false); }
++      if (event.key === "Tab" && opened && narrow.matches) {
++        const focusable = [...$("export-chat").querySelectorAll("button, select, textarea, summary")].filter(element => !element.disabled && element.getClientRects().length);
++        const first = focusable[0], last = focusable[focusable.length - 1];
++        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
++        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
++      }
++    });
++    document.addEventListener("keydown", event => {
++      // Disabling the composer during a request can move focus to the document.
++      // Escape still restores the report; don't handle a bubbled event twice.
++      if (event.key === "Escape" && opened && !event.defaultPrevented) {
++        event.preventDefault(); if (optionsOpen) setOptions(false); else setOpen(false);
++      }
++    });
+     $("export-chat-send").addEventListener("click", () => send());
+-    $("export-chat-clear").addEventListener("click", () => resetContext());
++    $("export-chat-clear").addEventListener("click", () => { resetContext(); setOptions(false, false); $("export-chat-input").focus({preventScroll: true}); });
+     $("export-chat-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } });
+     $("export-chat-scan").addEventListener("change", () => selectScan($("export-chat-scan").value, true));
+-    $("export-chat-common").addEventListener("change", () => { const question = $("export-chat-common").value; $("export-chat-common").value = ""; if (question) send(question); });
++    $("export-chat-common").addEventListener("change", () => { const question = $("export-chat-common").value; $("export-chat-common").value = ""; if (question) { setOptions(false, false); send(question); } });
+     $("export-live-refresh").addEventListener("click", checkHealth);
+     window.addEventListener("focus", checkHealth);
+     window.addEventListener("hashchange", syncReportSelection); window.addEventListener("popstate", syncReportSelection);
+@@ -208,7 +331,7 @@
+       setTimeout(() => { clearSessionFragment(); sessionReady = true; controls(); }, 50);
+     });
+     const poll = setInterval(() => { if (document.visibilityState !== "hidden") checkHealth(); }, 5000);
+-    window.addEventListener("pagehide", () => { clearInterval(poll); if (active) active.abort(); if (healthController) healthController.abort(); });
++    window.addEventListener("pagehide", () => { clearInterval(poll); if (stopProgress) stopProgress(); if (active) active.abort(); if (healthController) healthController.abort(); });
+   }
+   // A native POST navigation may apply its fragment after inline scripts run.
+   // Read the per-launch token only after that document has finished loading.
+diff --git a/tests/fixtures/dynamic_chat/source-provenance.json b/tests/fixtures/dynamic_chat/source-provenance.json
+--- a/tests/fixtures/dynamic_chat/source-provenance.json
++++ b/tests/fixtures/dynamic_chat/source-provenance.json
+@@ -3,6 +3,18 @@
+   "historical_manifest_sha256": "a729c5bddcc729c3bbad36278cec44b5d823c9fc3c6eff76eabdaf5c77aa013f",
+   "meaning": "Earlier browser captures are historical. Their artifacts and source hashes are unchanged, not relabelled as validation of the dynamic-chat tiers. Capture hashes matched the preserved pre-task sources.",
+   "replaced_sources": {
++    "exposureiq/report/html.py": {
++      "capture_sha256": "b12787e4c73ed94baeb9d72ea32dc2299f93df7c3c9c1af1c47349ff32f81ee5",
++      "reason": "Tier 2: local-chat-only scrollable report pane; scan-only exports remain unchanged."
++    },
++    "exposureiq/viewer/export.py": {
++      "capture_sha256": "77acdbe891f7257e641ff41b0d77b6c2448ac686a52dccc3cae9d71ef6e066ea",
++      "reason": "Tier 2: accessible split-pane divider, one Chat options menu and empty-chat suggestion chips."
++    },
++    "exposureiq/viewer/static/live-chat.css": {
++      "capture_sha256": "ff434afbc99a23f28b5996fbdca784495a7f04accdb67e40a5f7765624adc597",
++      "reason": "Tier 2: split-screen desktop layout, narrow full-screen chat, independent scrolling and reduced-motion styling."
++    },
+     "exposureiq/viewer/server.py": {
+       "capture_sha256": "eb630311639444fd9a10c5f68128d2e7b21c036d19dcc6140c3907e0b6d478db",
+       "reason": "Tier 1: conversation-bound retry metadata and honest checked-facts labels."
+diff --git a/tests/test_split_chat.py b/tests/test_split_chat.py
+--- /dev/null
++++ b/tests/test_split_chat.py
+@@ -0,0 +1,102 @@
++"""Tier 2 structure, real progress and unchanged authenticated boundaries."""
++
++import json
++import threading
++from importlib.resources import files
++
++import pytest
++
++from dynamic_chat_fakes import acceptance_scan
++from exposureiq.ai.config import AIConfig
++from exposureiq.ai.provider import FakeProvider
++from exposureiq.ai.service import AIService
++from exposureiq.viewer.export import live_report_page
++from exposureiq.viewer.server import MAX_PROGRESS_CONTEXTS
++from test_viewer import first_id, local_viewer, request, saved_root
++
++
++def test_split_markup_has_one_options_menu_and_only_live_report_gets_a_pane(portal_html):
++    scan = acceptance_scan()
++    page = live_report_page(scan, [scan], ai_enabled=True)
++    parsed = portal_html(page)
++    assert parsed.ids.count("report-pane") == parsed.ids.count("export-chat-divider") == 1
++    assert parsed.ids.count("export-chat-options") == parsed.ids.count("export-chat-clear") == 1
++    assert 'role="separator" tabindex="0"' in page and 'aria-valuemin="30" aria-valuemax="70" aria-valuenow="50"' in page
++    options = page.split('<div id="export-chat-options"', 1)[1].split('<p id="export-chat-stage"', 1)[0]
++    for identifier in ("export-chat-scan", "export-chat-mode", "export-chat-common", "export-chat-source", "export-live-status", "export-live-refresh", "export-chat-clear"):
++        assert f'id="{identifier}"' in options
++    for name in ("report-pane", "export-chat-divider", "export-chat-options", "exposureiq-chat-data"):
++        assert f'id="{name}"' not in live_report_page(scan, [scan], ai_enabled=False)
++    assert 'aria-label="Suggested questions"' in page and 'Shift+Enter for a new line' in page
++
++
++def test_split_style_and_script_are_bounded_accessible_and_literal():
++    static = files("exposureiq.viewer").joinpath("static")
++    css = static.joinpath("live-chat.css").read_text(encoding="utf-8")
++    script = static.joinpath("live-chat.js").read_text(encoding="utf-8")
++    for value in ("var(--report-split, 50%)", "font: 16px/1.5", "position: sticky; bottom: 0", "max-width: 899px", "prefers-reduced-motion", "overflow-y: auto"):
++        assert value in css
++    assert 'Math.max(30, Math.min(70,' in script
++    assert 'pane.inert = opened && narrow.matches' in script and 'event.key === "Tab"' in script
++    assert 'log.scrollTop = nearBottom ?' in script and 'Copy answer' in script
++    assert script.count('chip.type = "button"') == 1 and 'turns > 0' in script
++    assert 'credentials: "omit"' in script and 'mode: "same-origin"' in script
++    assert 'Status failure never substitutes an answer' in script
++    for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "new Function", "localStorage", "api_key", "base_url"):
++        assert forbidden not in script
++
++
++def test_status_reads_a_real_blocked_phraser_without_unlocking_ai_or_leaking_text(saved_root):
++    class Blocking(FakeProvider):
++        def __init__(self):
++            super().__init__()
++            self.entered, self.release = threading.Event(), threading.Event()
++
++        def complete(self, *args, **kwargs):
++            self.entered.set()
++            assert self.release.wait(5)
++            return super().complete(*args, **kwargs)
++
++    fake = Blocking()
++    service = AIService(AIConfig(mode="demo"), provider=fake, use_cache=False)
++    with local_viewer(saved_root, service=service) as server:
++        payload = {"scan": first_id(server), "question": "What is the worst finding?", "conversation": "1" * 32, "progress_id": "2" * 32}
++        response = []
++        worker = threading.Thread(target=lambda: response.append(request(server, "/api/ai/ask", method="POST", payload=payload)))
++        worker.start()
++        try:
++            assert fake.entered.wait(3)
++            path = "/api/ai/progress?conversation=" + payload["conversation"] + "&request=" + payload["progress_id"]
++            code, _, raw = request(server, path)
++            assert code == 200 and json.loads(raw) == {"stage": "Phrasing your answer", "done": False}
++            assert server.state.ai_lock.locked() and "question" not in raw.decode()
++            assert request(server, path, authenticated=False)[0] == 403
++            assert request(server, path, origin="https://other.example.com")[0] == 403
++            assert request(server, path.replace("1" * 32, "3" * 32))[0] == 400
++            assert request(server, path + "&request=" + "4" * 32)[0] == 400
++        finally:
++            fake.release.set()
++            worker.join(timeout=5)
++        assert response[0][0] == 200 and not worker.is_alive()
++        assert json.loads(request(server, path)[2]) == {"stage": "Reply ready", "done": True}
++
++
++@pytest.mark.parametrize("progress,conversation", [(None, "1" * 32), ("../private", "1" * 32), ("", "1" * 32), ("2" * 32, "")])
++def test_progress_requires_bounded_conversation_identifiers(saved_root, progress, conversation):
++    with local_viewer(saved_root) as server:
++        payload = {"scan": first_id(server), "question": "thanks", "conversation": conversation, "progress_id": progress}
++        assert request(server, "/api/ai/ask", method="POST", payload=payload)[0] == 400
++        assert not server.state.service.audit
++
++
++def test_progress_is_memory_bounded_and_no_call_turns_do_not_claim_live_ai(saved_root):
++    with local_viewer(saved_root) as server:
++        identifier = first_id(server)
++        for index in range(MAX_PROGRESS_CONTEXTS + 2):
++            result = server.state.ask({"scan": identifier, "question": "thanks", "conversation": "1" * 32, "progress_id": f"{index:032x}"})
++            assert result["source"] == "built-in" and not result.get("fact_check_ran")
++        assert len(server.state.chat_progress) == MAX_PROGRESS_CONTEXTS and not server.state.service.audit
++        assert ("1" * 32, "0" * 32) not in server.state.chat_progress
++        server.state.service.config = AIConfig()
++        server.state.health()
++        assert not server.state.chat_progress
+diff --git a/tests/test_viewer.py b/tests/test_viewer.py
+--- a/tests/test_viewer.py
++++ b/tests/test_viewer.py
+@@ -652,9 +652,12 @@
+         assert not server.state.chats and b"headline" not in raw
+ 
+ 
+-def test_server_only_live_script_uses_no_provider_connection_or_persistent_storage():
++def test_server_only_live_script_stores_only_a_tab_local_layout_ratio():
+     script = files("exposureiq.viewer").joinpath("static/live-chat.js").read_text(encoding="utf-8")
+-    for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "new Function", "localStorage", "sessionStorage", "api_key", "base_url", "https://", "http://", "XMLHttpRequest", "WebSocket"):
++    for forbidden in ("innerHTML", "outerHTML", "insertAdjacentHTML", "eval(", "new Function", "localStorage", "api_key", "base_url", "https://", "http://", "XMLHttpRequest", "WebSocket"):
+         assert forbidden not in script
+     assert '"/api/health?signature="' in script and '"/api/ai/ask"' in script
+     assert 'credentials: "omit"' in script and 'redirect: "error"' in script and 'mode: "same-origin"' in script
++    assert script.count("sessionStorage") == 2
++    assert 'sessionStorage.setItem("exposureiq-report-split", String(ratio))' in script
++    assert 'sessionStorage.getItem("exposureiq-report-split")' in script

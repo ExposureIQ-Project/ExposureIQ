@@ -1,0 +1,63 @@
+.....................F                                                   [100%]
+=================================== FAILURES ===================================
+_____________ test_tui_missing_scan_and_failed_launcher_are_honest _____________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-12/test_tui_missing_scan_and_fail0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fc4ceea9b10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fc4cee3b2a0>
+
+    def test_tui_missing_scan_and_failed_launcher_are_honest(tmp_path, ai_scan_factory, monkeypatch):
+        path = tmp_path / "saved.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+        notices = []
+        monkeypatch.setattr(tui, "open_browser", lambda url: False)
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=tmp_path)
+            app.ai_service = AIService(AIConfig(), use_cache=False)
+            app.notify = lambda text, **kwargs: notices.append(text)
+            async with app.run_test(size=(110, 38)) as pilot:
+                await pilot.click("#open-html-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert "Browser launch unavailable" in notices[-1] and "http://127.0.0.1:" in notices[-1]
+                path.unlink()  # Remove only this test's synthetic fixture.
+                await pilot.click("#open-html-report")
+                await app.report_open_worker.wait()
+                await pilot.pause()
+                assert "could not be opened safely" in notices[-1] and "http://" not in notices[-1]
+>       asyncio.run(exercise())
+
+tests/test_report_open.py:296: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=tmp_path)
+        app.ai_service = AIService(AIConfig(), use_cache=False)
+        app.notify = lambda text, **kwargs: notices.append(text)
+        async with app.run_test(size=(110, 38)) as pilot:
+            await pilot.click("#open-html-report")
+            await app.report_open_worker.wait()
+            await pilot.pause()
+            assert "Browser launch unavailable" in notices[-1] and "http://127.0.0.1:" in notices[-1]
+            path.unlink()  # Remove only this test's synthetic fixture.
+            await pilot.click("#open-html-report")
+            await app.report_open_worker.wait()
+            await pilot.pause()
+>           assert "could not be opened safely" in notices[-1] and "http://" not in notices[-1]
+E           AssertionError: assert ('could not be opened safely' in 'Browser launch unavailable; open this URL manually.\nhttp://127.0.0.1:42541/?report=f740dfa3e27e440b139848ed&view=scan#[session-redacted]\nKeep this URL private. The local viewer stops when the TUI exits.')
+
+tests/test_report_open.py:295: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_report_open.py::test_tui_missing_scan_and_failed_launcher_are_honest
+1 failed, 21 passed in 4.93s

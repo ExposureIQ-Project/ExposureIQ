@@ -1,0 +1,54 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "attempt": 1,
+      "passed": true,
+      "checks": [
+        "native token-protected report form",
+        "same-origin health",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "safe provider fallback",
+        "Off clears chat",
+        "backend-down prepared fallback"
+      ]
+    },
+    {
+      "attempt": 2,
+      "passed": true,
+      "checks": [
+        "native token-protected report form",
+        "same-origin health",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "safe provider fallback",
+        "Off clears chat",
+        "backend-down prepared fallback"
+      ]
+    },
+    {
+      "attempt": 3,
+      "passed": true,
+      "checks": [
+        "native token-protected report form",
+        "same-origin health",
+        "no provider call on health/greeting/thanks",
+        "three-turn fresh-wording host context",
+        "code-added first-use definition and once-only disclaimer",
+        "collapsed/opened Evidence",
+        "technical mode",
+        "safe provider fallback",
+        "Off clears chat",
+        "backend-down prepared fallback"
+      ]
+    }
+  ],
+  "limitation": "Fresh browser profiles and local servers; same-origin loopback HTTP and offline fakes only. No real key/provider/target traffic."
+}

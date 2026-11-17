@@ -204,7 +204,7 @@ def test_saved_result_design_keeps_tabs_columns_and_rounded_count_chips(size, tm
 
             assert {pane.id for pane in app.query(TabPane)} == {
                 "summary-tab", "subdomains-tab", "hosts-tab", "technologies-tab",
-                "findings-tab", "ports-tab", "scan-diff-tab",
+                "findings-tab", "ports-tab", "scan-diff-tab", "ai-tab",
             }
             assert app.query_one("#severity-counts").parent.id == "results"
             for severity, count, foreground in (
