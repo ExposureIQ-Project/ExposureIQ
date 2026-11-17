@@ -1,0 +1,3 @@
+PASS: real Firefox native-report and live-fake checks, repeat 1/3
+PASS: real Firefox native-report and live-fake checks, repeat 2/3
+PASS: real Firefox native-report and live-fake checks, repeat 3/3

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 216, in <module>
+    run()
+    ~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/tests/fixtures/dynamic_chat/check_split_browser.py", line 142, in run
+    assert browser.script("return document.getElementById('export-chat-divider').getAttribute('aria-valuenow');") == "30"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

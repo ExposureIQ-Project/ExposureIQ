@@ -1,0 +1,21 @@
+{
+  "source": "synthetic DEMO-HISTORY-04 only",
+  "command": ".venv/bin/exposureiq report /tmp/opencode/s5-html-export-rekkyj9w/results/example.com/demo-04.json --format html --results-dir /tmp/opencode/s5-html-export-rekkyj9w/results -o /tmp/opencode/s5-html-export-rekkyj9w/index.html",
+  "html": "/tmp/opencode/s5-html-export-rekkyj9w/index.html",
+  "bytes": 1406175,
+  "scans": 10,
+  "intents": 12,
+  "modes": [
+    "simple",
+    "technical"
+  ],
+  "warnings": [],
+  "scripts": 2,
+  "inert_json_blocks": 1,
+  "external_assets": 0,
+  "network": "offline export uses connect-src none",
+  "default_scan": "scan-feb0be2d1009999a9c04",
+  "browser": "installed Firefox, real headless browser",
+  "live_browser": "installed Firefox, real headless browser",
+  "live_report_bytes": 1415223
+}

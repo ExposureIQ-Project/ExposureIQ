@@ -1,0 +1,89 @@
+........................................................................ [ 31%]
+........................................................................ [ 62%]
+..............F......................................................... [ 94%]
+.............                                                            [100%]
+=================================== FAILURES ===================================
+____ test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle ____
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-4/test_reply_source_failure_reas0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7f9edf8c61f0>
+
+    def test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle(tmp_path, ai_scan_factory):
+        class Intermittent(FakeProvider):
+            unavailable = True
+    
+            def complete(self, messages, **kwargs):
+                if self.unavailable:
+                    self.calls += 1
+                    raise ProviderError("FAKE-NO-RAW-ERROR-ONLY", kind="connection")
+                return super().complete(messages, **kwargs)
+    
+        path = tmp_path / "results" / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+            provider = Intermittent()
+            app.ai_service = AIService(AIConfig(mode="local", model="offline-test"), provider=provider, use_cache=False)
+            async with app.run_test(size=(125, 48)) as pilot:
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                panel = app.query_one(AIPanel)
+                for question in ("Which host is the most exposed?", "then why would i fix it first?"):
+                    panel.start_chat(question)
+                    await panel.chat_worker.wait()
+                    await pilot.pause()
+                    reply = panel.exchanges[-1][1]
+                    assert "Built-in fallback" in plain(reply.heading)
+                    assert "Cannot reach the configured AI endpoint" in plain(reply.status)
+                    assert "FAKE-NO-RAW" not in plain(reply.status) + plain(reply.body)
+                    assert "F-0001" in plain(reply.evidence_text) and reply.evidence.collapsed
+                    assert "db.example.com" in plain(reply.body)
+                    assert panel.last_result["answer_focus"]["host"] == "db.example.com"
+                assert sum("Offline mode:" in plain(reply.status) for _, reply in panel.exchanges) == 1
+                provider.unavailable = False
+                panel.query_one("#ai-wording-mode", Select).value = "technical"
+                await pilot.pause()
+                panel.start_chat("what would that do or cause if didn't fixed?")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert panel.last_result["mode"] == "technical" and panel.last_result["answer_kind"] == "impact"
+                assert "Offline test reply" in plain(panel.exchanges[-1][1].heading)
+                assert "wording needs review" in plain(panel.query_one("#ai-chat-verified", Static))
+                panel.exchanges[-1][1].evidence.collapsed = False
+                await pilot.pause()
+                assert panel.exchanges[-1][1].evidence_text.region.height > 0
+                assert app.worker is None
+>       asyncio.run(exercise())
+
+tests/test_tui_ai_chat.py:320: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+        provider = Intermittent()
+        app.ai_service = AIService(AIConfig(mode="local", model="offline-test"), provider=provider, use_cache=False)
+        async with app.run_test(size=(125, 48)) as pilot:
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            panel = app.query_one(AIPanel)
+            for question in ("Which host is the most exposed?", "then why would i fix it first?"):
+                panel.start_chat(question)
+>               await panel.chat_worker.wait()
+                      ^^^^^^^^^^^^^^^^^^^^^^
+E               AttributeError: 'NoneType' object has no attribute 'wait'
+
+tests/test_tui_ai_chat.py:297: AttributeError
+=========================== short test summary info ============================
+FAILED tests/test_tui_ai_chat.py::test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle
+1 failed, 228 passed in 68.94s (0:01:08)

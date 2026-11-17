@@ -1,0 +1,159 @@
+{
+  "model": "qwen2.5:3b-instruct",
+  "provider": "installed local Ollama, OpenAI-compatible /v1",
+  "network": "loopback only; non-loopback sockets and external DNS blocked",
+  "scan": "acceptance_scan synthetic reserved names/IPs; no real scan used",
+  "settings": "explicit temporary local config; no saved preferences or key read; no downloads",
+  "limit": "One synthetic seven-question trial is not a general accuracy benchmark. Reference/number checks do not prove every model-written claim.",
+  "seconds": 15.08,
+  "attempts": 11,
+  "live_turns": 3,
+  "fallback_turns": 3,
+  "turns": [
+    {
+      "question": "what is the most bad finding here in this scan?",
+      "answer": "The most severe finding is a database (a service that stores information) service exposed on db.example.com, which has an urgent priority label and high severity. This exposes sensitive data to unauthorized access if proper security controls are not in place.",
+      "badge": "Live AI · qwen2.5:3b-instruct",
+      "source": "local",
+      "fallback_kind": "",
+      "reason": "",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "references": [
+        "F-0001"
+      ],
+      "wording_verified": false,
+      "attempts": 1,
+      "seconds": 5.55
+    },
+    {
+      "question": "then how can i fix it?",
+      "answer": "Fix steps: Ask owner about needed database access. Block public connections at firewall, allow only approved systems. Keep database on private network and grant each app required permissions only. Ensure application works post-change before finalizing.",
+      "badge": "Live AI · qwen2.5:3b-instruct",
+      "source": "local",
+      "fallback_kind": "",
+      "reason": "",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "references": [
+        "R:ports.database_exposed"
+      ],
+      "wording_verified": false,
+      "attempts": 2,
+      "seconds": 2.06
+    },
+    {
+      "question": "how long would that take?",
+      "answer": "For database, the typical effort is hours; moving an application to a private network can take days.\n\nThese are planning ranges, not times measured by your scan.\n\nAsk IT or the database administrator, with the application owner to check dependencies before giving a deadline.",
+      "badge": "Built-in answer",
+      "source": "template",
+      "fallback_kind": "evidence",
+      "reason": "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "references": [
+        "R:ports.database_exposed",
+        "F-0001"
+      ],
+      "wording_verified": false,
+      "attempts": 2,
+      "seconds": 1.82
+    },
+    {
+      "question": "what do you think?",
+      "answer": "My honest take: keep private services private before polishing smaller website protections.\n\nThat means giving database practical attention, not assuming anyone got in.\n\nAsk the application owner which systems genuinely need database access.",
+      "badge": "Built-in answer",
+      "source": "template",
+      "fallback_kind": "reply_format",
+      "reason": "The model's reply was not in a usable format, so I answered from your saved scan.",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "db.example.com",
+        "finding_id": "F-0001",
+        "scope": "finding"
+      },
+      "references": [
+        "R:ports.database_exposed",
+        "F-0001"
+      ],
+      "wording_verified": false,
+      "attempts": 2,
+      "seconds": 1.72
+    },
+    {
+      "question": "what does SMB mean?",
+      "answer": "SMB stands for Server Message Block, a file-sharing service that allows computers to share files with each other. It could expose shared folders if permissions are weak, potentially letting unauthorized access to sensitive data.",
+      "badge": "Live AI · qwen2.5:3b-instruct",
+      "source": "local",
+      "fallback_kind": "",
+      "reason": "",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "files.example.com",
+        "finding_id": "F-0003",
+        "scope": "finding"
+      },
+      "references": [
+        "R:ports.smb_exposed"
+      ],
+      "wording_verified": false,
+      "attempts": 2,
+      "seconds": 2.15
+    },
+    {
+      "question": "who should fix it?",
+      "answer": "Ask IT or the file-server administrator to own the SMB fix.\n\nGive them this finding and ask who still needs the affected service.\n\nAgree a safe change and a check that normal work still functions.",
+      "badge": "Built-in answer",
+      "source": "template",
+      "fallback_kind": "evidence",
+      "reason": "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.",
+      "facts_note": "Facts checked against your saved scan",
+      "focus": {
+        "host": "files.example.com",
+        "finding_id": "F-0003",
+        "scope": "finding"
+      },
+      "references": [
+        "R:ports.smb_exposed",
+        "F-0003"
+      ],
+      "wording_verified": false,
+      "attempts": 2,
+      "seconds": 1.78
+    },
+    {
+      "question": "thanks",
+      "answer": "You're welcome. We can come back to the saved findings whenever you're ready.",
+      "badge": "Built-in answer",
+      "source": "built-in",
+      "fallback_kind": "",
+      "reason": "",
+      "facts_note": "",
+      "focus": {},
+      "references": [],
+      "wording_verified": true,
+      "attempts": 0,
+      "seconds": 0.0
+    }
+  ],
+  "sources": {
+    "exposureiq/ai/chat.py": "1afeb2baba4e35188be698796f6ff32583bbed1e9f0c55325d8b5a7f323c8aae",
+    "exposureiq/ai/facts.py": "c32a1c524d91d45c39afb24cafbf4208e8ff32831996d058bc4e40dcaeeba81d",
+    "exposureiq/ai/checker.py": "c2f8f79144c542c8f5f1bcd4990b780fd0a2ac3ff49f4ed350b8cb65baa2914a",
+    "exposureiq/ai/prompts.py": "bb065e27d5b818b4ca35bc2548550d2c43455e7bd995e89182d19839874e8746",
+    "exposureiq/ai/provider.py": "50af8dfa6275036c92ac4edd56113fabec355708b538ab0d7212e61d40e80da3"
+  },
+  "outcome_counter_note": "The initial capture summary used the wrong live source name. This counter was corrected from the unchanged captured turns; no extra model call ran."
+}

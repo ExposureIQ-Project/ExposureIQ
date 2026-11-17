@@ -1,0 +1,6 @@
+Actual address: {'type': 'str', 'home_anchor': False, 'session_fragment': True, 'correct_path': True}
+DOM location: {'home_anchor': False, 'hash_length': 44, 'wrapped_home_anchor': False, 'same_view': True, 'live_api': 'undefined', 'wrapped_live_api': 'undefined'}
+After explicit late health: {'home_anchor': True, 'hash_length': 12}
+Actual address after health: {'home_anchor': True, 'session_fragment': False}
+Direct History API: {'home_anchor': True, 'hash_length': 12}
+Actual address after direct History API: {'home_anchor': True, 'session_fragment': False}

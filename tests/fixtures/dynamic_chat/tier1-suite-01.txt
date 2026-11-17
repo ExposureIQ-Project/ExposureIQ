@@ -1,0 +1,116 @@
+........................................................................ [  3%]
+........................................................................ [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+........................................................................ [ 41%]
+........................................................................ [ 45%]
+........................................................................ [ 49%]
+........................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 60%]
+........................................................................ [ 64%]
+........................................................................ [ 67%]
+.................................................................... [ 71%]
+........................................................................ [ 75%]
+.....................F..F............................................... [ 78%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+........................................................................ [ 90%]
+........................................................................ [ 94%]
+..............................................ssssssssssssssssssssssssss [ 97%]
+sssssssssss.sssssssssssssssssssssssssssss                                [100%]
+=================================== FAILURES ===================================
+______ test_fresh_wording_evidence_fake_keeps_host_facts_and_unique_refs _______
+
+    def test_fresh_wording_evidence_fake_keeps_host_facts_and_unique_refs():
+        from scripts.stage5_natural_fake import NaturalEvidenceProvider
+        from exposureiq.ai.chat import Chat
+        from exposureiq.ai.config import AIConfig, LOCAL_BASE
+        from exposureiq.ai.service import AIService, chat_text
+        from exposureiq.ai.tools import ReadOnlyTools
+        from exposureiq.demo_data import build_demo_scans
+        from exposureiq.insight.digest import scan_digest
+    
+        scan, fake = build_demo_scans()[3], NaturalEvidenceProvider()
+        service = AIService(AIConfig(mode="local", base_url=LOCAL_BASE, model="offline-only"), provider=fake, use_cache=False)
+        chat = Chat(scan_digest(scan), ReadOnlyTools(scan), service)
+        for question in ("Which host is the most exposed?", "then why would i fix it first?", "what would that do or cause if didn't fixed?"):
+            result = chat.ask(question)
+>           assert result["source"] == "fake" and not result["failure_kind"] and not result["dropped"]
+E           AssertionError: assert ('template' == 'fake'
+E             
+E             - fake
+E             + template)
+
+tests/test_stage5_evidence.py:86: AssertionError
+_ test_live_drawer_evidence_has_no_prepared_export_and_matches_actual_sources __
+
+    def test_live_drawer_evidence_has_no_prepared_export_and_matches_actual_sources():
+        structure = json.loads((EVIDENCE / "live-drawer-structure.json").read_text(encoding="utf-8"))
+        live = json.loads((EVIDENCE / "live-drawer-browser.json").read_text(encoding="utf-8"))
+        repeats = json.loads((EVIDENCE / "live-drawer-repeatability.json").read_text(encoding="utf-8"))
+        manifest = json.loads((EVIDENCE / "live-drawer-manifest.json").read_text(encoding="utf-8"))
+        assert structure["prepared_replies"] == structure["inert_json_blocks"] == structure["external_assets"] == 0
+        assert structure["scripts"] == 1 and structure["scans"] == 10
+        assert live["passed"] and "initial Off report has no chat" in live["checks"]
+        assert "open/close/Escape/focus" in live["checks"] and "mobile bounds" in live["checks"]
+        assert "45" not in live["backend_down_text"]
+        assert "No prepared answer was substituted" in live["backend_down_text"] or "No answer is generated here" in live["backend_down_text"]
+        assert repeats["passed"] and len(repeats["runs"]) == 3 and all(run["passed"] for run in repeats["runs"])
+        assert manifest["passed"]
+        for item in manifest["files"]:
+            raw = (EVIDENCE / item["file"]).read_bytes()
+            assert len(raw) == item["bytes"] and hashlib.sha256(raw).hexdigest() == item["sha256"]
+        for item in manifest["sources"]:
+            raw = (EVIDENCE.parents[1] / item["file"]).read_bytes()
+>           assert len(raw) == item["bytes"] and hashlib.sha256(raw).hexdigest() == item["sha256"]
+E           assert (27558 == 27248)
+E            +  where 27558 = len(b'"""Small standard-library HTTP viewer, restricted to 127.0.0.1.\n\nOnly static assets and an explicit saved-data/AI ...e a port between 0 and 65535.")\n    return ViewerServer(port, ViewerState(results_dir, service=service, demo=demo))\n')
+
+tests/test_stage5_evidence.py:152: AssertionError
+=========================== short test summary info ============================
+SKIPPED [1] tests/test_windows_helper.py:254: Native batch execution requires Windows
+SKIPPED [2] tests/test_windows_helper.py:264: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [6] tests/test_windows_helper.py:277: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [3] tests/test_windows_helper.py:288: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:303: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:312: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [4] tests/test_windows_helper.py:321: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:332: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:345: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:357: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:367: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:381: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:392: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:412: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [2] tests/test_windows_helper.py:422: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:438: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:450: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:461: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:470: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [1] tests/test_windows_helper.py:482: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [3] tests/test_windows_helper.py:492: PowerShell is not installed; Windows helper runtime tests skipped
+SKIPPED [5] tests/test_windows_installer.py:156: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:166: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:174: PowerShell is not installed
+SKIPPED [5] tests/test_windows_installer.py:184: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:200: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:212: PowerShell is not installed
+SKIPPED [3] tests/test_windows_installer.py:222: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:237: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:246: PowerShell is not installed
+SKIPPED [3] tests/test_windows_installer.py:259: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:277: PowerShell is not installed
+SKIPPED [2] tests/test_windows_installer.py:288: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:299: PowerShell is not installed
+SKIPPED [1] tests/test_windows_installer.py:306: PowerShell is not installed
+SKIPPED [2] tests/test_windows_installer.py:313: PowerShell is not installed
+FAILED tests/test_stage5_evidence.py::test_fresh_wording_evidence_fake_keeps_host_facts_and_unique_refs
+FAILED tests/test_stage5_evidence.py::test_live_drawer_evidence_has_no_prepared_export_and_matches_actual_sources
+2 failed, 1841 passed, 66 skipped, 4 subtests passed in 226.21s (0:03:46)

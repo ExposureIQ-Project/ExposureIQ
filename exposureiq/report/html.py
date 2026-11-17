@@ -1,6 +1,7 @@
 """Render a report model as one self-contained HTML document.
 
-No web fonts, remote images, or requests: the interactive dashboard works offline.
+No web fonts or remote images: disk dashboards work offline. Only authenticated
+local-server reports can attach the live saved-data chat drawer.
 A fixed embedded script handles scan selection, chart cursors and first-reveal
 animations. All scan text is escaped and never inserted into JavaScript.
 """
@@ -31,7 +32,8 @@ def _severity_badge(name: str) -> str:
     return f'<span class="badge badge-{key}">{_e(label)}</span>'
 
 
-def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = None) -> str:
+def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = None,
+                server_report: bool = False) -> str:
     links = "".join(
         f'<a href="#{prefix}{anchor}"'
         + (f' data-report-section="{anchor}"' if home_prefix else "")
@@ -52,7 +54,7 @@ def _navigation(report: dict, *, prefix: str = "", home_prefix: str | None = Non
     <div class="topbar-logo">{branding.LOGO_SVG}</div>
     <div class="topbar-copy"><strong>ExposureIQ</strong>
       <span class="topbar-target">{_e(report['target'])}</span></div>
-    <span class="offline-badge">Offline report</span>
+    <span class="offline-badge">{'Local report' if server_report else 'Offline report'}</span>
     <nav class="report-nav" aria-label="Report sections">{links}</nav>
   </div>
 </header>
@@ -683,6 +685,10 @@ _PORTAL_CSS = """
   border-radius: 8px; padding: 8px 12px; }
 .history-step:target { border-left-color: var(--indigo); box-shadow: 0 0 0 1px var(--teal); }
 .group-title { color: var(--indigo); margin-top: 0; }
+.portal-notices { max-width: 1180px; width: calc(100% - 48px); margin: 24px auto;
+  color: var(--muted); font-size: 12px; }
+#export-sharing-warning, #export-size-warning { border-left: 3px solid var(--indigo); padding-left: 12px; }
+[hidden] { display: none !important; }
 @media screen and (max-width: 760px) {
   .scan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .scan-card { padding: 16px; }
@@ -699,24 +705,54 @@ def _report_body(report: dict, prefix: str = "", fallbacks: dict | None = None) 
             + _inventory(report, prefix) + _methodology(report, prefix))
 
 
-def _document(report: dict, body: str, navigation: str) -> str:
+def _document(report: dict, body: str, navigation: str, *, chat_bundle: dict | None = None,
+              server_report: bool = False, start_view: str = "") -> str:
+    from exposureiq.viewer.export import SHARING_WARNING
+
     digest = base64.b64encode(hashlib.sha256(interactive.SCRIPT.encode("utf-8")).digest()).decode("ascii")
+    hashes, extra_css, extra_scripts, markup, connection_policy = [digest], "", "", "", "'none'"
+    if chat_bundle is not None:
+        if not server_report:
+            raise ValueError("AI chat requires the authenticated local report server.")
+        from exposureiq.viewer.export import chat_assets
+
+        markup, extra_css, script, data = chat_assets(chat_bundle)
+        for value in (script, data):
+            hashes.append(base64.b64encode(hashlib.sha256(value.encode("utf-8")).digest()).decode("ascii"))
+        extra_scripts = (f'<script id="exposureiq-chat-data" type="application/json">{data}</script>\n'
+                         f'<script id="exposureiq-live-chat">{script}</script>')
+        connection_policy = "'self'"
+    elif server_report:
+        from importlib.resources import files
+
+        script = files("exposureiq.viewer").joinpath("static/report-session.js").read_text(encoding="utf-8")
+        hashes.append(base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
+        extra_scripts = f'<script id="exposureiq-report-session">{script}</script>'
+    script_policy = " ".join("'sha256-" + value + "'" for value in hashes)
+    report_start = '<div id="report-pane" class="report-pane" role="region" aria-label="Saved HTML report" tabindex="-1">' if chat_bundle is not None else ""
+    report_end = "</div>" if chat_bundle is not None else ""
+    start_attribute = f' data-start-view="{_e(start_view)}"' if start_view else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ExposureIQ">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src {script_policy}; style-src 'unsafe-inline'; img-src data:; connect-src {connection_policy}; base-uri 'none'; form-action 'none'">
 <title>{_e(report.get('title') or 'Security Assessment Report')} — {_e(report.get('target'))}</title>
-<style>{_CSS}{interactive.CSS}{_PORTAL_CSS}</style>
+<style>{_CSS}{interactive.CSS}{_PORTAL_CSS}{extra_css}</style>
 </head>
 <body>
+{report_start}
 {navigation}
-<main id="report-main" tabindex="-1">
+<main id="report-main" tabindex="-1"{start_attribute}>
 {body}
 </main>
+<div class="portal-notices"><p id="export-sharing-warning">{_e(SHARING_WARNING)}</p><p id="export-size-warning" hidden></p></div>
+{report_end}
+{markup}
 <script id="exposureiq-interactions">{interactive.SCRIPT}</script>
+{extra_scripts}
 </body>
 </html>
 """
@@ -729,13 +765,15 @@ def render_html(report: dict) -> str:
     return _document(report, _report_body(report), _navigation(report))
 
 
-def render_domain_html(domain: dict) -> str:
+def render_domain_html(domain: dict, *, chat_bundle: dict | None = None, server_report: bool = False, start_view: str = "") -> str:
     """One portable HTML home page and separately bounded saved-scan views."""
     if not isinstance(domain, dict) or not domain.get("reports") or not domain.get("groups"):
         raise ValueError("domain report must contain saved reports and history groups")
     reports = domain["reports"]
     latest = reports[-1]
     view_ids = {_scan_key(report): "scan-" + _scan_token(report) for report in reports}
+    if not isinstance(start_view, str) or (start_view and (not server_report or start_view not in view_ids.values())):
+        raise ValueError("A server report can start only at one of its saved scan views.")
     fallbacks = {_scan_key(report): _history_id(report, view_ids[_scan_key(report)] + "-")
                  for report in reports}
     cards = []
@@ -761,7 +799,7 @@ def render_domain_html(domain: dict) -> str:
   <section class="page cover" id="domain-overview" tabindex="-1">
     <div class="cover-mark">{branding.LOGO_SVG}</div>
     <div class="brandline"><strong>Exposure<span>IQ</span></strong><span>Saved scan workspace</span></div>
-    <p class="kicker">Domain dashboard &middot; offline</p>
+    <p class="kicker">Domain dashboard &middot; {'local saved data' if server_report else 'offline'}</p>
     <h1>{_e(domain['target'])}</h1>
     <p class="meta">{len(reports)} saved scan(s) &middot; Latest scan {_e(latest['started_label'])}</p>
     <div class="exec"><p>Choose a scan below to inspect its findings, assets and changes.
@@ -793,5 +831,5 @@ def render_domain_html(domain: dict) -> str:
             f'<span class="muted">{_e(report["started_label"])}</span></div>'
             + _report_body(report, view_id + "-", fallbacks) + '</article>')
     first_group = "domain-" + domain["groups"][0]["key"] + "-"
-    navigation = _navigation(latest, prefix=view_ids[_scan_key(latest)] + "-", home_prefix=first_group)
-    return _document(latest, home + "".join(views), navigation)
+    navigation = _navigation(latest, prefix=view_ids[_scan_key(latest)] + "-", home_prefix=first_group, server_report=server_report)
+    return _document(latest, home + "".join(views), navigation, chat_bundle=chat_bundle, server_report=server_report, start_view=start_view)

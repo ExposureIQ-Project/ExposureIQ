@@ -1,0 +1,84 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-simple] _
+
+mode = 'simple', question = 'Explain this scan'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, mode="off")
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+>       assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+E       AssertionError: assert ('fake' == 'template'
+E         
+E         - template
+E         + fake)
+
+tests/test_ai_conversation.py:389: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-technical] _
+
+mode = 'technical', question = 'Explain this scan'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, mode="off")
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+>       assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+E       AssertionError: assert ('fake' == 'template'
+E         
+E         - template
+E         + fake)
+
+tests/test_ai_conversation.py:389: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-simple] _
+
+mode = 'simple', question = 'What could happen if left like that?'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, mode="off")
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+>       assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+E       AssertionError: assert ('fake' == 'template'
+E         
+E         - template
+E         + fake)
+
+tests/test_ai_conversation.py:389: AssertionError
+_ test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-technical] _
+
+mode = 'technical', question = 'What could happen if left like that?'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    @pytest.mark.parametrize("question", ["Explain this scan", "What could happen if left like that?"])
+    def test_multifinding_default_fallback_is_short_and_not_a_full_rule_report(mode, question):
+        scan = build_demo_scans()[3]
+        before = copy.deepcopy(scan)
+        chat = chat_for(scan, mode="off")
+        result = chat.ask(question, mode=mode)
+        text = chat_text(result)
+>       assert result["source"] == "template" and not result["priorities"] and not result["dropped"]
+E       AssertionError: assert ('fake' == 'template'
+E         
+E         - template
+E         + fake)
+
+tests/test_ai_conversation.py:389: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-simple]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[Explain this scan-technical]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-simple]
+FAILED tests/test_ai_conversation.py::test_multifinding_default_fallback_is_short_and_not_a_full_rule_report[What could happen if left like that?-technical]
+4 failed, 107 deselected in 0.17s

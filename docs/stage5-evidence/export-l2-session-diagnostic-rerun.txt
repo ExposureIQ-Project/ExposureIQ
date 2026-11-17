@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<stdin>", line 37, in <module>
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 118, in wait
+    raise RuntimeError("The browser's expected saved-data state did not appear.")
+RuntimeError: The browser's expected saved-data state did not appear.

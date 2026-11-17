@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ExposureIQ · saved-scan viewer</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header><strong>ExposureIQ</strong><span>Local saved-scan viewer · no scanning controls</span><button id="refresh">Refresh</button></header>
+  <p id="status" role="status">Opening local saved data…</p>
+  <div class="layout">
+    <aside><h2>Domains</h2><div id="domains"></div><p>AI settings live in the terminal. No key is sent to this browser.</p></aside>
+    <main>
+      <h1 id="title">Choose a saved domain</h1>
+      <p id="verdict"></p><pre id="sparkline"></pre><p id="formula"></p><p id="warning"></p>
+      <nav aria-label="Viewer sections">
+        <button data-tab="scans" class="active">Scans &amp; findings</button>
+        <button data-tab="chat" hidden>AI chat</button><button data-tab="log" hidden>AI logs</button>
+      </nav>
+      <section id="scans"><div id="scan-list"></div><h2 id="scan-title">No scan selected</h2><button id="open-report" disabled>Open HTML report</button><div id="findings"></div><pre id="finding-detail"></pre></section>
+      <section id="chat" hidden>
+        <div class="actions"><button id="explain" disabled>Explain this selection</button><button id="fix-first" disabled>Fix first</button><button id="most-exposed" disabled>Most exposed host</button></div>
+        <label for="common-questions">More common questions</label>
+        <select id="common-questions" disabled>
+          <option value="">Choose a question…</option>
+          <option>What do severity levels mean in this scan?</option>
+          <option>What does the risk score mean in this scan?</option>
+          <option>What are security headers in this scan?</option>
+          <option>What wasn't checked in this scan?</option>
+          <option>How can I confirm fixes from this scan?</option>
+          <option>What changed in this domain's saved history?</option>
+          <option>Which findings are still unfixed in the saved history?</option>
+          <option>What does ExposureIQ do with my saved scans?</option>
+        </select>
+        <label for="wording-mode">Wording</label><select id="wording-mode"><option value="simple">Simple</option><option value="technical">Technical</option></select>
+        <div id="chat-result" role="log" aria-label="Saved-data conversation">Choose a common question, or type your own. Replies are drafts based on saved data only.</div>
+        <label for="question">Ask about the selected scan (or domain if no scan is selected)</label>
+        <textarea id="question" maxlength="1000" rows="3" placeholder="Up to 1000 characters. Saved scans and defensive fixes only."></textarea>
+        <button id="send" disabled>Send</button><button id="clear-chat">Clear chat</button><p id="chat-verified"></p>
+      </section>
+      <section id="log" hidden><p>Memory only · last thirty AI calls. Keys and private system instructions are excluded.</p><pre id="log-result">No AI calls yet.</pre></section>
+    </main>
+  </div>
+  <footer>Review every AI draft with a teammate. Missing checks are not proof of safety. Remote sharing needs consent in terminal Settings.</footer>
+</body>
+</html>

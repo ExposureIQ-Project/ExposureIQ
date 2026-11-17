@@ -1,0 +1,9 @@
+Processing ./.
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: exposureiq
+  Building wheel for exposureiq (pyproject.toml): started
+  Building wheel for exposureiq (pyproject.toml): finished with status 'done'
+  Created wheel for exposureiq: filename=exposureiq-0.1.0-py3-none-any.whl size=287597 sha256=10e928bcb76ec64e1590cea266b631fd7f8bd4cc1a34ec34ac6934de904b2658
+  Stored in directory: /tmp/pip-ephem-wheel-cache-3ctmu4cq/wheels/4c/03/75/d7e07c3e0a7400819bdad9ef90460e34c14978ab06a80e3e80
+Successfully built exposureiq

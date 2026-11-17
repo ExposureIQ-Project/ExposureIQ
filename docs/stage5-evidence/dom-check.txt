@@ -1,0 +1,4 @@
+Command: node scripts/stage5_dom_check.cjs
+PASS: shipped JS keeps hostile scan/log strings literal and uses only relative, fake API calls.
+Method: a simulated DOM and fake fetch; no browser package or network.
+Limitation: this is not a real-browser visual or end-to-end test.

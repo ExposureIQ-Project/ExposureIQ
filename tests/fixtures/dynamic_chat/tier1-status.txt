@@ -1,0 +1,6 @@
+Tier 1: 1843 passed; 4 subtests passed in 226.65s.
+Failures: zero.
+Skips: 66 — 65 need PowerShell; one needs native Windows batch execution.
+Branch: feature/s5-dynamic-chat; inherited Stage 5 evidence preserved.
+Safety: offline suite only; no real key, model provider or target used.
+Next: Tier 2 split-screen chat; Tier 3 remains on hold.

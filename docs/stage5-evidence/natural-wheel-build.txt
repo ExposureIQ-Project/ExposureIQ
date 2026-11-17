@@ -1,0 +1,11 @@
+Processing ./.
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: exposureiq
+  Building wheel for exposureiq (pyproject.toml): started
+  Building wheel for exposureiq (pyproject.toml): finished with status 'done'
+  Created wheel for exposureiq: filename=exposureiq-0.1.0-py3-none-any.whl size=282238 sha256=939919e05c4fc383fc37e98f917c1c82453f74d8e0d101f4b0651b617dc2c81a
+  Stored in directory: /tmp/pip-ephem-wheel-cache-dytgxs26/wheels/fa/63/c8/5403147aadb463295cc65cd7a58f1a51c106d5f31179959542
+Successfully built exposureiq
+Wheel built from a private source snapshot; no repository build files, dependency installation or downloads.
+Wheel path: /tmp/opencode/s5-human-voice-wheel-m7a9dj24/exposureiq-0.1.0-py3-none-any.whl

@@ -1,0 +1,1 @@
+PASS: 20 TUI/CLI/viewer cases, 84 observed turns; both wording modes, host context, no-call thanks and safe timeout fallback. No real key/provider/target traffic.

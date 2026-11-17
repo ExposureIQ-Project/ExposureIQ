@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_natural_evidence.py", line 285, in <module>
+    main()
+    ~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_natural_evidence.py", line 254, in main
+    cases += viewer_cases(results, scan)
+             ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_natural_evidence.py", line 225, in viewer_cases
+    assert result["text"] == chat_text(result)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

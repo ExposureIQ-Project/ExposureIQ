@@ -1,0 +1,25 @@
+........................................................................ [ 33%]
+........................................................................ [ 67%]
+...........F..........................................................   [100%]
+=================================== FAILURES ===================================
+_________ test_displayed_question_is_literal_and_fake_key_is_redacted __________
+tests/test_tui_ai_chat.py:119: in test_displayed_question_is_literal_and_fake_key_is_redacted
+    asyncio.run(exercise())
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+tests/test_tui_ai_chat.py:109: in exercise
+    assert "Hostile-looking" in plain(app.query_one("#ai-warning", Static))
+E   AssertionError: assert 'Hostile-looking' in 'Some saved text looks like instructions. I treat it as data, never something to obey.'
+E    +  where 'Some saved text looks like instructions. I treat it as data, never something to obey.' = plain(Static(id='ai-warning', classes='ai-warning'))
+E    +    where Static(id='ai-warning', classes='ai-warning') = query_one('#ai-warning', Static)
+E    +      where query_one = ExposureIQApp(title='ExposureIQ', classes={'-theme-exposureiq', '-dark-mode'}, pseudo_classes={'dark', 'focus'}).query_one
+=========================== short test summary info ============================
+FAILED tests/test_tui_ai_chat.py::test_displayed_question_is_literal_and_fake_key_is_redacted
+1 failed, 213 passed in 60.71s (0:01:00)

@@ -1,0 +1,6 @@
+PASS: exported script agrees with Python on 40 phrase routes and 30 chat turns; modes, focus, literal text, collapsed evidence, common questions and clear-chat work without networking/storage.
+PASS: real Firefox offline export checks, screenshot: export-browser-l1.png
+PASS: actual live-report scripts use only token-protected relative requests; file/remote/missing-token pages stay offline, greetings/refusals make no calls, both modes and redaction work, Evidence stays literal, clear isolates conversations, host-named consent remains visible, Off drops pending replies, stale replies are suppressed and backend failures fall back safely.
+PASS: real Firefox same-origin live-transport checks with offline fake, screenshot: export-browser-l2.png
+Export: /tmp/opencode/s5-html-export-fwj521_p/index.html
+Bytes: 1436084

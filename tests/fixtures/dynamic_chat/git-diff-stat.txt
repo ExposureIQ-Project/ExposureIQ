@@ -1,0 +1,14 @@
+ .gitignore                  |   2 +
+ README.md                   | 112 ++++++++++++++++++--
+ exposureiq/cli.py           |  50 ++++++++-
+ exposureiq/report/html.py   |  60 +++++++++--
+ exposureiq/report/render.py |   9 +-
+ exposureiq/tui/app.py       | 243 +++++++++++++++++++++++++++++++++++++++++---
+ pyproject.toml              |   4 +
+ tests/conftest.py           |  90 ++++++++++++++++
+ tests/test_report_domain.py |   4 +
+ tests/test_saved_open.py    |   5 +-
+ tests/test_tui.py           |   2 +-
+ tests/test_tui_clipboard.py |   6 ++
+ tests/test_tui_history.py   |   9 +-
+ 13 files changed, 552 insertions(+), 44 deletions(-)

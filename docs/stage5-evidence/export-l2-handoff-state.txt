@@ -1,0 +1,1 @@
+PASS: ['native token-protected report form', 'same-origin health', 'no provider call on health/greeting', 'three-turn fresh-wording host context', 'collapsed/opened Evidence', 'technical mode', 'safe provider fallback', 'Off clears chat', 'backend-down prepared fallback']

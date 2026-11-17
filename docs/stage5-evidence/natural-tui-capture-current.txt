@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 289, in <module>
+    main()
+    ~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 273, in main
+    images = asyncio.run(screenshots(output, root))
+  File "/usr/lib/python3.14/asyncio/runners.py", line 205, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/runners.py", line 128, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/usr/lib/python3.14/asyncio/base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 243, in screenshots
+    images.append(capture(app, output, "12-impact-follow-up.svg", "ExposureIQ · Fresh-wording damage follow-up; conditional harm and code-added disclaimer", ["then what posible damage it can make?", "AI draft", "not proof that anyone broke in", "read, change or delete stored data", "saved evidence checked"]))
+                  ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_evidence.py", line 95, in capture
+    assert word in words, f"Expected visible text missing from {filename}: {word}"
+           ^^^^^^^^^^^^^
+AssertionError: Expected visible text missing from 12-impact-follow-up.svg: not proof that anyone broke in

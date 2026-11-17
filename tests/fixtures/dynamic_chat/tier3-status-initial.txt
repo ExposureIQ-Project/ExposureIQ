@@ -1,0 +1,6 @@
+Tier 3: 1872 passed; 4 subtests passed in 232.90s.
+Failures: one — local-address metadata failed the example-only fixture check.
+Skips: 66 — 65 need PowerShell; one needs native Windows batch execution.
+Branch: feature/s5-dynamic-chat; nothing staged or committed.
+Safety: synthetic saved data; no target traffic or real keys.
+Next: fix the evidence metadata and rerun the complete suite.

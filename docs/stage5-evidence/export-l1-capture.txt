@@ -1,0 +1,4 @@
+PASS: exported script agrees with Python on 40 phrase routes and 30 chat turns; modes, focus, literal text, collapsed evidence, common questions and clear-chat work without networking/storage.
+PASS: real Firefox offline export checks, screenshot: export-browser-l1.png
+Export: /tmp/opencode/s5-html-export-ux39uq4e/index.html
+Bytes: 1434128

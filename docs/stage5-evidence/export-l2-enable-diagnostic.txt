@@ -1,0 +1,9 @@
+Safe failed enable diagnostic: {"before": {"home_anchor": false, "hash_length": 44, "checked": false, "disabled": true, "source": "Offline chat \u00b7 prepared saved-data explanations"}, "after": {"home_anchor": true, "hash_length": 12, "checked": false, "disabled": false, "source": "Offline chat \u00b7 prepared saved-data explanations"}}
+Traceback (most recent call last):
+  File "<stdin>", line 22, in <module>
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 212, in check_live
+    browser.wait('document.getElementById("export-live-enabled").checked && window.location.hash === "#domain-home"')
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 120, in wait
+    raise RuntimeError("The browser's expected saved-data state did not appear.")
+RuntimeError: The browser's expected saved-data state did not appear.

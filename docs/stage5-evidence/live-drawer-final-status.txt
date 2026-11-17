@@ -1,0 +1,6 @@
+Tier: Natural chat and local HTML drawer — GREEN
+Tests: 1775 passed; 4 subtests passed
+Skips: 65 PowerShell tests; 1 native Windows test
+Safety: no real keys, live AI or target traffic
+Evidence: 12 captures; 84 turns; evaluation 22/22; Firefox 3/3
+Git: feature/s5-human-voice; unstaged, uncommitted, unpushed

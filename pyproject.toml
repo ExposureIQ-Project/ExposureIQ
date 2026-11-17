@@ -25,6 +25,10 @@ exposureiq = "exposureiq.cli:main"
 [tool.setuptools.packages.find]
 include = ["exposureiq*"]
 
+[tool.setuptools.package-data]
+"exposureiq.viewer" = ["static/*.html", "static/*.css", "static/*.js"]
+"exposureiq.ai" = ["fixtures/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

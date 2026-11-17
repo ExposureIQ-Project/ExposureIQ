@@ -1,0 +1,4 @@
+Before handoff layout storage: {'ratio': '30', 'saved': '30'}
+After handoff layout storage: {'ratio': '30', 'saved': '30'}
+Firefox: 19 checks passed; 5 real screenshots captured.
+Desktop viewport: [1280, 914] Narrow viewport: [500, 814]

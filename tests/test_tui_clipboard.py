@@ -631,6 +631,7 @@ def test_saved_browser_double_click_opens_once_without_copying(tmp_path, monkeyp
         monkeypatch.setattr(app, "open_saved", lambda path: opened.append(str(path)) or original_open(path))
         async with app.run_test(size=(120, 40), notifications=True) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")  # Retained flat-file browser.
             table = app.query_one("#saved-table", DataTable)
             expected = Path(app.saved_paths[str(row_index)])
             before = expected.read_bytes()
@@ -652,6 +653,7 @@ def test_saved_browser_single_click_only_chooses_a_row(tmp_path, offline):
         app = saved_browser_app(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")
             table = app.query_one("#saved-table", DataTable)
             for row_index in (0, 1, 0):
                 value = table.get_row_at(row_index)[0].plain
@@ -669,6 +671,7 @@ def test_saved_browser_enter_and_open_button_still_open_without_copying(tmp_path
         app = saved_browser_app(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")
             table = app.query_one("#saved-table", DataTable)
             expected = app.saved_paths["1"]
             value = table.get_row_at(1)[0].plain
@@ -690,6 +693,7 @@ def test_saved_browser_headers_and_empty_rows_do_not_open_or_copy(tmp_path, offl
         app = saved_browser_app(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")
             table = app.query_one("#saved-table", DataTable)
             gutter = table.content_region.offset - table.region.offset
             for point in (text_point(table, "File"), (gutter.x + 1, gutter.y + 5)):
@@ -706,6 +710,7 @@ def test_saved_browser_drag_does_not_select_or_copy_text(tmp_path, offline):
         app = saved_browser_app(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")
             table = app.query_one("#saved-table", DataTable)
             value = table.get_row_at(0)[1].plain
             await drag_text(pilot, table, value, table.header_height)
@@ -721,6 +726,7 @@ def test_saved_browser_raw_double_click_opens_the_clicked_file_without_copying(t
         app = saved_browser_app(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.click("#home-results")
+            await pilot.click("#browser-files")
             table = app.query_one("#saved-table", DataTable)
             expected = app.saved_paths["1"]
             value = table.get_row_at(1)[1].plain

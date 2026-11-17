@@ -1,0 +1,46 @@
+.................................................................F...... [ 22%]
+........................................................................ [ 44%]
+........................................................................ [ 67%]
+........................................................................ [ 89%]
+.....................F...........                                        [100%]
+=================================== FAILURES ===================================
+________ test_model_repeated_disclaimer_is_not_repeated_in_the_display _________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb462c83110>
+
+    def test_model_repeated_disclaimer_is_not_repeated_in_the_display(ai_scan_factory):
+        class Repeating(NaturalProvider):
+            def complete(self, *args, **kwargs):
+                reply = super().complete(*args, **kwargs)
+                output = json.loads(reply.content)
+                output["notes"].append({"text": PROOF_NOTE, "refs": ["S:scan"]})
+                return ProviderResponse(json.dumps(output))
+    
+        chat = chat_for(ai_scan_factory(), Repeating())
+        replies = [chat.ask(question) for question in ("What could happen?", "What could happen if not fixed?", "why?")]
+>       assert all(result["source"] == "demo" and not result["dropped"] for result in replies)
+E       assert False
+E        +  where False = all(<generator object test_model_repeated_disclaimer_is_not_repeated_in_the_display.<locals>.<genexpr> at 0x7fb462c8c860>)
+
+tests/test_ai_conversation.py:302: AssertionError
+_ test_original_transcript_context_notice_glossary_and_no_repeated_report_list _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fb462bd07d0>
+
+    def test_original_transcript_context_notice_glossary_and_no_repeated_report_list(ai_scan_factory):
+        bundle = build_chat_bundle(ai_scan_factory())
+        state = {}
+        replies = [offline_answer(bundle, bundle["default_scan"], question, state=state) for question in (
+            "Explain this scan in simple words.", "what could happen if it kept like that?", "and what do you think?", "why?", "thanks")]
+        assert [reply["kind"] for reply in replies] == ["overview", "impact", "opinion", "why", "thanks"]
+        assert sum(PROOF_NOTE in reply["text"] for reply in replies) == 1
+        assert sum(reply["notice"] == OFFLINE_NOTICE for reply in replies) == 1
+>       assert sum(GLOSSARY["database"]["explanation"] in reply["text"] for reply in replies) == 1
+E       assert 0 == 1
+E        +  where 0 = sum(<generator object test_original_transcript_context_notice_glossary_and_no_repeated_report_list.<locals>.<genexpr> at 0x7fb462dd6b20>)
+
+tests/test_export_chat.py:111: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_ai_conversation.py::test_model_repeated_disclaimer_is_not_repeated_in_the_display
+FAILED tests/test_export_chat.py::test_original_transcript_context_notice_glossary_and_no_repeated_report_list
+2 failed, 319 passed in 40.15s

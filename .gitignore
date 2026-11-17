@@ -15,3 +15,5 @@ results/
 .DS_Store
 .idea/
 .vscode/
+ai.json
+**/ai.json

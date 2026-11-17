@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "browser": "installed Firefox, real headless browser",
+  "source": "synthetic exported file",
+  "checks": [
+    "no AI icon, drawer or metadata",
+    "ten saved scan cards",
+    "scan selection"
+  ],
+  "screenshot": "live-drawer-offline-browser.png",
+  "network": "file page has connect-src none; non-loopback browser HTTP is directed to a refusing localhost proxy"
+}

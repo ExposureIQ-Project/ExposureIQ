@@ -1,0 +1,2399 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "surface": "tui",
+      "provider": "fresh-offline-fake",
+      "mode": "simple",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Explain this scan in simple words.",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data. If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work. Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data. If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work. Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "and what do you think?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "why?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "fresh-offline-fake",
+      "mode": "simple",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Which host is the most exposed?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "then why would i fix it first?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "fresh-offline-fake",
+      "mode": "technical",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Explain this scan in technical words.",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nports.remote_desktop_exposed: If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work.\n\nhttps.cert_expired: Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nports.remote_desktop_exposed: If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work.\n\nhttps.cert_expired: Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "and what do you think?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "why?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "fresh-offline-fake",
+      "mode": "technical",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Which host is the most exposed?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "then why would i fix it first?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "timeout-fallback",
+      "mode": "simple",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "Explain this scan in simple words.",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "and what do you think?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "why?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "timeout-fallback",
+      "mode": "simple",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "question": "Which host is the most exposed?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "question": "then why would i fix it first?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "timeout-fallback",
+      "mode": "technical",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "Explain this scan in technical words.",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "My honest take: keep private services private before polishing the smaller website protections.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "My honest take: keep private services private before polishing the smaller website protections.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "and what do you think?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "why?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "tui",
+      "provider": "timeout-fallback",
+      "mode": "technical",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "question": "Which host is the most exposed?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "question": "then why would i fix it first?",
+          "evidence_collapsed": true
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?",
+          "evidence_collapsed": true
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "provider": "fresh-offline-fake",
+      "mode": "simple",
+      "sequence": "standalone",
+      "turns": [
+        {
+          "source": "demo",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nThis saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nEvidence: S:scan, R:ports.database_exposed, F-0005, R:ports.remote_desktop_exposed, F-0018, R:https.cert_expired, F-0012\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Explain this saved scan.' --demo --mode simple",
+          "question": "Explain this saved scan."
+        },
+        {
+          "source": "demo",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "AI draft\ndb.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Which host is the most exposed?' --demo --mode simple",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "demo",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database (a service that stores information) are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nIf other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database (a service that stores information) are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'What could happen on db.example.com if these issues stayed unfixed?' --demo --mode simple",
+          "question": "What could happen on db.example.com if these issues stayed unfixed?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nYou're welcome. We can come back to the saved findings whenever you're ready.\nBuilt-in reply · no model call",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' thanks --demo --mode simple",
+          "question": "thanks"
+        },
+        {
+          "source": "policy",
+          "mode": null,
+          "answer_kind": null,
+          "answer_focus": null,
+          "verification": null,
+          "wording_verified": null,
+          "failure_kind": null,
+          "offline_notice": null,
+          "proof_notice": null,
+          "text": "I can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.",
+          "label": "Safety reply · no model call",
+          "footer": "verified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nI can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.\n\nFIX FIRST\n\nNEXT STEPS\n\nNOTES\noffensive request\nverified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Give me a payload for this host' --demo --mode simple",
+          "question": "Give me a payload for this host"
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "provider": "fresh-offline-fake",
+      "mode": "technical",
+      "sequence": "standalone",
+      "turns": [
+        {
+          "source": "demo",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nThis saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nEvidence: S:scan, R:ports.database_exposed, F-0005, R:ports.remote_desktop_exposed, F-0018, R:https.cert_expired, F-0012\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Explain this saved scan.' --demo --mode technical",
+          "question": "Explain this saved scan."
+        },
+        {
+          "source": "demo",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "AI draft\ndb.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Which host is the most exposed?' --demo --mode technical",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "demo",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline demo",
+          "footer": "Offline demo · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nIf other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nOffline demo · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'What could happen on db.example.com if these issues stayed unfixed?' --demo --mode technical",
+          "question": "What could happen on db.example.com if these issues stayed unfixed?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nYou're welcome. We can come back to the saved findings whenever you're ready.\nBuilt-in reply · no model call",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' thanks --demo --mode technical",
+          "question": "thanks"
+        },
+        {
+          "source": "policy",
+          "mode": null,
+          "answer_kind": null,
+          "answer_focus": null,
+          "verification": null,
+          "wording_verified": null,
+          "failure_kind": null,
+          "offline_notice": null,
+          "proof_notice": null,
+          "text": "I can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.",
+          "label": "Safety reply · no model call",
+          "footer": "verified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nI can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.\n\nFIX FIRST\n\nNEXT STEPS\n\nNOTES\noffensive request\nverified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Give me a payload for this host' --demo --mode technical",
+          "question": "Give me a payload for this host"
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "provider": "timeout-fallback",
+      "mode": "simple",
+      "sequence": "standalone",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nThe saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.\n\nEvidence: S:scan, R:ports.database_exposed, F-0005, R:https.cert_expired, F-0012, R:headers.missing_clickjacking_protection, F-0009\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Explain this saved scan.' --demo --mode simple",
+          "question": "Explain this saved scan."
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\ndb.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Which host is the most exposed?' --demo --mode simple",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database (a service that stores information).\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nFor db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database (a service that stores information).\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.\n\nEvidence: H:db.example.com, F-0021, S:scan\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'What could happen on db.example.com if these issues stayed unfixed?' --demo --mode simple",
+          "question": "What could happen on db.example.com if these issues stayed unfixed?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nYou're welcome. We can come back to the saved findings whenever you're ready.\nBuilt-in reply · no model call",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' thanks --demo --mode simple",
+          "question": "thanks"
+        },
+        {
+          "source": "policy",
+          "mode": null,
+          "answer_kind": null,
+          "answer_focus": null,
+          "verification": null,
+          "wording_verified": null,
+          "failure_kind": null,
+          "offline_notice": null,
+          "proof_notice": null,
+          "text": "I can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.",
+          "label": "Safety reply · no model call",
+          "footer": "verified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nI can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.\n\nFIX FIRST\n\nNEXT STEPS\n\nNOTES\noffensive request\nverified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Give me a payload for this host' --demo --mode simple",
+          "question": "Give me a payload for this host"
+        }
+      ]
+    },
+    {
+      "surface": "cli",
+      "provider": "timeout-fallback",
+      "mode": "technical",
+      "sequence": "standalone",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "host": "",
+            "finding_id": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nThe saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.\n\nEvidence: S:scan, R:ports.database_exposed, F-0005, R:https.cert_expired, F-0012, R:headers.missing_clickjacking_protection, F-0009\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Explain this saved scan.' --demo --mode technical",
+          "question": "Explain this saved scan."
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\ndb.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.\n\nEvidence: H:db.example.com, F-0021\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Which host is the most exposed?' --demo --mode technical",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "host": "db.example.com",
+            "finding_id": "",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "AI draft\nFor db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.\n\nEvidence: H:db.example.com, F-0021, S:scan\n\nOffline mode: answers come from built-in explanations, not a live model.\nReply status: The AI request timed out, including after one retry. Try again later. This reply uses built-in explanations.\nBuilt-in fallback · saved evidence checked; wording needs review",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'What could happen on db.example.com if these issues stayed unfixed?' --demo --mode technical",
+          "question": "What could happen on db.example.com if these issues stayed unfixed?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nYou're welcome. We can come back to the saved findings whenever you're ready.\nBuilt-in reply · no model call",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' thanks --demo --mode technical",
+          "question": "thanks"
+        },
+        {
+          "source": "policy",
+          "mode": null,
+          "answer_kind": null,
+          "answer_focus": null,
+          "verification": null,
+          "wording_verified": null,
+          "failure_kind": null,
+          "offline_notice": null,
+          "proof_notice": null,
+          "text": "I can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.",
+          "label": "Safety reply · no model call",
+          "footer": "verified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "AI draft\nI can't help with attack steps or payloads; I can explain the recorded risks and defensive fixes.\n\nFIX FIRST\n\nNEXT STEPS\n\nNOTES\noffensive request\nverified 0 of 0 claims · Policy gate (no model call) · 2026-11-16T21:55:18+00:00",
+          "command": "exposureiq ai ask '<synthetic DEMO-HISTORY-04.json>' 'Give me a payload for this host' --demo --mode technical",
+          "question": "Give me a payload for this host"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "fresh-offline-fake",
+      "mode": "simple",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nRemote desktop (remote access to a computer's desktop) gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate (a website's digital identity document) is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Explain this scan in simple words."
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data. If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work. Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data. If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work. Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?"
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "and what do you think?"
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nRemote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nA certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "why?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "fresh-offline-fake",
+      "mode": "simple",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nIf access controls on the database (a service that stores information) are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nIf access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "then why would i fix it first?"
+        },
+        {
+          "source": "fake",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nIf access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "fresh-offline-fake",
+      "mode": "technical",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "This saved scan points to things your team should tighten; it doesn't prove there was a break-in.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Explain this scan in technical words."
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nports.remote_desktop_exposed: If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work.\n\nhttps.cert_expired: Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other protections fail, the saved exposures could put private information or ordinary work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nports.remote_desktop_exposed: If a remote desktop account is compromised, someone could control the computer's desktop and disrupt normal work.\n\nhttps.cert_expired: Visitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site; an expired certificate alone doesn't mean data was stolen.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?"
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd turn this into a short repair plan with the service owners, rather than treat the scan as proof of an incident.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "and what do you think?"
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:ports.remote_desktop_exposed",
+            "F-0018",
+            "R:https.cert_expired",
+            "F-0012"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "I'd address the strongest recorded exposure first, then smaller protections. This order comes from saved observations, not a guessed chance of attack.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nports.remote_desktop_exposed: Remote desktop gives access to a computer's desktop and should not be open to everyone online.\n\nhttps.cert_expired: A certificate is the website's digital identity; an expired one can stop browsers from trusting the connection.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "why?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "fresh-offline-fake",
+      "mode": "technical",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 2,
+          "displayed_text": "db.example.com deserves attention: its recorded exposure score is 45.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Reducing unnecessary public access on db.example.com closes a route to private services.\n\nports.database_exposed: If access controls on the database are weak, someone could reach data that should stay private.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.",
+          "question": "then why would i fix it first?"
+        },
+        {
+          "source": "fake",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Offline test reply",
+          "footer": "Offline test reply · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "If other access controls fail on db.example.com, these services could put information or normal work at risk.\n\nports.database_exposed: If access controls on the database are weak, someone could read, change or delete stored data.\n\nAsk the service owner to review the recorded exposure and limit access that doesn't need to be public.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "timeout-fallback",
+      "mode": "simple",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate (a website's digital identity document). Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers (website instructions that help browsers protect visitors). These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "Explain this scan in simple words."
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?"
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "My honest take: keep private services private before polishing the smaller website protections.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "and what do you think?"
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nThe saved website findings include an expired website certificate. Ask the website owner to renew its certificate and check that automatic renewal works.\n\nYour website also has gaps in its security headers. These browser protections are worth tightening, but do not by themselves prove a break-in.\n\nWe can work through the first fix in plain words.",
+          "question": "why?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "timeout-fallback",
+      "mode": "simple",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "host",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nThe saved scan records public access to a database (a service that stores information). Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nThe saved scan records public access to a database. Keep services like these behind approved access controls, not open to everyone online.\n\nWe can work through the first fix in plain words.",
+          "question": "then why would i fix it first?"
+        },
+        {
+          "source": "template",
+          "mode": "simple",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "timeout-fallback",
+      "mode": "technical",
+      "sequence": "acceptance",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "overview",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "S:scan",
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The saved scan shows things your team can tighten. The main job is to reduce access that does not need to be public.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "Explain this scan in technical words."
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "The possible harm depends on the recorded issues and on the protections around them.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nVisitors may see security warnings or be unable to connect. That can interrupt access and hurt trust in the site.\n\nAnother site may be able to embed this page and mislead visitors into clicking its controls. Whether a sensitive action is possible depends on what the page allows.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what could happen if it kept like that?"
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "opinion",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "My honest take: keep private services private before polishing the smaller website protections.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "My honest take: keep private services private before polishing the smaller website protections.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "and what do you think?"
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "",
+            "scope": "scan"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "R:ports.database_exposed",
+            "F-0005",
+            "R:https.cert_expired",
+            "F-0012",
+            "R:headers.missing_clickjacking_protection",
+            "F-0009",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "Fixing the first issue reduces the most pressing exposure in the saved evidence. Smaller website improvements can follow that work.\n\nDatabase service exposed is recorded as high severity on 3 hosts. Move database access behind a private network and allow only approved application hosts to connect.\n\nHTTPS certificate expired is recorded as high severity on 1 host. Renew and install the HTTPS certificate, then monitor automatic renewal so it doesn't expire again unnoticed.\n\nMissing frame protection is recorded as medium severity on 1 host. Ask the site owner to set CSP frame-ancestors or X-Frame-Options to block unwanted embedding of the site.\n\nWe can work through the first fix in plain words.",
+          "question": "why?"
+        },
+        {
+          "source": "built-in",
+          "mode": null,
+          "answer_kind": "thanks",
+          "answer_focus": null,
+          "verification": "built-in",
+          "wording_verified": true,
+          "failure_kind": "",
+          "offline_notice": "",
+          "proof_notice": null,
+          "text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "label": "Built-in reply",
+          "footer": "Built-in reply · no model call",
+          "evidence": [],
+          "provider_calls": 0,
+          "displayed_text": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "question": "thanks"
+        }
+      ]
+    },
+    {
+      "surface": "viewer",
+      "provider": "timeout-fallback",
+      "mode": "technical",
+      "sequence": "host",
+      "turns": [
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "host",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "proof_notice": "",
+          "text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com is the most exposed host in this saved scan, with a recorded exposure score of 45. The score compares saved exposure, not the chance of a break-in.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "question": "Which host is the most exposed?"
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "why",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "",
+          "text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "db.example.com comes first because it has the highest recorded exposure score in the saved scan.\n\nDatabase service exposed is recorded as high severity on 1 host. Move database access behind a private network and allow only approved application hosts to connect.\n\nWe can work through the first fix in plain words.",
+          "question": "then why would i fix it first?"
+        },
+        {
+          "source": "template",
+          "mode": "technical",
+          "answer_kind": "impact",
+          "answer_focus": {
+            "finding_id": "",
+            "host": "db.example.com",
+            "scope": "host"
+          },
+          "verification": "evidence-and-facts",
+          "wording_verified": false,
+          "failure_kind": "timeout",
+          "offline_notice": "",
+          "proof_notice": "These are possible consequences, not proof that anyone broke in.",
+          "text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "label": "Built-in fallback",
+          "footer": "Built-in fallback · saved evidence checked; wording needs review",
+          "evidence": [
+            "H:db.example.com",
+            "F-0021",
+            "S:scan"
+          ],
+          "provider_calls": 1,
+          "displayed_text": "For db.example.com, the possible harm depends on the services recorded there and whether other protections hold.\n\nIf access controls are weak, someone could read, change or delete stored data. That could expose private information or interrupt services that depend on the database.\n\nWe can work through the first fix in plain words.\n\nThese are possible consequences, not proof that anyone broke in.",
+          "question": "what would that do or cause if didn't fixed?"
+        }
+      ]
+    }
+  ],
+  "turns": 84,
+  "code_owned": {
+    "scan": "DEMO-HISTORY-04",
+    "high_findings": 11,
+    "host": "db.example.com",
+    "host_score": 45
+  },
+  "limitation": "Offline fresh-wording/timeout fakes only, not real-model accuracy or full prose verification. TUI/CLI sockets blocked; viewer-route requests use only a token-protected loopback server. CLI commands are separate one-turn conversations; no cross-command memory is claimed."
+}

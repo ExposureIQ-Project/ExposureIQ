@@ -66,7 +66,12 @@ ExposureIQ is built around three ideas:
 | | `exposureiq report` command | Done |
 | | TUI Export picker for animated HTML and editable DOCX | Done |
 | | Custom report templates | Planned |
-| **AI (optional)** | Risk prioritisation and plain-language drafting | Planned |
+| **AI (optional)** | Checked saved-scan summaries; code-owned severity and priorities | Done |
+| | Domain history, risk trends, fixed/unfixed and regression explanations | Done |
+| | Natural saved-data chat; Simple/Technical wording, contextual follow-ups and collapsed Evidence | Done |
+| | Private Settings; Off/local/remote modes, OpenAI/Anthropic presets and checked fallback | Done |
+| **Local web viewer** | Saved domains, findings and chat on `127.0.0.1` only | Done; [platform limits](docs/ai-safety.md#local-web-viewer) |
+| **HTML AI drawer** | Floating open/close chat using TUI AI settings through the local server; Off hides it | Done; [export boundaries](docs/ai-safety.md#portable-html-chat) |
 
 ---
 
@@ -128,8 +133,10 @@ manual copying.
 table or its other columns. The grouped Hosts table copies the first listed hostname;
 rows with only an IP address copy that IP. Headers and empty rows copy nothing.
 
-**View saved results** is a file browser: single-click chooses a scan;
-double-click (or Enter) opens it without selecting or copying text.
+**View results** starts with domain folders: Enter opens a domain, then Enter
+opens a saved scan. **All files** retains the original flat file browser;
+single-click chooses a scan, and double-click (or Enter) opens it without
+selecting or copying text. Browsing never sends target probes.
 
 Desktop copying uses `wl-copy` on Wayland, `xclip`/`xsel` on X11, `pbcopy` on macOS,
 or PowerShell on Windows. Wayland and X11 are Linux display systems. No new
@@ -163,6 +170,71 @@ or diff for scan 3 only uses scans 1–3, even if scans 4–10 are already saved
 The HTML home lists all saved scans, with real and demo trends kept separate.
 Explicit `--compare` or
 `diff OLD.json NEW.json` still selects your chosen baseline.
+
+### Optional AI quick start and local web viewer
+
+These first three commands need no saved scan, key, model service or network:
+
+```bash
+exposureiq ai summary --demo   # synthetic scan, deterministic offline fake
+exposureiq ai history --demo   # synthetic ten-scan history; code verdict: mixed
+exposureiq ai eval             # normal and deliberately wrong offline fakes
+```
+
+For saved demo data and the local viewer:
+
+```bash
+exposureiq scan example.com --demos --no-report --plain # creates fake JSON only
+exposureiq ai ask example.com "What should I fix first?" --demo
+exposureiq ai ask example.com "Explain the saved findings" --demo --mode technical
+exposureiq web --demo --port 0 # prints a private per-launch loopback URL
+```
+
+Open the **full URL**, including its `#` fragment, in your browser. The viewer
+reads saved JSON; it cannot scan, change scope, run commands or receive an API
+key. Ctrl+C stops it. Secure file reads are unavailable on some platforms,
+including typical Windows installations; use the TUI or offline reports there.
+
+In the TUI, click **⚙ Settings → AI settings**. **Off (no AI)** is the default
+and hides AI tabs/buttons. **Local URL** accepts a loopback-only OpenAI-compatible
+endpoint (default `http://127.0.0.1:11434/v1`) and sends no key. **Remote API**
+includes OpenAI, Anthropic and other presets, or **Custom** for another compatible
+service. Enter a model available there and the key privately in the masked field;
+confirm the named host before saving or testing. Anthropic uses its native
+Messages API. Never put a key in a command, scan file or chat.
+
+The AI tab is one chat view: common questions, a message bar, distinct user/AI
+messages and ASCII thinking feedback. **Settings → Developer mode** reveals AI
+logs and the fake-data badge; normal users still see a plain warning on synthetic
+scans. There is no Demo setting; the explicit `--demo` CLI examples above remain
+offline test fixtures.
+
+Export a self-contained, scan-only HTML report:
+
+```bash
+exposureiq report example.com --format html --results-dir results -o reports
+```
+
+Open the generated `index.html` directly to view saved scans. For real AI chat,
+configure Local or Remote AI in the TUI, then open the same report in one command:
+
+```bash
+exposureiq web example.com --open
+```
+
+The floating chat icon opens/closes a side drawer and uses the TUI's AI settings.
+**Off** means no icon or chat. A saved JSON path under `--results-dir` can replace
+the domain. Provider keys stay on the server; keep the command running while
+chatting. There are no prepared answers in the HTML. A double-clicked file cannot
+access private AI settings and stays scan-only. Sharing it shares saved host
+names and findings, so keep it private. `--demo` is only an explicit offline fake.
+
+`ai summary` and `ai history` also accept a saved JSON filename or domain.
+`--json` gives structured output; `--no-fallback` exits nonzero on missing AI
+configuration, provider/tool failure or unverified claims. The default uses the
+verified template instead. See [safety and local/remote setup](docs/ai-safety.md),
+the [eight-step offline presentation](docs/stage5-presentation.md) and
+[twelve headless screenshots and evaluation](docs/stage5-evidence/README.md).
 
 ### Windows helper
 
@@ -350,10 +422,36 @@ ExposureIQ **actively probes systems** when you run a normal scan.
 
 The authors accept no responsibility for misuse.
 
-### About the AI layer
+### Responsible AI
 
-AI output can be wrong. It is meant to save writing time, not replace judgement.
-Any AI-generated text will be labelled as a draft for review before it is shared.
+AI is optional, read-only and labelled **AI draft**. Code, not the model, decides
+severity, counts, risk, history verdicts and priority order. Chat may explain the
+selected evidence in its own words; bounded checks validate references, factual
+placeholders and known safety violations. Its footer says **saved evidence
+checked; wording needs review**. This does not fully verify arbitrary model prose.
+Summaries/reports retain stricter code-approved sentence checks. Neither kind of
+checking proves that a host is safe, a breach happened or a fix worked.
+
+Simple is the default; Technical is available in chat and with `ai ask --mode
+technical`. Built-in replies handle greetings and thanks without a model call.
+HTML AI chat requires the authenticated local server and enabled TUI settings;
+no provider key is embedded or sent to the browser. Disk reports remain scan-only.
+Server failure shows an unavailable message, not a saved answer. A provider failure
+can still give the same clearly labelled, checked built-in fallback as the TUI.
+
+The assistant only discusses saved scans, ExposureIQ and defensive fixes. Its
+six tools read saved data; none scan, execute commands, change scope or act on a
+target. Saved strings are treated as data, never terminal markup or browser HTML.
+Local mode sends no key. Remote sharing requires consent naming the configured
+host; normalized host names and findings may leave your machine only then.
+
+Keys and disposable caches stay in private user files outside the source tree;
+keys are not encrypted at rest. `EXPOSUREIQ_AI_KEY` may override a remote key,
+but is never saved. Chat and the last thirty redacted AI calls stay in memory.
+Saving **Off** hides AI controls and forgets the stored key. Logs are visible
+only in Developer mode. Review every draft before sharing it.
+The [offline evaluation](docs/stage5-evidence/evaluation.md) tests safety
+regressions with fakes, not any real model's accuracy.
 
 ---
 

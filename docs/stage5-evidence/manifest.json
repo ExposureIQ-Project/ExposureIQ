@@ -1,0 +1,161 @@
+{
+  "network": "blocked; deterministic offline fakes only",
+  "screenshots": [
+    {
+      "file": "01-home-drawer.svg",
+      "title": "ExposureIQ · Gear, Home and sliding Settings drawer",
+      "bytes": 79802,
+      "sha256": "87ca662c2b7de2bf73dac73b19278bbb2169a71a2a4a3494dbdae429bdc955d8",
+      "observed_text": [
+        "Settings",
+        "AI settings",
+        "Developer mode"
+      ]
+    },
+    {
+      "file": "02-masked-settings.svg",
+      "title": "ExposureIQ · Uniform mode tabs and masked FAKE key; no connection test",
+      "bytes": 93776,
+      "sha256": "596838a953e074d8cdb7619a216b134a9dab27e87c0cc6a4a691359ccde6f292",
+      "observed_text": [
+        "AI settings",
+        "Off (no AI)",
+        "Local URL",
+        "API key",
+        "Custom"
+      ]
+    },
+    {
+      "file": "03-remote-consent.svg",
+      "title": "ExposureIQ · Host-named remote consent; cancelled",
+      "bytes": 100783,
+      "sha256": "661b40edb5f2e4823775e4944ac7ee0c58cb5186b68f0ff71f223c7b1ad2d867",
+      "observed_text": [
+        "ai.example.com",
+        "Cancel",
+        "Confirm sharing"
+      ]
+    },
+    {
+      "file": "04-domain-folders.svg",
+      "title": "ExposureIQ · Saved domains; original All files retained",
+      "bytes": 73988,
+      "sha256": "bcdeae3dc99960f5aa4e9717bdaa03f1adcb3c626df8d818c27eea83c90e3af0",
+      "observed_text": [
+        "example.com",
+        "All files",
+        "mixed"
+      ]
+    },
+    {
+      "file": "05-domain-scans.svg",
+      "title": "ExposureIQ · Ten offline scan rows and code sparkline",
+      "bytes": 90368,
+      "sha256": "fe72f8e263a27e7062cc80431e5a0d8fc1aa36dccb2206321b90e5cd3b1d110b",
+      "observed_text": [
+        "CODE VERDICT",
+        "mixed",
+        "Risk per host",
+        "2026"
+      ]
+    },
+    {
+      "file": "06-history-summary.svg",
+      "title": "ExposureIQ · Short history chat with code-owned counts and uncertainty",
+      "bytes": 100530,
+      "sha256": "7ee50eb2326a85c0322c3fe1632986457a6b6ad7f3ad03fdf5d4d69e15a616e8",
+      "observed_text": [
+        "reduced exposure",
+        "increased it",
+        "stayed present",
+        "two saved absences",
+        "saved evidence checked"
+      ]
+    },
+    {
+      "file": "07-scan-summary.svg",
+      "title": "ExposureIQ · Short saved-scan chat and honest evidence footer",
+      "bytes": 117714,
+      "sha256": "1abbac0f98c3fe29af5a5651fc6ee74d8a82fd3cf94266e5ff52d07a2c4700d0",
+      "observed_text": [
+        "You",
+        "sent",
+        "AI draft",
+        "saved evidence checked",
+        "wording needs review",
+        "Fake demonstration data"
+      ]
+    },
+    {
+      "file": "08-chat-refusal.svg",
+      "title": "ExposureIQ · Distinct messages and policy refusal; no model call for refusal",
+      "bytes": 121138,
+      "sha256": "41b606428bad20fbddcc21ebf9ca80a3c4381f81cfff748260695e72ebcea513",
+      "observed_text": [
+        "You",
+        "sent",
+        "payload",
+        "can't help",
+        "Policy gate"
+      ]
+    },
+    {
+      "file": "09-ai-log.svg",
+      "title": "ExposureIQ · Developer-only log; wrong offline fake reply rejected",
+      "bytes": 117533,
+      "sha256": "049af6111e2b818530d3e2de4ed3f373e135b3ccd5aa4bbd1cb5b8711893f684",
+      "observed_text": [
+        "DROPPED AND WHY",
+        "unknown reference",
+        "AI log",
+        "DEMO"
+      ]
+    },
+    {
+      "file": "10-chat-thinking.svg",
+      "title": "ExposureIQ · Immediate sent receipt and moving ASCII thinking feedback",
+      "bytes": 120121,
+      "sha256": "63eaa509e186b94241b6393f302228fe86a710350825f066f37aa244c8a26eb3",
+      "observed_text": [
+        "You",
+        "sent",
+        "thinking",
+        "Thinking",
+        "security headers"
+      ]
+    },
+    {
+      "file": "11-ai-off.svg",
+      "title": "ExposureIQ · Off hides AI controls and keeps the saved-scan summary",
+      "bytes": 147339,
+      "sha256": "fbef8d207b29e2b567da9cad713e36042b3496770c5158687911a464666349a2",
+      "observed_text": [
+        "Summary",
+        "Findings",
+        "NO PROBES SENT",
+        "fake data"
+      ]
+    },
+    {
+      "file": "12-impact-follow-up.svg",
+      "title": "ExposureIQ · Fresh-wording damage follow-up; conditional harm and code-added disclaimer",
+      "bytes": 122553,
+      "sha256": "e81382d88675faa221bdaaf386b57cb9b8d06cb6ab4b11066833419cc6409491",
+      "observed_text": [
+        "then what posible damage it can make?",
+        "AI draft",
+        "not proof that anyone broke in",
+        "read, change or delete stored data",
+        "saved evidence checked"
+      ]
+    }
+  ],
+  "evaluation": "22/22",
+  "follow_up": {
+    "file": "follow-up-transcript.md",
+    "sha256": "cf5361444bdd3ef8a9290e05c227397ba2dfebe2cdac39b8c72e0722eab28a96",
+    "model_calls": 1,
+    "question": "then what posible damage it can make?"
+  },
+  "note": "Real Textual headless captures. Chat uses an injected fresh-wording offline fake, not a real model or fully verified prose; summaries retain strict checking. No configured URL was contacted. Only external font rules removed. The masked key is fake; remote sharing was cancelled."
+}

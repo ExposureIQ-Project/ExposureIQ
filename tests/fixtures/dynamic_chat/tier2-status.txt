@@ -1,0 +1,6 @@
+Tier 2: 1851 passed; 4 subtests passed in 224.94s.
+Failures: zero.
+Skips: 66 — 65 need PowerShell; one needs native Windows batch execution.
+Branch: feature/s5-dynamic-chat; inherited Stage 5 evidence preserved.
+Safety: offline suite; local Ollama availability checked, no model trial yet.
+Next: finish the browser recheck, then Tier 3.

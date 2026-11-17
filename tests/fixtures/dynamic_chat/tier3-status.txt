@@ -1,0 +1,6 @@
+Tier 3: 1873 passed; 4 subtests passed in 223.93s.
+Failures: zero.
+Skips: 66 — 65 need PowerShell; one needs native Windows batch execution.
+Branch: feature/s5-dynamic-chat; nothing staged or committed.
+Safety: offline suite; separate synthetic local Qwen trial completed.
+Next: user reviews the evidence, tier diffs and five commit drafts.

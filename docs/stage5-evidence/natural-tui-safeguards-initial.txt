@@ -1,0 +1,70 @@
+.F...................                                                    [100%]
+=================================== FAILURES ===================================
+_____________ test_domain_history_summary_shows_each_code_section ______________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-17/test_domain_history_summary_sh0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7f2849e2d9b0>
+
+    def test_domain_history_summary_shows_each_code_section(tmp_path, ai_scan_factory):
+        root = tmp_path / "results"
+        persistent = ("headers.missing_csp", "medium")
+        returned = ("ports.database_exposed", "high")
+        for i, rules in enumerate([[persistent, returned], [persistent], [persistent], [persistent, returned]]):
+            storage.save_scan(ai_scan_factory(i, rules=rules), str(root / "example.com" / f"scan-{i}.json"))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), home=True, results_dir=root)
+            app.ai_service = AIService(AIConfig(mode="demo"), use_cache=False)
+            async with app.run_test(size=(125, 48)) as pilot:
+                await pilot.click("#home-results")
+                await pilot.press("enter")
+                assert isinstance(app.screen, DomainScreen)
+                await pilot.click("#domain-ai-chat")
+                panel = app.screen.query_one("#domain-ai", AIPanel)
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert app.screen.query_one("#domain-tabs", TabbedContent).active == "domain-ai-tab"
+                text = transcript(panel)
+                assert all(word in text for word in ("changes reduced exposure", "increased it", "Still present:", "Returned after two saved absences:"))
+                assert "isn't one clear direction" in text and "Database service exposed" in text
+                assert panel.last_result["history"]["regressions"][0]["rule"] == returned[0]
+                await pilot.click("#history-most-exposed")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert "db.example.com" in transcript(panel)
+>       asyncio.run(exercise())
+
+tests/test_tui_ai_chat.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), home=True, results_dir=root)
+        app.ai_service = AIService(AIConfig(mode="demo"), use_cache=False)
+        async with app.run_test(size=(125, 48)) as pilot:
+            await pilot.click("#home-results")
+            await pilot.press("enter")
+            assert isinstance(app.screen, DomainScreen)
+            await pilot.click("#domain-ai-chat")
+            panel = app.screen.query_one("#domain-ai", AIPanel)
+            await panel.chat_worker.wait()
+            await pilot.pause()
+            assert app.screen.query_one("#domain-tabs", TabbedContent).active == "domain-ai-tab"
+            text = transcript(panel)
+>           assert all(word in text for word in ("changes reduced exposure", "increased it", "Still present:", "Returned after two saved absences:"))
+E           assert False
+E            +  where False = all(<generator object test_domain_history_summary_shows_each_code_section.<locals>.exercise.<locals>.<genexpr> at 0x7f2843b3d460>)
+
+tests/test_tui_ai_chat.py:84: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_tui_ai_chat.py::test_domain_history_summary_shows_each_code_section
+1 failed, 20 passed in 29.15s

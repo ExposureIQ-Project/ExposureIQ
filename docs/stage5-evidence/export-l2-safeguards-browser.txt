@@ -1,0 +1,15 @@
+PASS: exported script agrees with Python on 40 phrase routes and 30 chat turns; modes, focus, literal text, collapsed evidence, common questions and clear-chat work without networking/storage.
+PASS: real Firefox offline export checks, screenshot: export-browser-l1.png
+PASS: actual live-report scripts use only token-protected relative requests; file/remote/missing-token pages stay offline, greetings/refusals make no calls, both modes and redaction work, Evidence stays literal, clear isolates conversations, host-named consent remains visible, Off drops pending replies, stale replies are suppressed and backend failures fall back safely.
+Traceback (most recent call last):
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_export_evidence.py", line 115, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_export_evidence.py", line 99, in main
+    browser = check_live(server, args.out / "export-browser-l2.png", fake)
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 210, in check_live
+    browser.wait('document.getElementById("export-live-enabled").checked && window.location.hash === "#domain-home"')
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/saifdemos/Projects/CyberSecurity/ExposureiQ/scripts/stage5_firefox_check.py", line 120, in wait
+    raise RuntimeError("The browser's expected saved-data state did not appear.")
+RuntimeError: The browser's expected saved-data state did not appear.

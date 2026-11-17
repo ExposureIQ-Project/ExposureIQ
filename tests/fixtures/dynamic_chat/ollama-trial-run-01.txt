@@ -1,0 +1,8 @@
+what is the most bad finding here in this scan? -> Live AI · qwen2.5:3b-instruct; 1 attempts; 5.55s
+then how can i fix it? -> Live AI · qwen2.5:3b-instruct; 2 attempts; 2.06s
+how long would that take? -> Built-in answer; 2 attempts; 1.82s
+what do you think? -> Built-in answer; 2 attempts; 1.72s
+what does SMB mean? -> Live AI · qwen2.5:3b-instruct; 2 attempts; 2.15s
+who should fix it? -> Built-in answer; 2 attempts; 1.78s
+thanks -> Built-in answer; 0 attempts; 0.0s
+Observed 0 live replies and 3 provider fallbacks; thanks made no model call.

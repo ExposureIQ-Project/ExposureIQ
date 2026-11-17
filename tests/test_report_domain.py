@@ -186,6 +186,10 @@ def test_only_the_fixed_hashed_script_can_run_and_untrusted_data_stays_text(tmp_
     parsed = portal_html(page)
     digest = base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode()
     assert parsed.scripts == [SCRIPT]
+    assert 'id="exposureiq-chat-data"' not in page and 'id="export-chat-toggle"' not in page
+    for script in parsed.scripts:
+        script_digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+        assert f"'sha256-{script_digest}'" in page
     assert f"script-src 'sha256-{digest}'" in page and "connect-src 'none'" in page
     assert "<img src=x" not in page and "<svg onload" not in page
     assert "&lt;svg onload" in page and "&lt;/script&gt;" in page

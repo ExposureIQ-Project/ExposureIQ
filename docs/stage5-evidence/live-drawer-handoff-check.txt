@@ -1,0 +1,12 @@
+PASS: complete virtual-environment suite: 1775 passed, 66 skipped, 4 subtests passed; no filters.
+PASS: retained exact skip reasons: 65 PowerShell tests and one native Windows batch test.
+PASS: no staged work; protected scan/scope/storage/schema/GitHub files unchanged.
+PASS: dependencies and Python minimum unchanged; README diffs confined to Features, Quick start and Responsible AI.
+PASS: 69 changed Python files parse with Python 3.10 grammar (syntax only).
+PASS: 226 changed text files are UTF-8 without BOM, with Unix line endings.
+PASS: 7 changed JavaScript files pass Node syntax checks; git diff --check passes.
+PASS: 137 local documentation links resolve; five attributed split commit drafts meet team format.
+PASS: current live-drawer source/evidence hashes match; six final status lines agree with the handoff.
+OBSERVED: latest four Firefox images inspected; narrow content bounds 500 x 758 pixels, not a native-phone test.
+Runtime: 3.14.8; Python 3.10 executable: not installed; no runtime validation claimed.
+Safety: offline fakes and synthetic evidence only; no real key, live model/provider or target traffic.

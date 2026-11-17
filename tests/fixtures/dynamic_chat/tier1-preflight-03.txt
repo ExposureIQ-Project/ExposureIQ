@@ -1,0 +1,2618 @@
+...................................................F.................... [ 12%]
+.F.............F.......F....................................F........... [ 24%]
+.....................FF................................................. [ 37%]
+........................................................................ [ 49%]
+..........................................................F............. [ 61%]
+.......F.F.....................F...F.....FFF............................ [ 74%]
+....................FF.................................F................ [ 86%]
+.......................................FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. [ 98%]
+.......                                                                  [100%]
+=================================== FAILURES ===================================
+_ test_code_selects_read_only_facts_before_the_phrasing_model[Explain F-0001-get_finding] _
+
+question = 'Explain F-0001', tool = 'get_finding'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88fc7e610>
+
+    @pytest.mark.parametrize("question,tool", [
+        ("Explain F-0001", "get_finding"), ("What should I fix first?", "list_findings"),
+        ("Which host is the most exposed?", "get_host"), ("Show scan history", "get_history"),
+        ("Which findings are still unfixed?", "list_unfixed"),
+    ])
+    def test_code_selects_read_only_facts_before_the_phrasing_model(question, tool, ai_scan_factory):
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(), provider=provider)
+>       result = chat.ask(question)
+                 ^^^^^^^^^^^^^^^^^^
+
+tests/test_ai_chat.py:29: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88fc8c690>
+question = 'Explain F-0001', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88fc7ee50>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+_ test_common_questions_get_focused_plain_english_checked_answers[How can I confirm fixes from this scan?-usual authorized checks] _
+
+question = 'How can I confirm fixes from this scan?'
+expected = 'usual authorized checks'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88fcab3d0>
+
+    @pytest.mark.parametrize("question,expected", [
+        ("What do severity levels mean in this scan?", "what to fix first"),
+        ("What does the risk score mean in this scan?", "not the chance of a break-in"),
+        ("What are security headers in this scan?", "instructions that help browsers protect visitors"),
+        ("What wasn't checked in this scan?", "missing or failed check"),
+        ("How can I confirm fixes from this scan?", "usual authorized checks"),
+        ("What does ExposureIQ do?", "I don't scan or take action"),
+    ])
+    def test_common_questions_get_focused_plain_english_checked_answers(question, expected, ai_scan_factory):
+        chat = build_chat(ai_scan_factory(), provider=FakeProvider())
+        result = chat.ask(question)
+>       assert expected in result["headline"]["text"]
+E       AssertionError: assert 'usual authorized checks' in 'Confirm that approved applications still connect and that the saved public-port finding is absent after the authorized recheck.'
+
+tests/test_ai_chat.py:184: AssertionError
+_ test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88fcfc930>
+
+    def test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it(ai_scan_factory):
+        rules = [("ports.database_exposed", "high"), ("https.cert_expired", "high"),
+                 ("headers.missing_csp", "medium")]
+        provider = FakeProvider()
+        chat = build_chat(ai_scan_factory(rules=rules), provider=provider)
+>       chat.ask("Explain f-0003")
+
+tests/test_ai_chat.py:292: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88fcf84b0>
+question = 'Explain f-0003', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88fcfd170>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+_ test_referenced_consequence_outside_bounded_digest_uses_only_selected_tool_evidence _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88fcfc1a0>
+
+    def test_referenced_consequence_outside_bounded_digest_uses_only_selected_tool_evidence(ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+        rules = [(rule, "high") for rule in ("ports.database_exposed", "ports.remote_desktop_exposed",
+                                            "https.cert_expired", "ports.smb_exposed", "ports.telnet_exposed")]
+        included = {rule for rule, severity in rules}
+        rules.extend((rule, metadata["severity"]) for rule, metadata in RULES.items() if rule not in included)
+        scan = ai_scan_factory(rules=rules)
+        finding_id = next(f["id"] for f in scan["assets"][0]["findings"] if f["rule"] == "tech.server_version_disclosed")
+        chat = build_chat(scan, provider=FakeProvider())
+        assert not any(group["rule"] == "tech.server_version_disclosed" for group in chat.digest["findings"])
+>       chat.ask(f"Explain {finding_id}")
+
+tests/test_ai_chat.py:360: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88fcf96d0>
+question = 'Explain F-0014', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88fcfdfe0>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+__________ test_selected_finding_does_not_need_unrelated_global_highs __________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88ea17320>
+
+    def test_selected_finding_does_not_need_unrelated_global_highs(ai_scan_factory):
+        scan = ai_scan_factory(rules=[("ports.database_exposed", "high"), ("https.cert_expired", "high"), ("headers.missing_csp", "medium")])
+        chat = chat_for(scan)
+>       chat.ask("Explain F-0003")
+
+tests/test_ai_conversation.py:227: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88ea06b70>
+question = 'Explain F-0003', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88ea17480>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+__ test_non_top_selected_host_or_finding_never_claims_to_be_the_most_exposed ___
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88ea73ed0>
+
+    def test_non_top_selected_host_or_finding_never_claims_to_be_the_most_exposed(ai_scan_factory):
+        scan = ai_scan_factory()
+        other = ai_scan_factory(rules=[("headers.missing_referrer_policy", "low")], host="www.example.com")["assets"][0]
+        other["findings"][0]["id"] = "F-0003"
+        scan["assets"].append(other)
+        chat = chat_for(scan)
+>       chat.ask("Explain F-0003")
+
+tests/test_ai_conversation.py:344: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88fc87430>
+question = 'Explain F-0003', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88ea2c0f0>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+___________ test_simple_and_technical_mode_changes_are_code_selected ___________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88ea72f00>
+
+    def test_simple_and_technical_mode_changes_are_code_selected(ai_scan_factory):
+        chat = chat_for(ai_scan_factory())
+>       simple = chat.ask("Explain F-0001")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_ai_conversation.py:355: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd88fc87d90>
+question = 'Explain F-0001', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88ea70300>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+_______ test_anthropic_tool_round_trip_is_read_only_bounded_and_checked ________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88ea9d170>
+
+    def test_anthropic_tool_round_trip_is_read_only_bounded_and_checked(ai_scan_factory):
+        def replies(calls):
+            if len(calls) == 1:
+                return json.dumps({"type": "message", "content": [{"type": "tool_use", "id": "fake_tool_1",
+                                  "name": "get_finding", "input": {"id": "F-0001"}}]})
+            blocks = calls[-1]["body"]["messages"][-1]["content"]
+            update = json.loads(next(block["text"] for block in reversed(blocks) if block["type"] == "text"))
+            assert update["reply_mode"] == "conversation" and "candidate" not in update
+            return anthropic_text(json.dumps({"headline": {"text": "A publicly reachable database should have tighter access controls.", "refs": ["F-0001"]},
+                                             "priorities": [], "notes": [], "next_steps": []}))
+    
+        with fake_server([200], body=replies) as (url, calls):
+            config = confirm_remote(AIConfig(mode="remote", provider="Anthropic", base_url=url,
+                                             model="fake-claude", api_key=FAKE_KEY), accepted=True)
+            service = AIService(config, use_cache=False)
+            scan = ai_scan_factory()
+            chat = Chat(scan_digest(scan), ReadOnlyTools(scan), service)
+>           result = chat.ask("Explain F-0001")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_ai_provider.py:192: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <exposureiq.ai.chat.Chat object at 0x7fd891666f30>
+question = 'Explain F-0001', no_fallback = False
+progress = <function Chat.ask.<locals>.<lambda> at 0x7fd88ea9d4e0>, mode = None
+host = '', finding_id = '', retry_id = ''
+
+    def ask(self, question: str, *, no_fallback=False, progress=None, mode=None, host="", finding_id="", retry_id="") -> dict:
+        start = time.monotonic()
+        decision = policy_gate(question, has_context=bool(self.answer_context))
+        if not decision.allowed:
+            return refusal_result(decision)
+        friendly = friendly_kind(question)
+        if friendly:
+            # No settings, credential, tool or provider reads for a greeting.
+            return self._built_in_reply(friendly_reply(friendly), kind=friendly)
+        config = self.service._configuration()
+        question = redact(question, (config.key, config.api_key))
+        if retry_id:
+            saved = self.retry_requests.get(retry_id)
+            if not saved or saved["question"] != question:
+                raise ValueError("Try again is available only for this conversation's saved question.")
+            context = copy.deepcopy(saved["context"])
+        else:
+            context = choose_context(question, self.digest, self.tools, self.answer_context,
+                                     mode=mode, host=host, finding_id=finding_id)
+        if context["clarification"]:
+            return self._built_in_reply({"headline": {"text": context["clarification"], "refs": []},
+                                        "priorities": [], "next_steps": [], "notes": []}, kind="clarification")
+        digest = self.digest
+        if context["kind"] in ("history", "unfixed") and digest.get("ref") != "S:history":
+            digest = build_history_layers(self.tools.scans)["L4"]
+        # Tool budget/evidence are per answer, never per conversation.
+        self.tools.calls, self.tools.evidence = [], []
+        if no_fallback and not config.ready and self.service.provider is None:
+            raise NotConfigured("AI is not configured. Open AI settings or use --demo.")
+        progress = progress or (lambda stage: None)
+        progress("Reading your scan")
+        # The code chooses all reads. No tool definitions go to a small model;
+        # an unexpected tool call is rejected without reading its arguments.
+        if context["kind"] in ("history", "unfixed"):
+            self.tools.execute("list_unfixed" if context["kind"] == "unfixed" else "get_history", {})
+        elif context["kind"] != "why" and context.get("intent") == "fix_first" and context.get("ranked_groups"):
+            self.tools.execute("list_findings", {"severity": context["ranked_groups"][0]["severity"]})
+        if context.get("finding_id"):
+            self.tools.execute("get_finding", {"id": context["finding_id"]})
+        elif context.get("host"):
+            self.tools.execute("get_host", {"host": context["host"]})
+        digest = redact(self.tools.augmented_digest(add_focus_evidence(digest, context, self.tools)), (config.key, config.api_key))
+        plan = answer_plan(digest, context)
+        plan.update(include_proof_note=not self.proof_notice_seen, defined_terms=sorted(self.defined_terms),
+                    wording_seed="")
+        pack = build_facts_pack(digest, plan, scan_id=self.tools.scan["scan_id"], question=question)
+        candidate = built_in_answer(pack)
+        model, source = "Built-in explanation (no AI)", "template"
+        failure_kind, reason = "not_configured", "AI is off or not configured, so I answered from your saved scan."
+        checked, entry, rejected, raw_content = None, None, [], ""
+        if config.ready or self.service.provider is not None:
+            try:
+                provider = self.service.provider or make_provider(config)
+                model = getattr(provider, "model", config.model)
+                for attempt in (1, 2):
+                    progress("Phrasing your answer")
+                    messages = chat_messages(pack, question=question, memory=list(self.memory), repair=attempt == 2)
+                    try:
+                        response, entry = self.service.call(provider, messages, config,
+                                                            purpose="chat" if attempt == 1 else "chat shorter retry", attempt=attempt)
+                    except ProviderError as error:
+                        if attempt == 1 and error.kind in ("empty", "incomplete", "invalid"):
+                            continue
+                        raise
+                    if response.tool_calls:
+                        raise ToolError("A phrasing model requested a tool. No model-requested read ran.")
+                    raw_content = redact(response.content, (config.key, config.api_key))
+                    progress("Checking the facts")
+                    try:
+                        checked = check_model_chat_output(raw_content, digest, plan, pack)
+                    except SchemaError as error:
+                        entry["parse_error"] = str(error)
+                        entry["attempt_failed"] = True
+                        factual_failure = any(word in str(error) for word in ("unsafe", "number", "reference"))
+                        entry["error_kind"] = "evidence" if factual_failure else "reply_format"
+                        entry["dropped"] = [{"claim": "reply format", "reason": str(error)}]
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = ("evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan.") if factual_failure else (
+                            "reply_format", "The model's reply was not in a usable format, so I answered from your saved scan.")
+                        checked = None
+                        continue
+                    if not checked.accepted:
+                        entry["attempt_failed"] = True
+                        entry["dropped"] = copy.deepcopy([*checked.dropped, *checked.removed])
+                        entry["error_kind"] = "evidence"
+                        rejected.extend(copy.deepcopy(entry["dropped"]))
+                        failure_kind, reason = "evidence", "The model's reply did not pass the saved-fact checks, so I answered from your saved scan."
+                        checked = None
+                        continue
+                    entry["dropped"] = copy.deepcopy(checked.removed)
+                    source = "fake" if getattr(provider, "offline", False) and config.mode != "demo" else config.mode if config.ready else "fake"
+                    failure_kind, reason, rejected = "", "", copy.deepcopy(checked.removed)
+                    break
+            except RateLimitError:
+                return refusal_result(GateDecision(False, "rate limit", "Request limit reached; wait one minute before asking again."))
+            except Exception as error:
+                checked, source = None, "template"
+                failure_kind, reason = failure_details(error)
+                if entry is not None and not isinstance(error, ProviderError):
+                    entry["error"], entry["error_kind"] = reason, failure_kind
+        progress("Checking the facts")
+        if checked is None:
+            if no_fallback:
+                raise AIUnavailable(reason + " --no-fallback disabled built-in replies.") from None
+            checked = check_chat_output(candidate, digest, plan)
+            source = "template"
+        if not checked.accepted:
+>           raise ValueError("The built-in explanation failed evidence or safety checks.")
+E           ValueError: The built-in explanation failed evidence or safety checks.
+
+exposureiq/ai/chat.py:156: ValueError
+___________ test_domain_history_and_one_shot_question_are_json_only ____________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_domain_history_and_one_sh0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88eb82770>
+capsys = <_pytest.capture.CaptureFixture object at 0x7fd88fd5fa80>
+
+    def test_domain_history_and_one_shot_question_are_json_only(tmp_path, ai_scan_factory, capsys):
+        for i in range(3):
+            storage.save_scan(ai_scan_factory(i), str(tmp_path / "example.com" / f"scan-{i}.json"))
+        assert cli.main(["ai", "history", "example.com", "--results-dir", str(tmp_path), "--demo", "--json"]) == 0
+        history = json.loads(capsys.readouterr().out)
+        assert "stable" in history["headline"]["text"]
+>       assert cli.main(["ai", "ask", "example.com", "Explain F-0001", "--results-dir", str(tmp_path), "--demo", "--json"]) == 0
+E       AssertionError: assert 2 == 0
+E        +  where 2 = <function main at 0x7fd890750b40>(['ai', 'ask', 'example.com', 'Explain F-0001', '--results-dir', '/tmp/opencode/pytest-of-saifdemos/pytest-3/test_domain_history_and_one_sh0', ...])
+E        +    where <function main at 0x7fd890750b40> = cli.main
+
+tests/test_ai_cli.py:54: AssertionError
+----------------------------- Captured stderr call -----------------------------
+Cannot read saved data or question safely. Select valid JSON/domain data; questions must be 1–1000 characters. Use --demo for offline examples.
+___ test_cli_chat_has_natural_body_separate_evidence_and_both_wording_modes ____
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_cli_chat_has_natural_body0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88eb83110>
+capsys = <_pytest.capture.CaptureFixture object at 0x7fd88fd69d90>
+
+    def test_cli_chat_has_natural_body_separate_evidence_and_both_wording_modes(tmp_path, ai_scan_factory, capsys):
+        path = tmp_path / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+>       assert cli.main(["ai", "ask", str(path), "Explain F-0001", "--demo"]) == 0
+E       AssertionError: assert 2 == 0
+E        +  where 2 = <function main at 0x7fd890750b40>(['ai', 'ask', '/tmp/opencode/pytest-of-saifdemos/pytest-3/test_cli_chat_has_natural_body0/one.json', 'Explain F-0001', '--demo'])
+E        +    where <function main at 0x7fd890750b40> = cli.main
+
+tests/test_ai_cli.py:69: AssertionError
+----------------------------- Captured stderr call -----------------------------
+Cannot read saved data or question safely. Select valid JSON/domain data; questions must be 1–1000 characters. Use --demo for offline examples.
+_ test_chat_echoes_sent_message_shows_ascii_thinking_and_a_clean_verified_footer _
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_chat_echoes_sent_message_0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4be770>
+
+    def test_chat_echoes_sent_message_shows_ascii_thinking_and_a_clean_verified_footer(tmp_path, ai_scan_factory):
+        class BlockingFake(FakeProvider):
+            def __init__(self):
+                super().__init__()
+                self.entered, self.release = threading.Event(), threading.Event()
+    
+            def complete(self, messages, **kwargs):
+                self.entered.set()
+                assert self.release.wait(5)
+                return super().complete(messages, **kwargs)
+    
+        path = tmp_path / "results" / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+            provider = BlockingFake()
+            app.ai_service = AIService(AIConfig(mode="demo"), provider=provider, use_cache=False)
+            async with app.run_test(size=(120, 42)) as pilot:
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                await pilot.click("#ai-explain")
+                assert await asyncio.to_thread(provider.entered.wait, 2)
+                panel = app.query_one("#scan-ai", AIPanel)
+                before = panel.frame
+                await pilot.pause(.15)
+                assert panel.frame != before
+                progress = plain(app.query_one("#ai-progress", Static))
+                assert "Thinking" in progress and "important fixes" in progress and progress.startswith("[")
+                user, reply = panel.exchanges[-1]
+                assert "sent" in plain(user.heading) and "Explain this scan" in plain(user.body)
+                assert "thinking" in plain(reply.heading) and panel.running
+                assert app.query_one("#ai-chat-send", Button).disabled
+                assert not app.query_one("#ai-chat-input", Input).value
+                provider.release.set()
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert panel.stage_history == ["Policy gate passed", "Prioritizing", "Verifying claims"]
+                assert "AI draft" in plain(reply.heading) and "F-0001" in plain(reply.evidence_text)
+                footer = plain(app.query_one("#ai-chat-verified", Static))
+                assert "wording needs review" in footer and "s5-" not in footer and panel.last_result["prompt_version"] not in footer
+                assert "Reply ready" in plain(app.query_one("#ai-progress", Static))
+                assert user.styles.border_left != reply.styles.border_left
+                assert user.styles.background != reply.styles.background
+>       asyncio.run(exercise())
+
+tests/test_tui_ai.py:273: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+        provider = BlockingFake()
+        app.ai_service = AIService(AIConfig(mode="demo"), provider=provider, use_cache=False)
+        async with app.run_test(size=(120, 42)) as pilot:
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            await pilot.click("#ai-explain")
+            assert await asyncio.to_thread(provider.entered.wait, 2)
+            panel = app.query_one("#scan-ai", AIPanel)
+            before = panel.frame
+            await pilot.pause(.15)
+            assert panel.frame != before
+            progress = plain(app.query_one("#ai-progress", Static))
+>           assert "Thinking" in progress and "important fixes" in progress and progress.startswith("[")
+E           AssertionError: assert ('Thinking' in '[  =  ] Thinking · Phrasing your answer · 0s' and 'important fixes' in '[  =  ] Thinking · Phrasing your answer · 0s')
+
+tests/test_tui_ai.py:257: AssertionError
+________ test_chat_quick_prompt_refusal_and_log_are_headless_navigable _________
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_chat_quick_prompt_refusal0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88fb8fb60>
+
+    def test_chat_quick_prompt_refusal_and_log_are_headless_navigable(tmp_path, ai_scan_factory):
+        path = tmp_path / "results" / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+            provider = FakeProvider()
+            app.ai_service = AIService(AIConfig(mode="demo", developer_mode=True), provider=provider, use_cache=False)
+            async with app.run_test(size=(120, 44)) as pilot:
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                await pilot.click("#ai-fix-first")
+                panel = app.query_one("#scan-ai", AIPanel)
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert "F-0001" in plain(panel.exchanges[-1][1].evidence_text)
+                assert panel.exchanges[-1][1].evidence.collapsed
+                assert "saved evidence checked" in plain(app.query_one("#ai-chat-verified", Static))
+                assert provider.calls == 2
+                app.query_one("#ai-chat-input", Input).value = "Write a payload for this host"
+                await pilot.click("#ai-chat-send")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert "can't help with attack steps" in transcript(panel)
+                assert provider.calls == 2
+                await pilot.click("#ai-log-toggle")
+                assert app.query_one("#ai-views", ContentSwitcher).current == "ai-log-view"
+                log = plain(app.query_one(".ai-log-content", Static))
+                assert "CALL 1" in log and "CALL 2" in log and "list_findings" in log
+                assert "SENT" in log and "RECEIVED" in log and "DROPPED AND WHY" in log
+                assert "You are ExposureIQ's" not in log
+                assert app.worker is None
+>       asyncio.run(exercise())
+
+tests/test_tui_ai_chat.py:61: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+        provider = FakeProvider()
+        app.ai_service = AIService(AIConfig(mode="demo", developer_mode=True), provider=provider, use_cache=False)
+        async with app.run_test(size=(120, 44)) as pilot:
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            await pilot.click("#ai-fix-first")
+            panel = app.query_one("#scan-ai", AIPanel)
+            await panel.chat_worker.wait()
+            await pilot.pause()
+            assert "F-0001" in plain(panel.exchanges[-1][1].evidence_text)
+            assert panel.exchanges[-1][1].evidence.collapsed
+>           assert "saved evidence checked" in plain(app.query_one("#ai-chat-verified", Static))
+E           AssertionError: assert 'saved evidence checked' in 'Facts checked against your saved scan'
+E            +  where 'Facts checked against your saved scan' = plain(Static(id='ai-chat-verified', classes='ai-verified'))
+E            +    where Static(id='ai-chat-verified', classes='ai-verified') = query_one('#ai-chat-verified', Static)
+E            +      where query_one = ExposureIQApp(title='ExposureIQ', classes={'-dark-mode', '-theme-exposureiq'}, pseudo_classes={'focus', 'dark'}).query_one
+
+tests/test_tui_ai_chat.py:46: AssertionError
+_ test_natural_damage_followup_is_a_literal_checked_chat_reply_not_a_safety_refusal _
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_natural_damage_followup_i0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d8a8670>
+
+    def test_natural_damage_followup_is_a_literal_checked_chat_reply_not_a_safety_refusal(tmp_path, ai_scan_factory):
+        path = tmp_path / "results" / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+            provider = FakeProvider()
+            app.ai_service = AIService(AIConfig(mode="demo"), provider=provider, use_cache=False)
+            async with app.run_test(size=(120, 44)) as pilot:
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                await pilot.click("#ai-explain")
+                panel = app.query_one(AIPanel)
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                app.query_one("#ai-chat-input", Input).value = "then what posible damage it can make?"
+                await pilot.click("#ai-chat-send")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                user, reply = panel.exchanges[-1]
+                assert plain(user.body) == "then what posible damage it can make?"
+                assert "Offline demo" in plain(reply.heading) and "AI draft" in plain(reply.heading)
+                assert "What could go wrong:" not in plain(reply.body)
+                assert "read, change or delete stored data" in plain(reply.body)
+                assert "not proof that anyone broke in" in plain(reply.body)
+                assert reply.evidence.collapsed and "F-0001" in plain(reply.evidence_text)
+                assert "off-topic" not in plain(reply.body) and not reply.body.render().spans
+                assert panel.last_result["verified"] == panel.last_result["total"]
+                assert provider.calls == 2 and app.worker is None
+                panel.start_chat("Why?")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert panel.last_result["answer_kind"] == "why" and provider.calls == 3
+>       asyncio.run(exercise())
+
+tests/test_tui_ai_chat.py:279: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+        provider = FakeProvider()
+        app.ai_service = AIService(AIConfig(mode="demo"), provider=provider, use_cache=False)
+        async with app.run_test(size=(120, 44)) as pilot:
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            await pilot.click("#ai-explain")
+            panel = app.query_one(AIPanel)
+            await panel.chat_worker.wait()
+            await pilot.pause()
+            app.query_one("#ai-chat-input", Input).value = "then what posible damage it can make?"
+            await pilot.click("#ai-chat-send")
+            await panel.chat_worker.wait()
+            await pilot.pause()
+            user, reply = panel.exchanges[-1]
+            assert plain(user.body) == "then what posible damage it can make?"
+>           assert "Offline demo" in plain(reply.heading) and "AI draft" in plain(reply.heading)
+E           AssertionError: assert ('Offline demo' in 'ExposureIQ · Built-in answer')
+E            +  where 'ExposureIQ · Built-in answer' = plain(Static(classes='ai-speaker'))
+E            +    where Static(classes='ai-speaker') = ChatMessage(id='ai-reply-3', classes='assistant-message').heading
+
+tests/test_tui_ai_chat.py:267: AssertionError
+____ test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle ____
+
+tmp_path = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_reply_source_failure_reas0')
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d340e00>
+
+    def test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle(tmp_path, ai_scan_factory):
+        class Intermittent(FakeProvider):
+            unavailable = True
+    
+            def complete(self, messages, **kwargs):
+                if self.unavailable:
+                    self.calls += 1
+                    raise ProviderError("FAKE-NO-RAW-ERROR-ONLY", kind="connection")
+                return super().complete(messages, **kwargs)
+    
+        path = tmp_path / "results" / "one.json"
+        storage.save_scan(ai_scan_factory(), str(path))
+    
+        async def exercise():
+            app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+            provider = Intermittent()
+            app.ai_service = AIService(AIConfig(mode="local", base_url="http://127.0.0.1:11434/v1", model="offline-test"), provider=provider, use_cache=False)
+            async with app.run_test(size=(125, 48)) as pilot:
+                app.query_one("#results", TabbedContent).active = "ai-tab"
+                await pilot.pause()
+                panel = app.query_one(AIPanel)
+                for question in ("Which host is the most exposed?", "then why would i fix it first?"):
+                    panel.start_chat(question)
+                    await panel.chat_worker.wait()
+                    await pilot.pause()
+                    reply = panel.exchanges[-1][1]
+                    assert "Built-in fallback" in plain(reply.heading)
+                    assert "Cannot reach the configured AI endpoint" in plain(reply.status)
+                    assert "FAKE-NO-RAW" not in plain(reply.status) + plain(reply.body)
+                    assert "F-0001" in plain(reply.evidence_text) and reply.evidence.collapsed
+                    assert "db.example.com" in plain(reply.body)
+                    assert panel.last_result["answer_focus"]["host"] == "db.example.com"
+                assert sum("Offline mode:" in plain(reply.status) for _, reply in panel.exchanges) == 1
+                provider.unavailable = False
+                panel.query_one("#ai-wording-mode", Select).value = "technical"
+                await pilot.pause()
+                panel.start_chat("what would that do or cause if didn't fixed?")
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                assert panel.last_result["mode"] == "technical" and panel.last_result["answer_kind"] == "impact"
+                assert "Offline test reply" in plain(panel.exchanges[-1][1].heading)
+                assert "wording needs review" in plain(panel.query_one("#ai-chat-verified", Static))
+                panel.exchanges[-1][1].evidence.collapsed = False
+                await pilot.pause()
+                assert panel.exchanges[-1][1].evidence_text.region.height > 0
+                assert app.worker is None
+>       asyncio.run(exercise())
+
+tests/test_tui_ai_chat.py:328: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.14/asyncio/runners.py:205: in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/runners.py:128: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.14/asyncio/base_events.py:720: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    async def exercise():
+        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=path.parent)
+        provider = Intermittent()
+        app.ai_service = AIService(AIConfig(mode="local", base_url="http://127.0.0.1:11434/v1", model="offline-test"), provider=provider, use_cache=False)
+        async with app.run_test(size=(125, 48)) as pilot:
+            app.query_one("#results", TabbedContent).active = "ai-tab"
+            await pilot.pause()
+            panel = app.query_one(AIPanel)
+            for question in ("Which host is the most exposed?", "then why would i fix it first?"):
+                panel.start_chat(question)
+                await panel.chat_worker.wait()
+                await pilot.pause()
+                reply = panel.exchanges[-1][1]
+>               assert "Built-in fallback" in plain(reply.heading)
+E               AssertionError: assert 'Built-in fallback' in 'ExposureIQ · Built-in answer'
+E                +  where 'ExposureIQ · Built-in answer' = plain(Static(classes='ai-speaker'))
+E                +    where Static(classes='ai-speaker') = ChatMessage(id='ai-reply-2', classes='assistant-message').heading
+
+tests/test_tui_ai_chat.py:308: AssertionError
+____ test_actual_loopback_navigation_summary_history_chat_log_and_no_writes ____
+
+saved_root = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_actual_loopback_navigatio0/results')
+
+    def test_actual_loopback_navigation_summary_history_chat_log_and_no_writes(saved_root):
+        before = {path: path.read_bytes() for path in saved_root.rglob("*.json")}
+        with local_viewer(saved_root) as server:
+            assert server.server_address[0] == "127.0.0.1" and "#" in server.url
+            code, headers, page = request(server, "/", authenticated=False)
+            assert code == 200 and b"Local saved-scan viewer" in page
+            for name, expected in SECURITY_HEADERS.items():
+                assert headers[name] == expected
+            code, _, data = request(server, "/api/domains")
+            assert code == 200 and json.loads(data)["domains"][0]["domain"] == "example.com"
+            identifier = first_id(server)
+            code, _, data = request(server, "/api/scan?scan=" + identifier)
+            assert code == 200 and json.loads(data)["finding_count"] == 2
+            for path, payload in (("summary", {"scan": identifier}), ("history", {"domain": "example.com"}),
+                                  ("ask", {"scan": identifier, "question": "What should I fix first?"})):
+                code, _, data = request(server, "/api/ai/" + path, method="POST", payload=payload)
+                result = json.loads(data)
+                assert code == 200 and result["verified"] == result["total"] and result["draft"] == "AI draft"
+                assert "s5-" not in result["footer"] and result["prompt_version"] not in result["footer"]
+            code, _, data = request(server, "/api/log")
+>           assert code == 200 and len(json.loads(data)["entries"]) == 4
+E           AssertionError: assert (200 == 200 and 3 == 4)
+E            +  where 3 = len([{'attempt': 1, 'attempt_failed': False, 'completion_incomplete': False, 'dropped': [], ...}, {'attempt': 1, 'attempt_...alse, 'dropped': [], ...}, {'attempt': 1, 'attempt_failed': False, 'completion_incomplete': False, 'dropped': [], ...}])
+
+tests/test_viewer.py:91: AssertionError
+_ test_browser_chat_accepts_the_exact_damage_followup_without_saved_file_changes _
+
+saved_root = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_browser_chat_accepts_the_0/results')
+
+    def test_browser_chat_accepts_the_exact_damage_followup_without_saved_file_changes(saved_root):
+        before = {path: path.read_bytes() for path in saved_root.rglob("*.json")}
+        fake = FakeProvider()
+        service = AIService(AIConfig(mode="demo"), provider=fake, use_cache=False)
+        with local_viewer(saved_root, service=service) as server:
+            identifier = first_id(server)
+            for question in ("Explain this scan in simple words.", "then what posible damage it can make?", "Why?"):
+                code, _, raw = request(server, "/api/ai/ask", method="POST", payload={"scan": identifier, "question": question})
+                result = json.loads(raw)
+                assert code == 200 and not result.get("policy_refusal")
+                assert result["verified"] == result["total"] and result["user"] == question
+                if question == "then what posible damage it can make?":
+                    assert result["answer_kind"] == "impact"
+                    assert "read, change or delete stored data" in result["text"]
+                    assert "not proof that anyone broke in" in result["text"]
+                    assert "off-topic request" not in result["text"]
+                elif question == "Why?":
+                    assert result["answer_kind"] == "why" and not result["priorities"]
+>               assert result["verification"] == "evidence-and-facts" and "wording needs review" in result["footer"]
+E               AssertionError: assert ('evidence-and-facts' == 'evidence-and-facts'
+E                 
+E                   evidence-and-facts and 'wording needs review' in 'Facts checked against your saved scan')
+
+tests/test_viewer.py:239: AssertionError
+______ test_browser_chat_mode_selected_finding_and_safe_failure_metadata _______
+
+saved_root = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_browser_chat_mode_selecte0/results')
+
+    def test_browser_chat_mode_selected_finding_and_safe_failure_metadata(saved_root):
+        from exposureiq.ai.provider import ProviderError
+    
+        class Unavailable:
+            model = "offline unavailable fake"
+    
+            def complete(self, *args, **kwargs):
+                raise ProviderError("FAKE-RAW-ERROR-ONLY", kind="bad_request")
+    
+        service = AIService(AIConfig(mode="demo"), provider=Unavailable(), use_cache=False)
+        with local_viewer(saved_root, service=service) as server:
+            identifier = first_id(server)
+            code, _, raw = request(server, "/api/ai/ask", method="POST", payload={"scan": identifier, "question": "Explain this finding",
+                                    "mode": "technical", "finding_id": "F-0001"})
+            result = json.loads(raw)
+            assert code == 200 and result["mode"] == "technical"
+            assert result["answer_focus"]["finding_id"] == "F-0001" and result["failure_kind"] == "bad_request"
+>           assert result["label"] == "Built-in fallback" and result["evidence_refs"]
+E           AssertionError: assert ('Built-in answer' == 'Built-in fallback'
+E             
+E             - Built-in fallback
+E             + Built-in answer)
+
+tests/test_viewer.py:264: AssertionError
+__ test_chat_clear_and_separate_tabs_do_not_reuse_focus_or_once_only_notices ___
+
+saved_root = PosixPath('/tmp/opencode/pytest-of-saifdemos/pytest-3/test_chat_clear_and_separate_t0/results')
+
+    def test_chat_clear_and_separate_tabs_do_not_reuse_focus_or_once_only_notices(saved_root):
+        from exposureiq.ai.conversation import OFFLINE_NOTICE, PROOF_NOTE
+    
+        with local_viewer(saved_root) as server:
+            identifier = first_id(server)
+            def ask(question, conversation):
+                code, _, raw = request(server, "/api/ai/ask", method="POST", payload={"scan": identifier, "question": question, "conversation": conversation})
+                assert code == 200
+                return json.loads(raw)
+>           first = ask("Explain F-0002", "1" * 32)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_viewer.py:566: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+question = 'Explain F-0002', conversation = '11111111111111111111111111111111'
+
+    def ask(question, conversation):
+        code, _, raw = request(server, "/api/ai/ask", method="POST", payload={"scan": identifier, "question": question, "conversation": conversation})
+>       assert code == 200
+E       assert 400 == 200
+
+tests/test_viewer.py:564: AssertionError
+_ test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb21640>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x7fd88fa1d240>
+
+    def test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data(ai_scan_factory, monkeypatch):
+        from exposureiq.ai import config, provider
+    
+        monkeypatch.setattr(config, "load_config", lambda *a, **k: pytest.fail("Export must not load AI settings"))
+        monkeypatch.setattr(provider, "make_provider", lambda *a, **k: pytest.fail("Export must not create a provider"))
+        scan = ai_scan_factory()
+        scan["assets"][0]["findings"][0].update(title="UNTRUSTED-TITLE-ONLY", detail="UNTRUSTED-DETAIL-ONLY",
+                                                 recommendation="UNTRUSTED-RECOMMENDATION-ONLY")
+        scan["assets"][0]["technologies"][0].update(source="UNTRUSTED-BANNER-ONLY", version="UNTRUSTED-VERSION-ONLY")
+        before = copy.deepcopy(scan)
+>       bundle = build_chat_bundle(scan)
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_clickjacking_protection] _
+
+rule = 'headers.missing_clickjacking_protection'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4bd430>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_csp] _
+
+rule = 'headers.missing_csp'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d39e090>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_hsts] _
+
+rule = 'headers.missing_hsts'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4bc3b0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_permissions_policy] _
+
+rule = 'headers.missing_permissions_policy'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d39c1a0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_referrer_policy] _
+
+rule = 'headers.missing_referrer_policy'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4becf0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_x_content_type_options] _
+
+rule = 'headers.missing_x_content_type_options'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4be610>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.weak_csp] _
+
+rule = 'headers.weak_csp'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d39fc10>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.weak_hsts] _
+
+rule = 'headers.weak_hsts'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88f4beae0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_expired] _
+
+rule = 'https.cert_expired'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d39e2a0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_expiring_soon] _
+
+rule = 'https.cert_expiring_soon'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88d39f740>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_hostname_mismatch] _
+
+rule = 'https.cert_hostname_mismatch'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88faa4460>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_self_signed] _
+
+rule = 'https.cert_self_signed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb235e0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_untrusted] _
+
+rule = 'https.cert_untrusted'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb23d70>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.not_available] _
+
+rule = 'https.not_available'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb21e80>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.admin_interface_exposed] _
+
+rule = 'ports.admin_interface_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb20460>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.database_exposed] _
+
+rule = 'ports.database_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb231c0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.ftp_exposed] _
+
+rule = 'ports.ftp_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb22c40>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.remote_desktop_exposed] _
+
+rule = 'ports.remote_desktop_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb238a0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.smb_exposed] _
+
+rule = 'ports.smb_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb21c70>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.ssh_exposed] _
+
+rule = 'ports.ssh_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb21640>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.telnet_exposed] _
+
+rule = 'ports.telnet_exposed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb22560>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.generator_version_disclosed] _
+
+rule = 'tech.generator_version_disclosed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb22610>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.powered_by_disclosed] _
+
+rule = 'tech.powered_by_disclosed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb238a0>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.server_version_disclosed] _
+
+rule = 'tech.server_version_disclosed'
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb23480>
+
+    @pytest.mark.parametrize("rule", sorted(RULE_HELP))
+    def test_every_rule_can_be_prepared_in_simple_and_technical_modes(rule, ai_scan_factory):
+        from exposureiq.fingerprint.severity import RULES
+    
+>       bundle = build_chat_bundle(ai_scan_factory(rules=[(rule, RULES[rule]["severity"])]))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:94: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+________ test_prepared_history_counts_follow_the_selected_wording_mode _________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb22c40>
+
+    def test_prepared_history_counts_follow_the_selected_wording_mode(ai_scan_factory):
+        scans = [ai_scan_factory(index) for index in range(3)]
+>       bundle = build_chat_bundle(scans[-1], scans)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:105: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+_ test_original_transcript_context_notice_glossary_and_no_repeated_report_list _
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd86fb22e50>
+
+    def test_original_transcript_context_notice_glossary_and_no_repeated_report_list(ai_scan_factory):
+>       bundle = build_chat_bundle(ai_scan_factory())
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:115: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+____ test_reported_three_turn_host_example_stays_on_db_and_score_45[simple] ____
+
+mode = 'simple'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    def test_reported_three_turn_host_example_stays_on_db_and_score_45(mode):
+        scans = build_demo_scans()
+>       bundle = build_chat_bundle(scans[3], scans[:4])
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-10-01T10:00:00Z', 'hosts': 4, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'api.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+__ test_reported_three_turn_host_example_stays_on_db_and_score_45[technical] ___
+
+mode = 'technical'
+
+    @pytest.mark.parametrize("mode", ["simple", "technical"])
+    def test_reported_three_turn_host_example_stays_on_db_and_score_45(mode):
+        scans = build_demo_scans()
+>       bundle = build_chat_bundle(scans[3], scans[:4])
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:131: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-10-01T10:00:00Z', 'hosts': 4, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'api.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+____ test_finding_ref_followups_timing_owner_and_small_facts_in_both_modes _____
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88ea36c40>
+
+    def test_finding_ref_followups_timing_owner_and_small_facts_in_both_modes(ai_scan_factory):
+        scan = ai_scan_factory()
+>       bundle = build_chat_bundle(scan)
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:144: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+________ test_compact_digest_missing_and_ambiguous_findings_are_honest _________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88efd22a0>
+
+    def test_compact_digest_missing_and_ambiguous_findings_are_honest(ai_scan_factory):
+        scan = ai_scan_factory()
+        scan["assets"][0]["findings"].append(copy.deepcopy(scan["assets"][0]["findings"][0]))
+>       bundle = build_chat_bundle(scan)
+                 ^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:163: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+___________ test_each_scan_uses_only_its_own_compatible_predecessors ___________
+
+ai_scan_factory = <function ai_scan_factory.<locals>.build at 0x7fd88efd2b90>
+
+    def test_each_scan_uses_only_its_own_compatible_predecessors(ai_scan_factory):
+        scans = [ai_scan_factory(i, rules=rules) for i, rules in enumerate(
+            [[("ports.database_exposed", "high")], [("headers.missing_csp", "medium")], [("ports.database_exposed", "high")]])]
+>       bundle = build_chat_bundle(scans[1], scans)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_export_chat.py:175: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+exposureiq/viewer/export.py:139: in build_chat_bundle
+    "scans": {view_id(item): _scan_bundle(item, ordered) for item in ordered}}
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+exposureiq/viewer/export.py:122: in _scan_bundle
+    replies[focus][mode][intent] = _prepared_reply(current, chosen, intent=intent)
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+digest = {'ref': 'S:scan', 'target': 'example.com', 'date': '2026-01-01T00:00:00Z', 'hosts': 1, ...}
+context = {'kind': 'overview', 'finding_id': '', 'host': 'db.example.com', 'mode': 'simple', ...}
+intent = 'finding'
+
+    def _prepared_reply(digest, context, *, intent):
+        plan = answer_plan(digest, {**context, "kind": "overview" if intent == "fix" else intent,
+                                    "list_requested": intent == "fix"})
+        plan.update(include_proof_note=False, defined_terms=list(GLOSSARY))
+        checked = check_chat_output(fallback_chat(digest, plan), digest, plan)
+        if not checked.accepted:
+>           raise ExportError("A prepared export reply failed its evidence or safety checks.")
+E           exposureiq.viewer.export.ExportError: A prepared export reply failed its evidence or safety checks.
+
+exposureiq/viewer/export.py:62: ExportError
+=========================== short test summary info ============================
+FAILED tests/test_ai_chat.py::test_code_selects_read_only_facts_before_the_phrasing_model[Explain F-0001-get_finding]
+FAILED tests/test_ai_chat.py::test_common_questions_get_focused_plain_english_checked_answers[How can I confirm fixes from this scan?-usual authorized checks]
+FAILED tests/test_ai_chat.py::test_damage_followup_keeps_a_referenced_finding_but_whole_scan_question_clears_it
+FAILED tests/test_ai_chat.py::test_referenced_consequence_outside_bounded_digest_uses_only_selected_tool_evidence
+FAILED tests/test_ai_conversation.py::test_selected_finding_does_not_need_unrelated_global_highs
+FAILED tests/test_ai_conversation.py::test_non_top_selected_host_or_finding_never_claims_to_be_the_most_exposed
+FAILED tests/test_ai_conversation.py::test_simple_and_technical_mode_changes_are_code_selected
+FAILED tests/test_ai_provider.py::test_anthropic_tool_round_trip_is_read_only_bounded_and_checked
+FAILED tests/test_ai_cli.py::test_domain_history_and_one_shot_question_are_json_only
+FAILED tests/test_ai_cli.py::test_cli_chat_has_natural_body_separate_evidence_and_both_wording_modes
+FAILED tests/test_tui_ai.py::test_chat_echoes_sent_message_shows_ascii_thinking_and_a_clean_verified_footer
+FAILED tests/test_tui_ai_chat.py::test_chat_quick_prompt_refusal_and_log_are_headless_navigable
+FAILED tests/test_tui_ai_chat.py::test_natural_damage_followup_is_a_literal_checked_chat_reply_not_a_safety_refusal
+FAILED tests/test_tui_ai_chat.py::test_reply_source_failure_reason_collapsed_evidence_and_wording_toggle
+FAILED tests/test_viewer.py::test_actual_loopback_navigation_summary_history_chat_log_and_no_writes
+FAILED tests/test_viewer.py::test_browser_chat_accepts_the_exact_damage_followup_without_saved_file_changes
+FAILED tests/test_viewer.py::test_browser_chat_mode_selected_finding_and_safe_failure_metadata
+FAILED tests/test_viewer.py::test_chat_clear_and_separate_tabs_do_not_reuse_focus_or_once_only_notices
+FAILED tests/test_export_chat.py::test_bundle_has_twelve_prepared_intents_in_both_modes_valid_refs_and_no_raw_data
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_clickjacking_protection]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_csp]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_hsts]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_permissions_policy]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_referrer_policy]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.missing_x_content_type_options]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.weak_csp]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[headers.weak_hsts]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_expired]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_expiring_soon]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_hostname_mismatch]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_self_signed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.cert_untrusted]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[https.not_available]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.admin_interface_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.database_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.ftp_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.remote_desktop_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.smb_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.ssh_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[ports.telnet_exposed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.generator_version_disclosed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.powered_by_disclosed]
+FAILED tests/test_export_chat.py::test_every_rule_can_be_prepared_in_simple_and_technical_modes[tech.server_version_disclosed]
+FAILED tests/test_export_chat.py::test_prepared_history_counts_follow_the_selected_wording_mode
+FAILED tests/test_export_chat.py::test_original_transcript_context_notice_glossary_and_no_repeated_report_list
+FAILED tests/test_export_chat.py::test_reported_three_turn_host_example_stays_on_db_and_score_45[simple]
+FAILED tests/test_export_chat.py::test_reported_three_turn_host_example_stays_on_db_and_score_45[technical]
+FAILED tests/test_export_chat.py::test_finding_ref_followups_timing_owner_and_small_facts_in_both_modes
+FAILED tests/test_export_chat.py::test_compact_digest_missing_and_ambiguous_findings_are_honest
+FAILED tests/test_export_chat.py::test_each_scan_uses_only_its_own_compatible_predecessors
+50 failed, 533 passed in 98.45s (0:01:38)

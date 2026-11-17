@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from rich.text import Text
-from textual.widgets import Button, DataTable, Static, TabPane
+from textual.widgets import Button, DataTable, Static, TabbedContent
 
 from exposureiq import cli, storage
 from exposureiq.demo_data import build_demo_scans
@@ -83,7 +83,7 @@ def test_demos_tui_finishes_on_scan_ten_with_complete_history(tmp_path):
             assert app.mode == "results" and app.result["demo"]
             assert app.result["scan_id"] == scans[-1]["scan_id"]
             assert len(app.result["saved_scans"]) == 10
-            assert app.query_one("#scan-diff-tab", TabPane).display
+            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
             assert_history_window(app, scans, 10)
             assert "HIGH 0" in text(app.query_one("#severity-high", Static))
             assert "MEDIUM 0" in text(app.query_one("#severity-medium", Static))
@@ -139,7 +139,7 @@ def test_preview_tab_and_diff_view_stop_at_the_selected_scan(tmp_path, number):
             await pilot.pause()
             assert app.result["mode"] == "preview" and app.worker is None
             assert app.result["scan_id"] == scans[number - 1]["scan_id"]
-            assert app.query_one("#scan-diff-tab", TabPane).display == (number > 1)
+            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display == (number > 1)
             if number > 1:
                 assert_history_window(app, scans, number)
             app.action_diff_view()
@@ -171,6 +171,7 @@ def test_browser_diff_uses_selected_row_not_latest_scan(tmp_path, real):
         app = ExposureIQApp(args, home=True, browser=True)
         async with app.run_test(size=(110, 34)) as pilot:
             await pilot.pause()
+            await pilot.click("#browser-files")  # Selected-file diff still uses the original list.
             table = app.query_one("#saved-table", DataTable)
             row = next(int(key) for key, path in app.saved_paths.items()
                        if Path(path).resolve() == paths[2].resolve())
@@ -278,7 +279,7 @@ def test_opening_earlier_previews_clears_later_history(tmp_path):
             assert_history_window(app, scans, 3)
             assert app.open_saved(paths[0])
             await pilot.pause()
-            assert not app.query_one("#scan-diff-tab", TabPane).display
+            assert not app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
             for name in ("meta", "headline", "body", "message"):
                 assert not text(app.query_one(f"#scan-diff-{name}", Static))
             await pilot.press("q")

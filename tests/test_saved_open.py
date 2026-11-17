@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from rich.text import Text
-from textual.widgets import Button, DataTable, Input, Static, TabPane
+from textual.widgets import Button, DataTable, Input, Static, TabbedContent
 
 from exposureiq import cli, storage
 from exposureiq.discovery import scope
@@ -213,6 +213,7 @@ def test_browser_mode_starts_on_the_saved_file_list(tmp_path):
             assert app.mode == "browser" and app.query_one("#browser").display
             assert not app.query_one("#home").display
             assert app.query_one("#saved-table", DataTable).row_count == 1
+            await pilot.click("#browser-files")  # The legacy file list is now an explicit choice.
             await pilot.click("#saved-open")
             await pilot.pause(0.2)
             assert app.mode == "results"
@@ -293,7 +294,7 @@ def test_results_diff_tab_shows_changes_since_the_previous_scan(tmp_path):
             await app.worker.wait()
             await pilot.pause()
             assert app.mode == "results"
-            assert app.query_one("#scan-diff-tab", TabPane).display
+            assert app.query_one("#results", TabbedContent).get_tab("scan-diff-tab").display
             assert "1 thing got worse" in text(app.query_one("#scan-diff-headline", Static))
             assert "example.com" in text(app.query_one("#scan-diff-body", Static))
             await pilot.press("q")

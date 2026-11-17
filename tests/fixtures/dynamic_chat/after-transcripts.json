@@ -1,0 +1,274 @@
+{
+  "stage": "after",
+  "scan": "synthetic reserved-data fixture",
+  "network": "loopback fake server only; non-loopback sockets and external DNS blocked",
+  "model_limit": "No Ollama or real-model accuracy trial. The fake after server phrases the code facts deterministically.",
+  "paths": {
+    "built-in": {
+      "turns": [
+        {
+          "question": "what is the most bad finding here in this scan?",
+          "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "Offline mode: answers come from built-in explanations, not a live model.",
+          "source": "template",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "then how can i fix it?",
+          "answer": "For database on db.example.com, use these defensive steps.\n\nAsk the application owner which systems genuinely need database access.\n\nHave IT block public connections at the firewall and allow only those approved application systems.\n\nKeep the database on a private network and give each application only the permissions it needs.\n\nCheck that the application still works before closing the change.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "F-0001",
+            "R:ports.database_exposed"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "how long would that take?",
+          "answer": "For database, the typical effort is hours; moving an application to a private network can take days.\n\nThese are planning ranges, not times measured by your scan.\n\nAsk IT or the database administrator, with the application owner to check dependencies before giving a deadline.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what do you think?",
+          "answer": "My honest take: keep private services private before polishing smaller website protections.\n\nThat means giving database practical attention, not assuming anyone got in.\n\nAsk the application owner which systems genuinely need database access.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what does SMB mean?",
+          "answer": "SMB means Server Message Block, a file-sharing service.\n\nThis scan records SMB on one host.\n\nIf file permissions are weak, public SMB access could let someone read, change or delete shared files.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "files.example.com",
+            "finding_id": "F-0003",
+            "scope": "finding"
+          },
+          "references": [
+            "S:scan",
+            "R:ports.smb_exposed",
+            "F-0003"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "who should fix it?",
+          "answer": "Ask IT or the file-server administrator to own the SMB fix.\n\nGive them this finding and ask who still needs the affected service.\n\nAgree a safe change and a check that normal work still functions.",
+          "badge": "Built-in answer",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "AI is off or not configured, so I answered from your saved scan.",
+          "offline_notice": "",
+          "source": "template",
+          "focus": {
+            "host": "files.example.com",
+            "finding_id": "F-0003",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.smb_exposed",
+            "F-0003"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "thanks",
+          "answer": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "badge": "Built-in answer",
+          "facts_note": "",
+          "reason": "",
+          "offline_notice": "",
+          "source": "built-in",
+          "focus": {},
+          "references": [],
+          "wording_verified": true
+        }
+      ],
+      "model_calls": 0,
+      "forced_json": false
+    },
+    "fake-small-model-server": {
+      "turns": [
+        {
+          "question": "what is the most bad finding here in this scan?",
+          "answer": "The most serious saved finding is a database (a service that stores information) on one host.\n\nThe code marks this as urgent under its severity and sensitive-exposure rules. If access controls are weak, public database access could let someone read, change or delete stored data.\n\nAsk the application owner which systems genuinely need database access.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "then how can i fix it?",
+          "answer": "For database on db.example.com, these are the changes to discuss with IT.\n\nAsk the application owner which systems genuinely need database access.\n\nHave IT block public connections at the firewall and allow only those approved application systems.\n\nKeep the database on a private network and give each application only the permissions it needs.\n\nCheck that the application still works before closing the change.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "F-0001",
+            "R:ports.database_exposed"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "how long would that take?",
+          "answer": "For database, the typical effort is hours; moving an application to a private network can take days.\n\nThese are planning ranges, not times measured by your scan.\n\nAsk IT or the database administrator, with the application owner to check dependencies before giving a deadline.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what do you think?",
+          "answer": "My take: keep private services private before polishing smaller website protections.\n\nThat means giving database practical attention, not assuming anyone got in.\n\nAsk the application owner which systems genuinely need database access.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "db.example.com",
+            "finding_id": "F-0001",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.database_exposed",
+            "F-0001"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "what does SMB mean?",
+          "answer": "SMB means Server Message Block, a file-sharing service.\n\nThis scan records SMB on one host.\n\nIf file permissions are weak, public SMB access could let someone read, change or delete shared files.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "files.example.com",
+            "finding_id": "F-0003",
+            "scope": "finding"
+          },
+          "references": [
+            "S:scan",
+            "R:ports.smb_exposed",
+            "F-0003"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "who should fix it?",
+          "answer": "Ask IT or the file-server administrator to own the SMB fix.\n\nGive them this finding and ask who still needs the affected service.\n\nAgree a safe change and a check that normal work still functions.",
+          "badge": "Live AI · synthetic-small-model",
+          "facts_note": "Facts checked against your saved scan",
+          "reason": "",
+          "offline_notice": "",
+          "source": "local",
+          "focus": {
+            "host": "files.example.com",
+            "finding_id": "F-0003",
+            "scope": "finding"
+          },
+          "references": [
+            "R:ports.smb_exposed",
+            "F-0003"
+          ],
+          "wording_verified": false
+        },
+        {
+          "question": "thanks",
+          "answer": "You're welcome. We can come back to the saved findings whenever you're ready.",
+          "badge": "Built-in answer",
+          "facts_note": "",
+          "reason": "",
+          "offline_notice": "",
+          "source": "built-in",
+          "focus": {},
+          "references": [],
+          "wording_verified": true
+        }
+      ],
+      "model_calls": 6,
+      "forced_json": false
+    }
+  }
+}

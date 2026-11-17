@@ -1,0 +1,39 @@
+{
+  "historical_manifest": "docs/stage5-evidence/live-drawer-manifest.json",
+  "historical_manifest_sha256": "a729c5bddcc729c3bbad36278cec44b5d823c9fc3c6eff76eabdaf5c77aa013f",
+  "meaning": "Earlier browser captures are historical. Their artifacts and source hashes are unchanged, not relabelled as validation of the dynamic-chat tiers. Capture hashes matched the preserved pre-task sources.",
+  "replaced_sources": {
+    "exposureiq/cli.py": {
+      "capture_sha256": "147b487d5fbad554e70c9a6675e9b9b0e22a73e78f3e7e3c66db08ce609a7dd7",
+      "reason": "Tier 3: shared quiet loopback browser launcher; existing web source/--open command remains."
+    },
+    "exposureiq/viewer/static/app.js": {
+      "capture_sha256": "a2760b5da868b33a0dd1d49eec06a1f6abc4691738123123fd43aa542617ad35",
+      "reason": "Tier 3: a bounded scan-view hint in the same authenticated native report handoff."
+    },
+    "exposureiq/viewer/static/report-session.js": {
+      "capture_sha256": "23d1ab4c64d5a741ebb74fb6e0a87b8cbefb81eea87c2d4032e5eb1f87d23f91",
+      "reason": "Tier 3: AI-Off reports clear the temporary token and select only an existing scan view."
+    },
+    "exposureiq/report/html.py": {
+      "capture_sha256": "b12787e4c73ed94baeb9d72ea32dc2299f93df7c3c9c1af1c47349ff32f81ee5",
+      "reason": "Tier 2: local-chat-only scrollable report pane; scan-only exports remain unchanged."
+    },
+    "exposureiq/viewer/export.py": {
+      "capture_sha256": "77acdbe891f7257e641ff41b0d77b6c2448ac686a52dccc3cae9d71ef6e066ea",
+      "reason": "Tier 2: accessible split-pane divider, one Chat options menu and empty-chat suggestion chips."
+    },
+    "exposureiq/viewer/static/live-chat.css": {
+      "capture_sha256": "ff434afbc99a23f28b5996fbdca784495a7f04accdb67e40a5f7765624adc597",
+      "reason": "Tier 2: split-screen desktop layout, narrow full-screen chat, independent scrolling and reduced-motion styling."
+    },
+    "exposureiq/viewer/server.py": {
+      "capture_sha256": "eb630311639444fd9a10c5f68128d2e7b21c036d19dcc6140c3907e0b6d478db",
+      "reason": "Tier 1: conversation-bound retry metadata and honest checked-facts labels."
+    },
+    "exposureiq/viewer/static/live-chat.js": {
+      "capture_sha256": "94b39bcead6344afaebe470659be13176fc8965b8b89eb4a32063dfa16a5ad7e",
+      "reason": "Tier 1: literal per-answer source, evidence and retry rendering."
+    }
+  }
+}

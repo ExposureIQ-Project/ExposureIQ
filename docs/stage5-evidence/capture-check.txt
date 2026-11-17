@@ -1,0 +1,1 @@
+Captured 11 headless SVGs; evaluation 22/22; no network or real key used.

@@ -1,0 +1,312 @@
+{
+  "branch": "feature/s5-dynamic-chat",
+  "staged": 0,
+  "tracked_modified": 13,
+  "untracked": 299,
+  "protected": {
+    "exposureiq/fingerprint/web.py": {
+      "sha256": "4bfeb75b8469678ba6ad9c7b5220fae2639896fd98ffe53329711cc8cc99de10",
+      "unchanged": true
+    },
+    "exposureiq/discovery/scope.py": {
+      "sha256": "70f10115a0c959866ed980b53fa5624709f9b56ce8bb29718d2c0068e083ca64",
+      "unchanged": true
+    },
+    "scope.txt": {
+      "sha256": "67db1d9cbda13a1d268b1557785aa86ad5fb71bcce338d7224cd1529ef3845d9",
+      "unchanged": true
+    },
+    "exposureiq/storage.py": {
+      "sha256": "7d92d7805a00e03a9918c95e8addc121199494edb51e840a2ed56addea49b931",
+      "unchanged": true
+    }
+  },
+  "github_changed": false,
+  "groups": [
+    {
+      "tier": 1,
+      "diff": "tier1-source.patch",
+      "files": [
+        {
+          "file": "exposureiq/ai/chat.py",
+          "added": 100,
+          "removed": 79
+        },
+        {
+          "file": "exposureiq/ai/checker.py",
+          "added": 76,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/ai/context.py",
+          "added": 93,
+          "removed": 29
+        },
+        {
+          "file": "exposureiq/ai/conversation.py",
+          "added": 3,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/ai/facts.py",
+          "added": 259,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/ai/fixes.py",
+          "added": 175,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/ai/glossary.py",
+          "added": 4,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/ai/intents.py",
+          "added": 95,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/ai/plain.py",
+          "added": 113,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/ai/policy.py",
+          "added": 5,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/ai/prompts.py",
+          "added": 46,
+          "removed": 56
+        },
+        {
+          "file": "exposureiq/ai/provider.py",
+          "added": 25,
+          "removed": 10
+        },
+        {
+          "file": "exposureiq/ai/schema.py",
+          "added": 67,
+          "removed": 7
+        },
+        {
+          "file": "exposureiq/ai/service.py",
+          "added": 56,
+          "removed": 23
+        },
+        {
+          "file": "exposureiq/tui/ai_log.py",
+          "added": 8,
+          "removed": 3
+        },
+        {
+          "file": "exposureiq/tui/ai_panel.py",
+          "added": 39,
+          "removed": 11
+        },
+        {
+          "file": "exposureiq/viewer/server.py",
+          "added": 4,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/viewer/static/live-chat.js",
+          "added": 9,
+          "removed": 2
+        },
+        {
+          "file": "tests/dynamic_chat_fakes.py",
+          "added": 140,
+          "removed": 0
+        },
+        {
+          "file": "tests/fixtures/dynamic_chat/source-provenance.json",
+          "added": 15,
+          "removed": 0
+        },
+        {
+          "file": "tests/test_ai_chat.py",
+          "added": 19,
+          "removed": 15
+        },
+        {
+          "file": "tests/test_ai_cli.py",
+          "added": 2,
+          "removed": 1
+        },
+        {
+          "file": "tests/test_ai_conversation.py",
+          "added": 15,
+          "removed": 14
+        },
+        {
+          "file": "tests/test_ai_provider.py",
+          "added": 21,
+          "removed": 8
+        },
+        {
+          "file": "tests/test_dynamic_chat.py",
+          "added": 311,
+          "removed": 0
+        },
+        {
+          "file": "tests/test_tui_ai.py",
+          "added": 4,
+          "removed": 4
+        },
+        {
+          "file": "tests/test_tui_ai_chat.py",
+          "added": 56,
+          "removed": 9
+        },
+        {
+          "file": "tests/test_viewer.py",
+          "added": 32,
+          "removed": 4
+        }
+      ],
+      "source_files": 28,
+      "added": 1792,
+      "removed": 285
+    },
+    {
+      "tier": 2,
+      "diff": "tier2-source.patch",
+      "files": [
+        {
+          "file": "exposureiq/report/html.py",
+          "added": 4,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/viewer/export.py",
+          "added": 11,
+          "removed": 3
+        },
+        {
+          "file": "exposureiq/viewer/server.py",
+          "added": 42,
+          "removed": 3
+        },
+        {
+          "file": "exposureiq/viewer/static/live-chat.css",
+          "added": 87,
+          "removed": 39
+        },
+        {
+          "file": "exposureiq/viewer/static/live-chat.js",
+          "added": 139,
+          "removed": 16
+        },
+        {
+          "file": "tests/fixtures/dynamic_chat/source-provenance.json",
+          "added": 12,
+          "removed": 0
+        },
+        {
+          "file": "tests/test_split_chat.py",
+          "added": 102,
+          "removed": 0
+        },
+        {
+          "file": "tests/test_viewer.py",
+          "added": 5,
+          "removed": 2
+        }
+      ],
+      "source_files": 8,
+      "added": 402,
+      "removed": 63
+    },
+    {
+      "tier": 3,
+      "diff": "tier3-source.patch",
+      "files": [
+        {
+          "file": "exposureiq/cli.py",
+          "added": 4,
+          "removed": 3
+        },
+        {
+          "file": "exposureiq/report/html.py",
+          "added": 7,
+          "removed": 4
+        },
+        {
+          "file": "exposureiq/tui/app.py",
+          "added": 88,
+          "removed": 5
+        },
+        {
+          "file": "exposureiq/tui/domain_browser.py",
+          "added": 24,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/viewer/browser.py",
+          "added": 39,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/viewer/export.py",
+          "added": 3,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/viewer/server.py",
+          "added": 22,
+          "removed": 19
+        },
+        {
+          "file": "exposureiq/viewer/session.py",
+          "added": 76,
+          "removed": 0
+        },
+        {
+          "file": "exposureiq/viewer/static/app.js",
+          "added": 5,
+          "removed": 3
+        },
+        {
+          "file": "exposureiq/viewer/static/live-chat.js",
+          "added": 6,
+          "removed": 2
+        },
+        {
+          "file": "exposureiq/viewer/static/report-session.js",
+          "added": 6,
+          "removed": 2
+        },
+        {
+          "file": "tests/fixtures/dynamic_chat/source-provenance.json",
+          "added": 12,
+          "removed": 0
+        },
+        {
+          "file": "tests/test_ai_cli.py",
+          "added": 6,
+          "removed": 6
+        },
+        {
+          "file": "tests/test_report_open.py",
+          "added": 297,
+          "removed": 0
+        }
+      ],
+      "source_files": 14,
+      "added": 595,
+      "removed": 48
+    }
+  ],
+  "redacted_test_traces": [
+    "tier3-preflight-01.txt",
+    "tier3-preflight-03.txt"
+  ],
+  "unavailable_baseline": {
+    "tests/test_stage5_evidence.py": "Inherited before this task, but absent from the pre-task source snapshot. Its exact Tier 1 delta is unavailable, not reconstructed or counted as a new file."
+  },
+  "meaning": "Tier diffs compare preserved pre-task and green-tier snapshots. The ordinary Git diff also includes inherited tracked Stage 5 work; it omits untracked packages. No staging/commit/push/gh command ran."
+}

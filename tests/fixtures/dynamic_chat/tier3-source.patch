@@ -1,0 +1,1044 @@
+diff --git a/exposureiq/cli.py b/exposureiq/cli.py
+--- a/exposureiq/cli.py
++++ b/exposureiq/cli.py
+@@ -494,9 +494,10 @@
+     print("Keep this per-launch URL private. Ctrl+C stops the viewer. No target probes or browser credentials.", flush=True)
+     try:
+         if args.open_browser:
+-            import webbrowser
+-
+-            webbrowser.open(url)
++            from exposureiq.viewer.browser import open_browser
++
++            if not open_browser(url):
++                print("Browser launch was unavailable. Open the local URL above manually.", file=sys.stderr)
+         server.serve_forever()
+     except KeyboardInterrupt:
+         return 130
+diff --git a/exposureiq/report/html.py b/exposureiq/report/html.py
+--- a/exposureiq/report/html.py
++++ b/exposureiq/report/html.py
+@@ -706,7 +706,7 @@
+ 
+ 
+ def _document(report: dict, body: str, navigation: str, *, chat_bundle: dict | None = None,
+-              server_report: bool = False) -> str:
++              server_report: bool = False, start_view: str = "") -> str:
+     from exposureiq.viewer.export import SHARING_WARNING
+ 
+     digest = base64.b64encode(hashlib.sha256(interactive.SCRIPT.encode("utf-8")).digest()).decode("ascii")
+@@ -731,6 +731,7 @@
+     script_policy = " ".join("'sha256-" + value + "'" for value in hashes)
+     report_start = '<div id="report-pane" class="report-pane" role="region" aria-label="Saved HTML report" tabindex="-1">' if chat_bundle is not None else ""
+     report_end = "</div>" if chat_bundle is not None else ""
++    start_attribute = f' data-start-view="{_e(start_view)}"' if start_view else ""
+     return f"""<!DOCTYPE html>
+ <html lang="en">
+ <head>
+@@ -744,7 +745,7 @@
+ <body>
+ {report_start}
+ {navigation}
+-<main id="report-main" tabindex="-1">
++<main id="report-main" tabindex="-1"{start_attribute}>
+ {body}
+ </main>
+ <div class="portal-notices"><p id="export-sharing-warning">{_e(SHARING_WARNING)}</p><p id="export-size-warning" hidden></p></div>
+@@ -764,13 +765,15 @@
+     return _document(report, _report_body(report), _navigation(report))
+ 
+ 
+-def render_domain_html(domain: dict, *, chat_bundle: dict | None = None, server_report: bool = False) -> str:
++def render_domain_html(domain: dict, *, chat_bundle: dict | None = None, server_report: bool = False, start_view: str = "") -> str:
+     """One portable HTML home page and separately bounded saved-scan views."""
+     if not isinstance(domain, dict) or not domain.get("reports") or not domain.get("groups"):
+         raise ValueError("domain report must contain saved reports and history groups")
+     reports = domain["reports"]
+     latest = reports[-1]
+     view_ids = {_scan_key(report): "scan-" + _scan_token(report) for report in reports}
++    if not isinstance(start_view, str) or (start_view and (not server_report or start_view not in view_ids.values())):
++        raise ValueError("A server report can start only at one of its saved scan views.")
+     fallbacks = {_scan_key(report): _history_id(report, view_ids[_scan_key(report)] + "-")
+                  for report in reports}
+     cards = []
+@@ -829,4 +832,4 @@
+             + _report_body(report, view_id + "-", fallbacks) + '</article>')
+     first_group = "domain-" + domain["groups"][0]["key"] + "-"
+     navigation = _navigation(latest, prefix=view_ids[_scan_key(latest)] + "-", home_prefix=first_group, server_report=server_report)
+-    return _document(latest, home + "".join(views), navigation, chat_bundle=chat_bundle, server_report=server_report)
++    return _document(latest, home + "".join(views), navigation, chat_bundle=chat_bundle, server_report=server_report, start_view=start_view)
+diff --git a/exposureiq/tui/app.py b/exposureiq/tui/app.py
+--- a/exposureiq/tui/app.py
++++ b/exposureiq/tui/app.py
+@@ -39,6 +39,8 @@
+ from exposureiq.tui.ai_panel import AIPanel
+ from exposureiq.tui.ai_settings import AISettings, DeveloperModeChanged, SettingsDrawer
+ from exposureiq.tui.domain_browser import DomainScreen, OpenDomainScan
++from exposureiq.viewer.browser import open_browser
++from exposureiq.viewer.session import ViewerSession
+ 
+ _SEVERITY = {"high": f"bold {branding.TUI_HIGH} on {branding.HIGH_BACKGROUND}",
+              "medium": branding.AMBER, "low": branding.LOW}
+@@ -165,6 +167,12 @@
+         self.warnings = warnings or []
+ 
+ 
++class HTMLReportOpened(Message):
++    def __init__(self, *, url="", launch_requested=False, failed=False):
++        super().__init__()
++        self.url, self.launch_requested, self.failed = url, launch_requested, failed
++
++
+ class _ScanLogHandler(logging.Handler):
+     def __init__(self, app):
+         super().__init__(logging.WARNING)
+@@ -187,6 +195,7 @@
+         Binding("a", "add_scope", "Add to scope"),
+         Binding("d", "diff_view", "Diff"),
+         Binding("e", "export_report", "Export"),
++        Binding("h", "open_html_report", "Open HTML report"),
+         Binding("tab", "focus_next", "Next panel"),
+         Binding("shift+tab", "focus_previous", "Previous", show=False),
+     ]
+@@ -236,6 +245,7 @@
+     }
+     #mode-badge.demo { color: $warning; border: round $demo-border; }
+     #export-report { display: none; width: auto; min-width: 12; height: 3; margin-left: 1; }
++    #open-html-report { display: none; width: auto; min-width: 20; height: 3; margin-left: 1; }
+     #back { width: 5; min-width: 5; height: 3; padding: 0; border: round $panel-border;
+             color: $primary; text-style: bold; }
+     #settings { width: 5; min-width: 5; height: 3; padding: 0; margin-right: 1; }
+@@ -356,6 +366,9 @@
+         self.file_browser = False
+         self._selected_domain = None
+         self.ai_service = AIService()
++        self.viewer = ViewerSession()
++        self._opening_report = False
++        self.report_open_worker = None
+         self.result = None
+         self.exit_code = 0
+         self.phase_states = dict.fromkeys(PHASES, "waiting")
+@@ -451,6 +464,7 @@
+             with Horizontal(id="header-actions"):
+                 yield Static(id="mode-badge", markup=False)
+                 yield Button("Export", id="export-report", variant="primary", disabled=True)
++                yield Button("Open HTML report", id="open-html-report", disabled=True)
+         yield Static("Scanning", id="scan-status", markup=False)
+         with VerticalScroll(id="home"):
+             with Vertical(id="home-center"):
+@@ -582,6 +596,7 @@
+             self.worker = self._run_scan()
+ 
+     def on_unmount(self) -> None:
++        self.viewer.stop()
+         if self._rerunning or (self.mode == "scanning" and not self._finished):
+             self.control.cancel()
+         root = logging.getLogger()
+@@ -645,7 +660,7 @@
+     def _hide_all_views(self):
+         self.clear_selection()
+         for selector in ("#home", "#browser", "#scanning", "#results", "#scan-status", "#result-log",
+-                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report"):
++                         "#rerun-panel", "#user-scope-saved", "#scope-skipped-panel", "#export-report", "#open-html-report"):
+             try:
+                 self.query_one(selector).display = False
+             except Exception:
+@@ -761,6 +776,7 @@
+         self.ai_service.limiter = previous.limiter
+         self.ai_service.audit = previous.audit
+         self.ai_service._audit_lock = previous._audit_lock
++        self.viewer.set_service(self.ai_service)
+         self._sync_ai_preferences(reset=reset)
+ 
+     def _sync_ai_preferences(self, *, reset=False):
+@@ -1099,16 +1115,17 @@
+         self.query_one("#scan-status").display = True
+         self.query_one("#result-log").display = True
+         self._update_export_button()
++        self._update_open_report_button()
+         self._set_back(True)
+         self._set_title(result["target"], result.get("started_at"), demo=bool(result.get("demo")))
+         if preview:
+             self.query_one("#scan-status", Static).update("Saved scan · read-only preview — no probes sent")
+-            self._keys("← saved results   e Export   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
++            self._keys("← saved results   e Export   h Open HTML report   Tab panels   ↑↓←→ move   Enter detail   q quit", "NO PROBES SENT")
+         else:
+             status = "Scan finished" if not self.exit_code else "Scan finished — results could not be saved"
+             self.query_one("#scan-status", Static).update(
+                 status)
+-            self._keys("← saved results   e Export   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
++            self._keys("← saved results   e Export   h Open HTML report   a add scope   Tab panels   ↑↓←→ move   Enter detail   "
+                        "q / Ctrl+C quit/cancel", "NO PROBES SENT" if result.get("demo") else status)
+         if result.get("user_scope_path"):
+             self.query_one("#user-scope-saved").display = True
+@@ -1344,18 +1361,84 @@
+                                   severity="information" if copied else "warning")
+ 
+     def check_action(self, action: str, parameters: tuple) -> bool | None:
+-        if action in ("add_scope", "export_report", "diff_view") and isinstance(self.screen, ModalScreen):
++        if action in ("add_scope", "export_report", "diff_view", "open_html_report") and isinstance(self.screen, ModalScreen):
+             return False  # AI settings must not expose the scan/action shortcuts.
+-        if action in ("quit", "add_scope", "export_report") and isinstance(self.focused, Input):
++        if action in ("quit", "add_scope", "export_report", "open_html_report") and isinstance(self.focused, Input):
+             return False  # Let the user type q/a/e in a domain box.
+         if action == "export_report":
+             return self._can_export() and not isinstance(self.screen, (ScopeConfirmation, ExportDialog))
++        if action == "open_html_report":
++            return bool(self._report_source() and not self._opening_report and not self._rerunning and not self._exporting)
+         if action == "add_scope":
+             return bool(self._finished and not self._rerunning and not self._exporting and self.result
+                         and self.mode == "results" and self.result.get("mode") != "preview"
+                         and not self.result.get("demo") and not isinstance(self.screen, (ScopeConfirmation, ExportDialog))
+                         and eligible_hosts(self.result["target"], self.result.get("skipped_hosts", [])))
+         return True
++
++    # --------------------------------------------------------------- local HTML
++    def _report_source(self):
++        if isinstance(self.screen, DomainScreen):
++            return self.screen.report_source()
++        if self.mode == "results" and self._finished and self.result:
++            return self.result.get("saved_to")
++        return None
++
++    def _update_open_report_button(self):
++        for screen in self.screen_stack:
++            for button in screen.query("#open-html-report"):
++                button.display = self.mode == "results"
++                button.disabled = not self._report_source() or self._opening_report or self._rerunning or self._exporting
++            for button in screen.query("#domain-report"):
++                button.disabled = not screen.entries or self._opening_report
++
++    @on(Button.Pressed, "#open-html-report")
++    def open_html_report_button(self):
++        self.action_open_html_report()
++
++    def action_open_html_report(self):
++        if not self.check_action("open_html_report", ()):
++            return
++        source = str(self._report_source())
++        root = Path(self.results_dir).expanduser().absolute()
++        path = Path(source).expanduser().absolute()
++        try:
++            path.relative_to(root)
++        except ValueError:
++            # A file explicitly opened by the TUI may be in another folder.
++            # Only the TUI selects that root; browser/AI requests cannot do so.
++            root = path.parent
++        self._opening_report = True
++        self._update_open_report_button()
++        self.report_open_worker = self._open_html_report(source, root)
++
++    @work(thread=True, exclusive=True, group="report-open", exit_on_error=False)
++    def _open_html_report(self, source, root):
++        worker = get_current_worker()
++        try:
++            url = self.viewer.report_url(source, root, self.ai_service)
++            self.viewer.set_service(self.ai_service)
++            if worker.is_cancelled:
++                return
++            launched = open_browser(url)
++        except Exception:
++            if not worker.is_cancelled:
++                self.post_message(HTMLReportOpened(failed=True))
++        else:
++            if not worker.is_cancelled:
++                self.post_message(HTMLReportOpened(url=url, launch_requested=launched))
++
++    @on(HTMLReportOpened)
++    def on_html_report_opened(self, event: HTMLReportOpened):
++        self._opening_report = False
++        self._update_open_report_button()
++        if event.failed:
++            self.notify("The selected saved scan could not be opened safely. Check that it still exists.",
++                        severity="error", markup=False)
++            return
++        lead = "Browser launch requested." if event.launch_requested else "Browser launch unavailable; open this URL manually."
++        self.notify(lead + "\n" + event.url + "\nKeep this URL private. The local viewer stops when the TUI exits.",
++                    severity="information" if event.launch_requested else "warning", timeout=12, markup=False)
+ 
+     # ----------------------------------------------------------------- exports
+     def _can_export(self) -> bool:
+diff --git a/exposureiq/tui/domain_browser.py b/exposureiq/tui/domain_browser.py
+--- a/exposureiq/tui/domain_browser.py
++++ b/exposureiq/tui/domain_browser.py
+@@ -9,7 +9,7 @@
+ from textual.containers import Horizontal, Vertical
+ from textual.message import Message
+ from textual.screen import Screen
+-from textual.widgets import Button, DataTable, Static, TabbedContent, TabPane
++from textual.widgets import Button, DataTable, Input, Static, TabbedContent, TabPane
+ 
+ from exposureiq.history import domain_history, sparkline, trend_arrow
+ from exposureiq.insight.risk import RISK_FORMULA, has_check_evidence, risk_score
+@@ -27,7 +27,8 @@
+ 
+ 
+ class DomainScreen(Screen):
+-    BINDINGS = [Binding("escape", "back", "Domains", priority=True), Binding("q", "quit", "Quit")]
++    BINDINGS = [Binding("escape", "back", "Domains", priority=True), Binding("q", "quit", "Quit"),
++                Binding("h", "open_html_report", "Open HTML report")]
+     CSS = """
+     DomainScreen { padding: 1 2; }
+     #domain-actions { height: 3; margin-bottom: 1; }
+@@ -38,6 +39,7 @@
+     #domain-sparkline { height: auto; color: $primary; margin: 1 0; }
+     #domain-scans { height: 1fr; }
+     #domain-formula, #domain-note { height: auto; color: $text-muted; }
++    #domain-keys { dock: bottom; height: auto; color: $key-hint; }
+     #domain-tabs { height: 1fr; }
+     #domain-tabs > ContentSwitcher { height: 1fr; overflow: hidden hidden; }
+     #domain-tabs TabPane { height: 100%; }
+@@ -54,6 +56,7 @@
+             yield Button("⚙", id="domain-settings", tooltip="Settings")
+             yield Button("← Domains", id="domain-back")
+             yield Button("Open selected scan", id="domain-open", variant="primary")
++            yield Button("Open HTML report", id="domain-report", disabled=not self.entries)
+             yield Button("Ask about history", id="domain-ai-chat", variant="primary")
+         yield Static(Text("Domain / " + self.domain), id="domain-title", markup=False)
+         yield Static(f"CODE VERDICT  {self.verdict['value']} {trend_arrow(self.verdict['value'])}", id="domain-verdict", markup=False)
+@@ -69,6 +72,7 @@
+         if self.entries and str(self.entries[-1]["scan"].get("scan_id", "")).startswith("DEMO-"):
+             note += " Fake demonstration data; no real probes were sent."
+         yield Static(note, id="domain-note", markup=False)
++        yield Static("Enter opens a scan   h Open HTML report   Esc domains   q quit", id="domain-keys", markup=False)
+ 
+     def on_mount(self):
+         if self.entries:
+@@ -121,6 +125,24 @@
+         if table.row_count:
+             table.action_select_cursor()
+ 
++    def report_source(self):
++        if not self.is_mounted:
++            return None
++        table = self.query_one("#domain-scans", DataTable)
++        if not table.row_count or not 0 <= table.cursor_row < len(self.entries):
++            return None
++        # Rows are newest-first; entries remain oldest-first for history.
++        return self.entries[-1 - table.cursor_row]["path"]
++
++    def check_action(self, action, parameters):
++        if action == "open_html_report":
++            return not isinstance(self.app.focused, Input) and self.app.check_action(action, parameters)
++        return True
++
++    @on(Button.Pressed, "#domain-report")
++    def action_open_html_report(self):
++        self.app.action_open_html_report()
++
+     @on(Button.Pressed, "#domain-back")
+     def action_back(self):
+         self.app.pop_screen()
+diff --git a/exposureiq/viewer/browser.py b/exposureiq/viewer/browser.py
+--- /dev/null
++++ b/exposureiq/viewer/browser.py
+@@ -0,0 +1,39 @@
++"""Quiet browser launch for an already-authorized loopback report URL.
++
++True means a launcher accepted the request, not that a page was observed.
++This helper does not render, export, scan or contact an AI provider.
++"""
++
++from __future__ import annotations
++
++import subprocess
++import sys
++from urllib.parse import urlsplit
++import webbrowser
++
++
++def open_browser(url: str) -> bool:
++    try:
++        parsed = urlsplit(url)
++        if (parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.username is not None
++                or parsed.password is not None or parsed.port is None or not 1 <= parsed.port <= 65535
++                or any(ord(char) < 32 or ord(char) == 127 for char in url)):
++            return False
++    except (ValueError, TypeError):
++        return False
++    if sys.platform.startswith("linux"):
++        try:
++            process = subprocess.Popen(["xdg-open", url], stdin=subprocess.DEVNULL,
++                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
++                                       start_new_session=True)
++            try:
++                if process.wait(timeout=1) == 0:
++                    return True
++            except subprocess.TimeoutExpired:
++                return True  # Launcher is running; page success is unobserved.
++        except OSError:
++            pass
++    try:
++        return bool(webbrowser.open(url))
++    except (OSError, webbrowser.Error):
++        return False
+diff --git a/exposureiq/viewer/export.py b/exposureiq/viewer/export.py
+--- a/exposureiq/viewer/export.py
++++ b/exposureiq/viewer/export.py
+@@ -150,7 +150,7 @@
+                                      "signature": scan_signature(item)} for item in ordered}}
+ 
+ 
+-def live_report_page(scan: dict, scans: list[dict], *, ai_enabled=False, private=()) -> str:
++def live_report_page(scan: dict, scans: list[dict], *, ai_enabled=False, private=(), focus_scan=False) -> str:
+     """Render the export's report in memory; never write a file or call AI.
+ 
+     Private server strings are removed before rendering, not after hashing the
+@@ -172,7 +172,8 @@
+         for original, safe in [(scan, safe_scan), *zip(scans, safe_scans)]:
+             if view_id(safe) in bundle["scans"]:
+                 bundle["scans"][view_id(safe)]["signature"] = scan_signature(original)
+-    page, _ = check_export_size(render_domain_html(domain, chat_bundle=bundle, server_report=True))
++    page, _ = check_export_size(render_domain_html(domain, chat_bundle=bundle, server_report=True,
++                                                 start_view=view_id(safe_scan) if focus_scan else ""))
+     return page
+ 
+ 
+diff --git a/exposureiq/viewer/server.py b/exposureiq/viewer/server.py
+--- a/exposureiq/viewer/server.py
++++ b/exposureiq/viewer/server.py
+@@ -285,7 +285,7 @@
+                 "model": config.model, "scan_id": match,
+                 "note": "Settings and provider keys stay on the local server. This check did not call a model."}
+ 
+-    def report_page(self, identifier, *, private=()):
++    def report_page(self, identifier, *, private=(), focus_scan=False):
+         from exposureiq.viewer.export import live_report_page
+ 
+         scan = self.selected(identifier)
+@@ -293,7 +293,7 @@
+             ids = [entry["id"] for entry in self.entries.values() if entry["target"] == scan["target"]]
+         scans = [self.selected(item) for item in ids]
+         config = self.service._configuration()
+-        return live_report_page(scan, scans, ai_enabled=config.mode != "off", private=(config.key, config.api_key, *private))
++        return live_report_page(scan, scans, ai_enabled=config.mode != "off", private=(config.key, config.api_key, *private), focus_scan=focus_scan)
+ 
+ 
+ class ViewerServer(ThreadingHTTPServer):
+@@ -313,11 +313,11 @@
+         # Fragments are never sent in HTTP requests or Referrer headers.
+         return self.origin + "/#" + self.token
+ 
+-    def report_url(self, source):
++    def report_url(self, source, *, focus_scan=False):
+         identifier = self.state.report_identifier(source)
+         # The static page makes a same-origin native POST, so navigation never
+         # puts a session token in a query or exposes a saved report without auth.
+-        return self.origin + "/?report=" + identifier + "#" + self.token
++        return self.origin + "/?report=" + identifier + ("&view=scan" if focus_scan else "") + "#" + self.token
+ 
+     def get_request(self):
+         connection, address = super().get_request()
+@@ -407,7 +407,8 @@
+             return
+         try:
+             path, query = self._route()
+-            handoff = path == "/" and set(query) == {"report"} and re.fullmatch(r"[a-f0-9]{24}", query["report"])
++            handoff = (path == "/" and set(query) in ({"report"}, {"report", "view"})
++                       and re.fullmatch(r"[a-f0-9]{24}", query["report"]) and query.get("view", "scan") == "scan")
+             if path in STATIC and (not query or handoff):
+                 name, content_type = STATIC[path]
+                 self._send(200, (files("exposureiq.viewer") / "static" / name).read_bytes(), content_type)
+@@ -479,8 +480,9 @@
+             raw = self.rfile.read(int(lengths[0]))
+             if len(raw) != int(lengths[0]):
+                 raise ValueError
+-            form = parse_qs(raw.decode("utf-8"), keep_blank_values=True, max_num_fields=2, strict_parsing=True)
+-            if set(form) != {"scan", "session"} or any(len(values) != 1 for values in form.values()):
++            form = parse_qs(raw.decode("utf-8"), keep_blank_values=True, max_num_fields=3, strict_parsing=True)
++            if (set(form) not in ({"scan", "session"}, {"scan", "session", "view"})
++                    or any(len(values) != 1 for values in form.values()) or form.get("view", ["scan"]) != ["scan"]):
+                 raise ValueError
+             return {key: values[0] for key, values in form.items()}
+         except (ValueError, UnicodeError):
+@@ -490,6 +492,7 @@
+         if not self._boundary(write=True):
+             return
+         locked = report_locked = False
++        state = self.server.state  # A TUI folder switch cannot change held locks.
+         try:
+             path, query = self._route()
+             if path == "/api/report" and not query:
+@@ -501,36 +504,36 @@
+                 if not session.isascii() or not hmac.compare_digest(session, self.server.token):
+                     self._send(403, {"error": "Open the full per-launch viewer URL before opening a report."})
+                     return
+-                report_locked = self.server.state.report_lock.acquire(blocking=False)
++                report_locked = state.report_lock.acquire(blocking=False)
+                 if not report_locked:
+                     self._send(409, {"error": "A saved HTML report is already being prepared. Try again shortly."})
+                     return
+-                page = self.server.state.report_page(form["scan"], private=(self.server.token,))
++                page = state.report_page(form["scan"], private=(self.server.token,), focus_scan=form.get("view") == "scan")
+                 csp = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)"', page).group(1)
+                 self._send(200, page.encode("utf-8"), "text/html; charset=utf-8", csp=csp + "; frame-ancestors 'none'")
+                 return
+             if not self._boundary(authenticated=True, write=True):
+                 return
+-            operations = {"/api/ai/summary": self.server.state.summary,
+-                          "/api/ai/history": self.server.state.history, "/api/ai/ask": self.server.state.ask}
++            operations = {"/api/ai/summary": state.summary,
++                          "/api/ai/history": state.history, "/api/ai/ask": state.ask}
+             if path not in operations or query:
+                 self._send(404, {"error": "No such read-only AI route. No scan or scope actions exist."})
+                 return
+             payload = self._body()
+-            locked = self.server.state.ai_lock.acquire(blocking=False)
++            locked = state.ai_lock.acquire(blocking=False)
+             if not locked:
+                 self._send(409, {"error": "An AI answer is already running; wait for it to finish."})
+                 return
+-            if self.server.state.service._configuration().mode == "off":
+-                self.server.state.chats.clear()
++            if state.service._configuration().mode == "off":
++                state.chats.clear()
+                 self._send(409, {"error": "AI is off. Enable Local or Remote AI in terminal Settings first."})
+                 return
+             result = operations[path](payload)
+-            if self.server.state.service._configuration().mode == "off":
+-                self.server.state.chats.clear()
++            if state.service._configuration().mode == "off":
++                state.chats.clear()
+                 self._send(409, {"error": "AI was turned off while the answer was running. The reply was not displayed."})
+                 return
+-            config = self.server.state.service._configuration()
++            config = state.service._configuration()
+             # Redact every data field before building presentation. The paragraph
+             # breaks added by our renderer are safe layout, not terminal controls
+             # copied from a saved string; do not flatten them into one paragraph.
+@@ -547,9 +550,9 @@
+             self._send(503, {"error": "AI answer unavailable. No raw provider error or credential was displayed."})
+         finally:
+             if locked:
+-                self.server.state.ai_lock.release()
++                state.ai_lock.release()
+             if report_locked:
+-                self.server.state.report_lock.release()
++                state.report_lock.release()
+ 
+     def _method_not_allowed(self):
+         if self._boundary():
+diff --git a/exposureiq/viewer/session.py b/exposureiq/viewer/session.py
+--- /dev/null
++++ b/exposureiq/viewer/session.py
+@@ -0,0 +1,76 @@
++"""One lazy, read-only daemon viewer for a terminal application's lifetime."""
++
++from __future__ import annotations
++
++from pathlib import Path
++import threading
++
++from exposureiq.viewer.server import ViewerState, make_server
++
++
++class ViewerSession:
++    def __init__(self):
++        self.server = None
++        self.thread = None
++        self._lock = threading.Lock()
++        self._closed = False
++
++    def report_url(self, source: str, results_dir, service) -> str:
++        """Choose saved data, then start/reuse the same free-port server.
++
++        A folder switch is an explicit TUI selection, not a browser/AI route.
++        Each replacement catalog retains the exact same fail-closed reader.
++        """
++        with self._lock:
++            if self._closed:
++                raise ValueError("The terminal viewer session has stopped.")
++            # Do not resolve away a symlink: ViewerState must reject it.
++            root = Path(results_dir).expanduser().absolute()
++            if self.server is None:
++                server = make_server(root, port=0, service=service)
++                try:
++                    url = server.report_url(source, focus_scan=True)
++                    thread = threading.Thread(target=lambda: server.serve_forever(poll_interval=0.1),
++                                              name="exposureiq-report-viewer", daemon=True)
++                    thread.start()
++                except Exception:
++                    server.server_close()
++                    raise
++                self.server, self.thread = server, thread
++                return url
++            server = self.server
++            if server.state.root != root:
++                candidate = ViewerState(root, service=service)
++                candidate.report_identifier(source)  # Validate before swapping.
++                candidate.ai_lock = server.state.ai_lock
++                candidate.report_lock = server.state.report_lock
++                server.state = candidate
++            else:
++                self._set_service(service)
++                server.state.refresh()
++            return server.report_url(source, focus_scan=True)
++
++    def _set_service(self, service) -> None:
++        if self.server is not None and self.server.state.service is not service:
++            self.server.state.service = service
++            # Old model wording/retry contexts do not cross settings changes.
++            self.server.state.chats.clear()
++            with self.server.state.progress_lock:
++                self.server.state.chat_progress.clear()
++
++    def set_service(self, service) -> None:
++        with self._lock:
++            if not self._closed:
++                self._set_service(service)
++
++    def stop(self) -> None:
++        with self._lock:
++            if self._closed:
++                return
++            self._closed = True
++            server, thread = self.server, self.thread
++        if server is not None:
++            server.shutdown()
++            server.server_close()
++            if thread is not None:
++                thread.join(timeout=2)
+diff --git a/exposureiq/viewer/static/app.js b/exposureiq/viewer/static/app.js
+--- a/exposureiq/viewer/static/app.js
++++ b/exposureiq/viewer/static/app.js
+@@ -194,11 +194,13 @@
+ for (const button of document.querySelectorAll("[data-tab]")) button.addEventListener("click", () => tab(button.dataset.tab));
+ $("refresh").addEventListener("click", refresh);
+ $("clear-chat").addEventListener("click", () => { clearAnswer(); controls(); $("status").textContent = "Chat cleared. No conversation is saved to disk."; });
+-function openReport(identifier, target = "_blank") {
++function openReport(identifier, target = "_blank", focusScan = false) {
+   if (!/^[a-f0-9]{24}$/.test(identifier)) return;
+   const form = document.createElement("form");
+   form.method = "POST"; form.action = "/api/report#" + token; form.target = target; form.rel = "noopener";
+-  for (const [name, value] of [["scan", identifier], ["session", token]]) {
++  const fields = [["scan", identifier], ["session", token]];
++  if (focusScan) fields.push(["view", "scan"]);
++  for (const [name, value] of fields) {
+     const field = document.createElement("input"); field.type = "hidden"; field.name = name; field.value = value; form.append(field);
+   }
+   document.body.append(form); form.submit(); form.remove();
+@@ -214,7 +216,7 @@
+ else if (window.location.search) {
+   const requested = new URLSearchParams(window.location.search).get("report");
+   if (/^[a-f0-9]{24}$/.test(requested || ""))
+-    api("/api/health").then(() => openReport(requested, "_self")).catch(() => { $("status").textContent = "The private report session could not be opened. Use the full URL printed by exposureiq web."; });
++    api("/api/health").then(() => openReport(requested, "_self", new URLSearchParams(window.location.search).get("view") === "scan")).catch(() => { $("status").textContent = "The private report session could not be opened. Use the full URL printed by exposureiq web."; });
+   else $("status").textContent = "Choose a saved report from this local viewer.";
+ }
+ else refresh();
+diff --git a/exposureiq/viewer/static/live-chat.js b/exposureiq/viewer/static/live-chat.js
+--- a/exposureiq/viewer/static/live-chat.js
++++ b/exposureiq/viewer/static/live-chat.js
+@@ -20,8 +20,12 @@
+     } catch (_) { return; }
+ 
+     function clearSessionFragment() {
+-      if (window.location.hash.slice(1) === token)
+-        window.history.replaceState(null, "", window.location.pathname + window.location.search + "#domain-home");
++      if (window.location.hash.slice(1) === token) {
++        const start = $("report-main").dataset.startView;
++        const initial = /^scan-[a-f0-9]{20}$/.test(start || "") && $(start)?.classList.contains("scan-view") ? start : "domain-home";
++        window.history.replaceState(null, "", window.location.pathname + window.location.search + "#" + initial);
++        window.dispatchEvent(new Event("hashchange"));
++      }
+     }
+     clearSessionFragment();
+     window.addEventListener("hashchange", clearSessionFragment);
+diff --git a/exposureiq/viewer/static/report-session.js b/exposureiq/viewer/static/report-session.js
+--- a/exposureiq/viewer/static/report-session.js
++++ b/exposureiq/viewer/static/report-session.js
+@@ -4,8 +4,12 @@
+   // fragment; do not retain it, connect anywhere or read browser storage.
+   function clearFragment() {
+     const location = window.location;
+-    if (location.protocol === "http:" && location.hostname === "127.0.0.1" && /^[A-Za-z0-9_-]{43}$/.test(location.hash.slice(1)))
+-      window.history.replaceState(null, "", location.pathname + location.search + "#domain-home");
++    if (location.protocol === "http:" && location.hostname === "127.0.0.1" && /^[A-Za-z0-9_-]{43}$/.test(location.hash.slice(1))) {
++      const start = document.getElementById("report-main").dataset.startView;
++      const initial = /^scan-[a-f0-9]{20}$/.test(start || "") && document.getElementById(start)?.classList.contains("scan-view") ? start : "domain-home";
++      window.history.replaceState(null, "", location.pathname + location.search + "#" + initial);
++      window.dispatchEvent(new Event("hashchange"));
++    }
+   }
+   window.addEventListener("hashchange", clearFragment);
+   window.addEventListener("pageshow", () => { clearFragment(); setTimeout(clearFragment, 50); });
+diff --git a/tests/fixtures/dynamic_chat/source-provenance.json b/tests/fixtures/dynamic_chat/source-provenance.json
+--- a/tests/fixtures/dynamic_chat/source-provenance.json
++++ b/tests/fixtures/dynamic_chat/source-provenance.json
+@@ -3,6 +3,18 @@
+   "historical_manifest_sha256": "a729c5bddcc729c3bbad36278cec44b5d823c9fc3c6eff76eabdaf5c77aa013f",
+   "meaning": "Earlier browser captures are historical. Their artifacts and source hashes are unchanged, not relabelled as validation of the dynamic-chat tiers. Capture hashes matched the preserved pre-task sources.",
+   "replaced_sources": {
++    "exposureiq/cli.py": {
++      "capture_sha256": "147b487d5fbad554e70c9a6675e9b9b0e22a73e78f3e7e3c66db08ce609a7dd7",
++      "reason": "Tier 3: shared quiet loopback browser launcher; existing web source/--open command remains."
++    },
++    "exposureiq/viewer/static/app.js": {
++      "capture_sha256": "a2760b5da868b33a0dd1d49eec06a1f6abc4691738123123fd43aa542617ad35",
++      "reason": "Tier 3: a bounded scan-view hint in the same authenticated native report handoff."
++    },
++    "exposureiq/viewer/static/report-session.js": {
++      "capture_sha256": "23d1ab4c64d5a741ebb74fb6e0a87b8cbefb81eea87c2d4032e5eb1f87d23f91",
++      "reason": "Tier 3: AI-Off reports clear the temporary token and select only an existing scan view."
++    },
+     "exposureiq/report/html.py": {
+       "capture_sha256": "b12787e4c73ed94baeb9d72ea32dc2299f93df7c3c9c1af1c47349ff32f81ee5",
+       "reason": "Tier 2: local-chat-only scrollable report pane; scan-only exports remain unchanged."
+diff --git a/tests/test_ai_cli.py b/tests/test_ai_cli.py
+--- a/tests/test_ai_cli.py
++++ b/tests/test_ai_cli.py
+@@ -125,7 +125,7 @@
+ 
+ def test_web_command_does_not_open_browser_unless_requested(monkeypatch, capsys):
+     from exposureiq import viewer
+-    import webbrowser
++    from exposureiq.viewer import browser
+ 
+     calls, opened = [], []
+     class Server:
+@@ -135,7 +135,7 @@
+         def server_close(self):
+             calls.append("close")
+     monkeypatch.setattr(viewer, "make_server", lambda *args, **kwargs: Server())
+-    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url))
++    monkeypatch.setattr(browser, "open_browser", lambda url: opened.append(url) or True)
+     assert cli.main(["web", "--demo", "--port", "0"]) == 0
+     assert calls == ["serve", "close"] and not opened
+     assert "127.0.0.1" in capsys.readouterr().out
+@@ -150,7 +150,7 @@
+ 
+ def test_web_source_opens_actual_report_handoff_without_scanning(monkeypatch, capsys):
+     from exposureiq import viewer
+-    import webbrowser
++    from exposureiq.viewer import browser
+ 
+     calls, opened = [], []
+     class Server:
+@@ -163,7 +163,7 @@
+             calls.append("close")
+     monkeypatch.setattr(viewer, "make_server", lambda *a, **k: Server())
+     monkeypatch.setattr(cli, "_execute_scan", lambda *a, **k: pytest.fail("Web must not scan"))
+-    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url))
++    monkeypatch.setattr(browser, "open_browser", lambda url: opened.append(url) or True)
+     assert cli.main(["web", "example.com", "--open", "--demo"]) == 0
+     assert calls == ["example.com", "serve", "close"] and len(opened) == 1
+     assert "?report=" in opened[0] and "Local HTML report:" in capsys.readouterr().out
+@@ -171,7 +171,7 @@
+ 
+ def test_web_invalid_source_closes_server_without_raw_error_or_browser(monkeypatch, capsys):
+     from exposureiq import viewer
+-    import webbrowser
++    from exposureiq.viewer import browser
+ 
+     closed = []
+     class Server:
+@@ -180,7 +180,7 @@
+         def server_close(self):
+             closed.append(True)
+     monkeypatch.setattr(viewer, "make_server", lambda *a, **k: Server())
+-    monkeypatch.setattr(webbrowser, "open", lambda *a: pytest.fail("An invalid source must not open a browser"))
++    monkeypatch.setattr(browser, "open_browser", lambda *a: pytest.fail("An invalid source must not open a browser"))
+     assert cli.main(["web", "outside.example.com", "--open", "--demo"]) == 2
+     assert closed == [True]
+     output = capsys.readouterr()
+diff --git a/tests/test_report_open.py b/tests/test_report_open.py
+--- /dev/null
++++ b/tests/test_report_open.py
+@@ -0,0 +1,297 @@
++"""Tier 3: lazy viewer reuse, exact saved deep links and quiet fake launchers."""
++
++import asyncio
++import base64
++import hashlib
++import json
++import socket
++import subprocess
++import threading
++from types import SimpleNamespace
++from urllib.parse import parse_qs, urlencode, urlsplit
++
++import pytest
++from rich.text import Text
++from textual.widgets import Button, DataTable, Input, Static, TabbedContent
++
++from exposureiq import cli, storage
++from exposureiq.ai.config import AIConfig
++from exposureiq.ai.provider import FakeProvider
++from exposureiq.ai.service import AIService
++from exposureiq.tui import app as tui
++from exposureiq.tui.app import ExposureIQApp
++from exposureiq.tui.domain_browser import DomainScreen
++from exposureiq.viewer import browser
++from exposureiq.viewer.export import view_id
++from exposureiq.viewer.reader import ViewerError
++from exposureiq.viewer.session import ViewerSession
++from test_viewer import first_id, local_viewer, report_request, request, saved_root
++
++
++def plain(widget):
++    value = widget.render()
++    return value.plain if isinstance(value, Text) else str(value)
++
++
++@pytest.mark.parametrize("platform,outcome", [("linux", 0), ("linux", "timeout"), ("win32", 0), ("darwin", 0)])
++def test_browser_launcher_is_quiet_and_does_not_claim_a_page_was_observed(monkeypatch, platform, outcome):
++    calls, fallback = [], []
++    url = "http://127.0.0.1:12345/?report=" + "1" * 24 + "#" + "2" * 43
++
++    def popen(argv, **kwargs):
++        calls.append((argv, kwargs))
++        def wait(timeout):
++            assert timeout == 1
++            if outcome == "timeout":
++                raise subprocess.TimeoutExpired(argv, timeout)
++            return outcome
++        return SimpleNamespace(wait=wait)
++
++    monkeypatch.setattr(browser.sys, "platform", platform)
++    monkeypatch.setattr(browser.subprocess, "Popen", popen)
++    monkeypatch.setattr(browser.webbrowser, "open", lambda url: fallback.append(url) or True)
++    assert browser.open_browser(url)
++    if platform == "linux":
++        assert not fallback and calls[0][0] == ["xdg-open", url]
++        assert calls[0][1] == {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
++                               "stderr": subprocess.DEVNULL, "start_new_session": True}
++    else:
++        assert not calls and fallback == [url]
++
++
++@pytest.mark.parametrize("failure", ["missing", "nonzero"])
++def test_browser_falls_back_if_linux_launcher_cannot_start(monkeypatch, failure):
++    monkeypatch.setattr(browser.sys, "platform", "linux")
++    def launch(*args, **kwargs):
++        if failure == "missing":
++            raise OSError("FAKE-RAW-LAUNCH-ERROR-ONLY")
++        return SimpleNamespace(wait=lambda timeout: 1)
++    fallback = []
++    monkeypatch.setattr(browser.subprocess, "Popen", launch)
++    monkeypatch.setattr(browser.webbrowser, "open", lambda url: fallback.append(url) or True)
++    assert browser.open_browser("http://127.0.0.1:12345/#synthetic") and len(fallback) == 1
++    monkeypatch.setattr(browser.webbrowser, "open", lambda url: False)
++    assert not browser.open_browser("http://127.0.0.1:12345/#synthetic")
++
++
++@pytest.mark.parametrize("url", ["https://127.0.0.1:12345/", "http://localhost:12345/", "http://example.com/", "file:///tmp/report.html",
++                                "http://private:synthetic@127.0.0.1:12345/", "http://127.0.0.1:0/", "http://127.0.0.1:99999/", "http://127.0.0.1:12345/\n", None])
++def test_browser_never_opens_an_unexpected_url(monkeypatch, url):
++    monkeypatch.setattr(browser.subprocess, "Popen", lambda *a, **k: pytest.fail("Unexpected URL must not launch"))
++    monkeypatch.setattr(browser.webbrowser, "open", lambda *a, **k: pytest.fail("Unexpected URL must not launch"))
++    assert not browser.open_browser(url)
++
++
++def test_session_reuses_one_daemon_free_port_and_stops_on_exit(saved_root):
++    service = AIService(AIConfig(), use_cache=False)
++    before = {path: path.read_bytes() for path in saved_root.rglob("*.json")}
++    session = ViewerSession()
++    assert session.server is None
++    try:
++        one = session.report_url("example.com", saved_root, service)
++        server, thread = session.server, session.thread
++        two = session.report_url("example.com", saved_root, service)
++        assert one == two and session.server is server and session.thread is thread
++        assert thread.daemon and thread.is_alive() and server.server_address[0] == "127.0.0.1" and server.server_port > 0
++        parsed = urlsplit(one)
++        assert parsed.fragment == server.token and len(parsed.fragment) == 43
++        assert parse_qs(parsed.query) == {"report": [first_id(server)], "view": ["scan"]}
++        assert request(server, "/api/health")[0] == 200 and request(server, "/api/health", authenticated=False)[0] == 403
++        assert not service.audit
++    finally:
++        session.stop()
++        session.stop()
++    assert not thread.is_alive()
++    connection = socket.socket()
++    try:
++        assert connection.connect_ex(("127.0.0.1", server.server_port)) != 0
++    finally:
++        connection.close()
++    with pytest.raises(ValueError, match="stopped"):
++        session.report_url("example.com", saved_root, service)
++    assert before == {path: path.read_bytes() for path in saved_root.rglob("*.json")}
++    other = ViewerSession()
++    try:
++        other.report_url("example.com", saved_root, service)
++        assert other.server.token != server.token
++    finally:
++        other.stop()
++
++
++def test_session_folder_switch_keeps_the_same_server_and_confined_reader(saved_root, tmp_path, ai_scan_factory):
++    session, service = ViewerSession(), AIService(AIConfig(), use_cache=False)
++    try:
++        session.report_url("example.com", saved_root, service)
++        server, thread = session.server, session.thread
++        root = tmp_path / "other-results"
++        path = root / "chosen.json"
++        storage.save_scan(ai_scan_factory(9), str(path))
++        session.report_url(str(path), root, service)
++        assert session.server is server and session.thread is thread and server.state.root == root
++        assert len(server.state.entries) == 1
++        with pytest.raises(ViewerError):
++            session.report_url(str(saved_root / "example.com/scan-2.json"), root, service)
++        bad = tmp_path / "root-link"
++        bad.symlink_to(root, target_is_directory=True)
++        with pytest.raises(ViewerError, match="symlink"):
++            session.report_url(str(bad / "chosen.json"), bad, service)
++        assert server.state.root == root
++        new_service = AIService(AIConfig(mode="demo"), provider=FakeProvider(), use_cache=False)
++        session.set_service(new_service)
++        assert server.state.service is new_service and not new_service.audit
++    finally:
++        session.stop()
++
++
++def test_folder_switch_retains_the_running_request_lock(saved_root, tmp_path, ai_scan_factory):
++    class Blocking(FakeProvider):
++        def __init__(self):
++            super().__init__()
++            self.entered, self.release = threading.Event(), threading.Event()
++
++        def complete(self, *args, **kwargs):
++            self.entered.set()
++            assert self.release.wait(5)
++            return super().complete(*args, **kwargs)
++
++    fake = Blocking()
++    service = AIService(AIConfig(mode="demo"), provider=fake, use_cache=False)
++    session, replies = ViewerSession(), []
++    try:
++        session.report_url("example.com", saved_root, service)
++        server, old_state = session.server, session.server.state
++        payload = {"scan": first_id(server), "question": "What is the worst finding?"}
++        worker = threading.Thread(target=lambda: replies.append(request(server, "/api/ai/ask", method="POST", payload=payload)))
++        worker.start()
++        try:
++            assert fake.entered.wait(3)
++            other = tmp_path / "new-root"
++            path = other / "selected.json"
++            storage.save_scan(ai_scan_factory(8), str(path))
++            session.report_url(str(path), other, service)
++            assert old_state is not server.state and server.state.ai_lock is old_state.ai_lock
++            assert server.state.ai_lock.locked() and server.state.report_lock is old_state.report_lock
++            payload["scan"] = server.state.report_identifier(str(path))
++            assert request(server, "/api/ai/ask", method="POST", payload=payload)[0] == 409
++        finally:
++            fake.release.set()
++            worker.join(timeout=5)
++        assert replies[0][0] == 200 and not server.state.ai_lock.locked() and not worker.is_alive()
++    finally:
++        session.stop()
++
++
++@pytest.mark.parametrize("enabled", [True, False])
++def test_scan_deep_link_keeps_auth_csp_off_behavior_and_no_writes(saved_root, portal_html, enabled):
++    service = AIService(AIConfig(mode="demo") if enabled else AIConfig(), use_cache=False)
++    before = {path: path.read_bytes() for path in saved_root.rglob("*.json")}
++    with local_viewer(saved_root, service=service) as server:
++        identifier = first_id(server)
++        url = urlsplit(server.report_url("example.com", focus_scan=True))
++        assert request(server, "/?" + url.query, authenticated=False)[0] == 200
++        code, headers, raw = report_request(server, identifier, extra={"view": "scan"})
++        page = raw.decode()
++        expected = view_id(server.state.selected(identifier))
++        assert code == 200 and f'data-start-view="{expected}"' in page
++        assert server.token not in page and b"session=" not in raw
++        assert ('id="export-chat"' in page) == enabled
++        for script in portal_html(page).scripts:
++            digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
++            assert "'sha256-" + digest + "'" in headers["Content-Security-Policy"]
++        assert "frame-ancestors 'none'" in headers["Content-Security-Policy"] and not service.audit
++        assert report_request(server, identifier, extra={"view": "scan"}, session="wrong")[0] == 403
++        assert report_request(server, identifier, extra={"view": "scan"}, origin="https://other.example.com")[0] == 403
++        for view in ("", "home", "../../private", "scan-" + "0" * 20, '<script>bad</script>'):
++            assert report_request(server, identifier, extra={"view": view})[0] == 400
++        payload = urlencode({"scan": identifier, "session": server.token, "view": "scan"}) + "&view=scan"
++        assert request(server, "/api/report", method="POST", authenticated=False, headers={"Content-Type": "application/x-www-form-urlencoded"}, raw=payload.encode())[0] == 400
++    assert before == {path: path.read_bytes() for path in saved_root.rglob("*.json")}
++
++
++def test_tui_report_button_and_h_share_viewer_from_results_ai_and_domain(tmp_path, ai_scan_factory, monkeypatch):
++    root = tmp_path / "results"
++    paths = []
++    for index in range(2):
++        path = root / "example.com" / f"scan-{index}.json"
++        storage.save_scan(ai_scan_factory(index), str(path))
++        paths.append(path)
++    opened, notices = [], []
++    monkeypatch.setattr(tui, "open_browser", lambda url: opened.append(url) or True)
++    monkeypatch.setattr(cli, "_execute_scan", lambda *a, **k: pytest.fail("Report opening must not scan"))
++    before = {path: path.read_bytes() for path in paths}
++
++    async def exercise():
++        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(paths[0]), results_dir=root)
++        app.ai_service = AIService(AIConfig(mode="demo"), provider=FakeProvider(), use_cache=False)
++        app.notify = lambda message, **kwargs: notices.append((message, kwargs))
++        async with app.run_test(size=(125, 46)) as pilot:
++            assert app.viewer.server is None and not app.query_one("#open-html-report", Button).disabled
++            assert "h Open HTML report" in plain(app.query_one("#keys", Static))
++            await pilot.click("#open-html-report")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            server, thread = app.viewer.server, app.viewer.thread
++            assert len(opened) == 1 and "view=scan" in opened[0]
++            assert parse_qs(urlsplit(opened[0]).query)["report"] == [server.state.report_identifier(str(paths[0]))]
++            app.query_one("#results", TabbedContent).active = "ai-tab"
++            await pilot.pause()
++            app.query_one("#open-html-report", Button).focus()
++            await pilot.press("h")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            assert len(opened) == 2 and app.viewer.server is server and app.viewer.thread is thread
++            field = app.query_one("#ai-chat-input", Input)
++            field.value = ""
++            field.focus()
++            await pilot.press("h")
++            assert field.value == "h" and len(opened) == 2
++            await pilot.click("#back")
++            await pilot.pause()
++            await pilot.press("enter")
++            await pilot.pause()
++            assert isinstance(app.screen, DomainScreen)
++            table = app.screen.query_one("#domain-scans", DataTable)
++            table.move_cursor(row=1)
++            table.focus()
++            await pilot.press("h")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            assert len(opened) == 3 and app.viewer.server is server
++            assert parse_qs(urlsplit(opened[-1]).query)["report"] == [server.state.report_identifier(str(paths[0]))]
++            app.screen.query_one("#domain-tabs", TabbedContent).active = "domain-ai-tab"
++            await pilot.pause()
++            await pilot.click("#domain-report")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            assert len(opened) == 4 and app.viewer.server is server and not app.ai_service.audit
++            app.screen.query_one("#domain-report", Button).focus()
++            await pilot.press("q")
++        assert not thread.is_alive() and app.return_value == 0
++    asyncio.run(exercise())
++    assert all(url in message for url, (message, _) in zip(opened, notices))
++    assert all("Browser launch requested" in message and kwargs["markup"] is False for message, kwargs in notices)
++    assert before == {path: path.read_bytes() for path in paths}
++
++
++def test_tui_missing_scan_and_failed_launcher_are_honest(tmp_path, ai_scan_factory, monkeypatch):
++    path = tmp_path / "saved.json"
++    storage.save_scan(ai_scan_factory(), str(path))
++    notices = []
++    monkeypatch.setattr(tui, "open_browser", lambda url: False)
++
++    async def exercise():
++        app = ExposureIQApp(cli.build_parser().parse_args([]), open_file=str(path), results_dir=tmp_path)
++        app.ai_service = AIService(AIConfig(), use_cache=False)
++        app.notify = lambda text, **kwargs: notices.append(text)
++        async with app.run_test(size=(110, 38)) as pilot:
++            await pilot.click("#open-html-report")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            assert "Browser launch unavailable" in notices[-1] and "http://127.0.0.1:" in notices[-1]
++            path.unlink()  # Remove only this test's synthetic fixture.
++            await pilot.pause(.25)  # Textual ignores clicks during its .2s button effect.
++            await pilot.click("#open-html-report")
++            await app.report_open_worker.wait()
++            await pilot.pause()
++            assert "could not be opened safely" in notices[-1] and "http://" not in notices[-1]
++    asyncio.run(exercise())

@@ -1,0 +1,1 @@
+PASS: shipped JS keeps strings/evidence literal, labels model replies honestly, sends both wording modes, separates messages, animates pending replies, hides Off AI/developer logs and uses only relative fake API calls.

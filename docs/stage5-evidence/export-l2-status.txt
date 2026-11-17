@@ -1,0 +1,6 @@
+Tier: Export L2 — GREEN
+Tests: 1751 passed; 4 subtests passed
+Skips: 66 existing Windows-only tests
+Safety: no real keys, live providers or target traffic
+Evidence: authentication tests and real Firefox; fakes only
+Git: feature/s5-human-voice; uncommitted and unpushed
